@@ -4,7 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 
-import '../../core/services/app_settings.dart';
+import '../../core/services/security_scoped_bookmark_service.dart';
 
 class StorageSetupScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -49,7 +49,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
         throw Exception('선택한 폴더를 찾을 수 없습니다.');
       }
 
-      await AppSettings.instance.setRecordingsSavePath(path);
+      await SecurityScopedBookmarkService.saveRecordingsFolderSelection(path);
       if (!mounted) return;
       widget.onComplete();
     } catch (e) {

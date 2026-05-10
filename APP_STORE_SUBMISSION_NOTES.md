@@ -4,7 +4,9 @@
 
 - `APP_STORE_METADATA_KO.md`: 앱 설명, 부제, 키워드, 홍보 문구, 심사 메모 전체 초안
 - `APP_STORE_PRIVACY_ANSWERS.md`: App Store Privacy Nutrition Label 입력값
+- `APP_STORE_PREP_CHECKLIST.md`: 제출 전 입력/스크린샷/QA 체크리스트
 - `PRIVACY_POLICY.md`: 개인정보 처리방침 게시용 본문
+- `macos/Runner/PrivacyInfo.xcprivacy`: 앱 Privacy Manifest
 
 ## App Review Notes
 
@@ -53,3 +55,9 @@ Data Collection: No
 Tracking: No
 Privacy Label: Data Not Collected
 ```
+
+## 제출 전 확인
+
+- App Store compliance mode에서 Hugging Face 토큰 입력과 다운로드 URL 편집 UI는 기본 노출되지 않습니다.
+- 저장 폴더는 security-scoped bookmark로 저장/복원합니다.
+- App Store archive에는 Calendar/AppleEvent entitlement와 제한 모델 선택지가 포함되지 않아야 합니다.

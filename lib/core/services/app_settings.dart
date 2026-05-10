@@ -119,6 +119,13 @@ class AppSettings {
   Future<void> setRecordingsSavePath(String v) =>
       _prefs.setString('recordingsSavePath', v);
 
+  /// macOS sandbox에서 앱 재실행 후 사용자 선택 저장 폴더 접근을 복원하기 위한
+  /// security-scoped bookmark(Base64).
+  String get recordingsSaveBookmark =>
+      _prefs.getString('recordingsSaveBookmark') ?? '';
+  Future<void> setRecordingsSaveBookmark(String v) =>
+      _prefs.setString('recordingsSaveBookmark', v);
+
   // ── 테마 모드 ─────────────────────────────────────────────────────
   /// 'system' | 'light' | 'dark'
   String get themeMode => _prefs.getString('themeMode') ?? 'system';

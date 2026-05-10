@@ -9,7 +9,7 @@ This document is for continuing App Store submission work from another Apple/Git
 - Local path: `/Users/channy/LocalMinutes`
 - GitHub repo: `https://github.com/subi9218/LocalMinutes`
 - Branch: `main`
-- Current git state at handoff: clean after latest committed work
+- Current git state at handoff: local App Store risk-reduction changes are pending commit
 - Important: a GitHub PAT was pasted in chat during setup. If still active, revoke it when no longer needed.
 
 ## Completed So Far
@@ -77,7 +77,7 @@ Updated:
 
 ### Local Verification
 
-Commands run successfully after moving the project to `/Users/channy/LocalMinutes`:
+Commands run successfully after moving the project to `/Users/channy/LocalMinutes` and after the latest App Store risk-reduction changes:
 
 ```bash
 flutter analyze
@@ -91,6 +91,7 @@ Results:
 - `flutter test`: all tests passed (`90/90`)
 - `flutter build macos --debug`: succeeded
   - Built app: `build/macos/Build/Products/Debug/적자생존.app`
+- `macos/Runner/PrivacyInfo.xcprivacy`: included in built app resources
 
 Note: the first debug build after folder migration failed because stale Flutter/Xcode files still referenced `/Users/channy/meeting_assistant2`. Running `flutter clean` fixed it.
 
@@ -215,45 +216,56 @@ This script checks:
 
 ## App Store Review Risk Notes
 
-The latest review pass found no obvious fatal App Store blocker in release entitlements, but the following should be handled before submission.
+The latest review pass found no obvious fatal App Store blocker in release entitlements. The two main code risks previously identified were addressed locally and still need App Store-signed QA once certificates are ready.
 
-### P0/P1 Risk: Model Download Flow
+### Model Download Flow
 
-Current model download flow may ask for a Hugging Face token for Gemma:
+Previous risk:
+
+- The setup screen could show Hugging Face token UI with copy implying a token was required for the summary model.
+
+Current state:
 
 - `lib/presentation/screens/setup_screen.dart`
 - `lib/core/services/model_download_service.dart`
 
-Risk:
+- App Store compliance mode hides the token input and custom download URL UI by default.
+- The "token required" wording was removed.
+- Public Hugging Face/GitHub model URLs were checked with unauthenticated range requests.
+- Still test the in-app download flow before upload.
 
-- App Review may reject if the core app flow requires an external Hugging Face account/token.
+### Sandbox Persistent Folder Access
 
-Recommended fix:
+Previous risk:
 
-- Make the default App Store model path token-free and publicly downloadable.
-- Or use Qwen/public models as the primary review path.
-- Keep the Review Notes very explicit about model download steps.
+- Storage selection stored only the folder path, so sandbox access could be lost after relaunch.
 
-### P0/P1 Risk: Sandbox Persistent Folder Access
-
-Current storage selection stores only the folder path:
+Current state:
 
 - `lib/presentation/screens/storage_setup_screen.dart`
 - `lib/core/services/app_settings.dart`
+- `lib/core/services/security_scoped_bookmark_service.dart`
+- `macos/Runner/MainFlutterWindow.swift`
 
 Release entitlements include app-scope bookmarks:
 
 - `macos/Runner/Release.entitlements`
 
-Risk:
+- The app now stores/restores a security-scoped bookmark for the selected recording folder.
+- If restore fails, recording start asks the user to reselect the save folder.
+- Still test with an App Store-signed/sandboxed build:
+  - choose save folder
+  - record
+  - quit app
+  - reopen
+  - record again to the same folder
 
-- In App Store sandbox, the app may lose write permission to the selected folder after relaunch because no security-scoped bookmark is stored/restored.
+### Privacy Manifest
 
-Recommended fix or QA:
-
-- Build an App Store signed/sandboxed archive.
-- Test: choose save folder -> record -> quit app -> reopen -> record again to same folder.
-- If it fails, implement security-scoped bookmark storage/restoration via macOS native channel or a suitable plugin.
+- Added `macos/Runner/PrivacyInfo.xcprivacy`.
+- It declares no tracking and no collected data.
+- It includes the UserDefaults required reason entry used by `shared_preferences`.
+- The manifest was verified as included in the built app resources.
 
 ### Calendar / AppleEvent
 
@@ -308,6 +320,6 @@ APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 - `APP_STORE_PRIVACY_ANSWERS.md`
 - `APP_STORE_SUBMISSION_NOTES.md`
 - `APP_STORE_COMPLIANCE.md`
+- `APP_STORE_PREP_CHECKLIST.md`
 - `AI_HANDOFF.md`
 - `NEXT_AI_TASKS.md`
-

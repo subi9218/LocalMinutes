@@ -17,6 +17,7 @@ import 'core/services/entitlement_service.dart';
 import 'core/services/isar_service.dart';
 import 'core/services/menu_bar_service.dart';
 import 'core/services/native_appearance.dart';
+import 'core/services/security_scoped_bookmark_service.dart';
 import 'data/datasources/llm_service.dart';
 import 'data/datasources/microphone_service.dart';
 import 'presentation/providers/meeting_providers.dart';
@@ -38,6 +39,7 @@ void main() async {
       }
       await IsarService.instance.init();
       await AppSettings.init(); // 설정 로드
+      await SecurityScopedBookmarkService.restoreRecordingsFolderAccess();
       await EntitlementService.init(); // 무료/유료 게이트 (현재 hardcode pro)
       final modelsOk = await _checkModels();
       await _runAutoDelete(); // 자동 삭제 (설정된 경우)
@@ -357,6 +359,11 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
       // 3) 메뉴바 트레이 아이콘 제거
       try {
         await MenuBarService.instance.dispose();
+      } catch (_) {}
+      try {
+        await SecurityScopedBookmarkService.stopAccessingBookmark(
+          AppSettings.instance.recordingsSaveBookmark,
+        );
       } catch (_) {}
     } catch (e) {
       debugPrint('[gracefulShutdown] $e');

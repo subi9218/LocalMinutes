@@ -14,6 +14,7 @@ import '../../core/services/auto_delete_service.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/diagnostic_export_service.dart';
 import '../../core/services/model_download_service.dart';
+import '../../core/services/security_scoped_bookmark_service.dart';
 import '../../core/services/summary_templates.dart';
 import '../../core/services/user_error_message.dart';
 import '../providers/settings_providers.dart';
@@ -320,7 +321,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   Future<void> _pickRecordingsFolder() async {
     final path = await getDirectoryPath(confirmButtonText: '선택');
     if (path != null) {
-      await _settings.setRecordingsSavePath(path);
+      await SecurityScopedBookmarkService.saveRecordingsFolderSelection(path);
       if (mounted) setState(() {});
       await _loadStorageInfo();
     }

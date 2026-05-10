@@ -15,6 +15,7 @@ import '../../core/services/calendar_service.dart';
 import '../../core/services/chunked_summarizer.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/menu_bar_service.dart';
+import '../../core/services/security_scoped_bookmark_service.dart';
 import '../../core/services/summary_templates.dart';
 import '../../core/services/tag_extractor.dart';
 import '../../core/services/user_error_message.dart';
@@ -909,6 +910,17 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         throw const _RecordingStartException(
           title: '저장 폴더 선택이 필요합니다',
           message: '회의 녹음을 시작하려면 먼저 녹음 파일을 저장할 폴더를 선택해주세요.',
+        );
+      }
+      final restoredAccess =
+          await SecurityScopedBookmarkService.restoreRecordingsFolderAccess();
+      if (!restoredAccess) {
+        throw _RecordingStartException(
+          title: '저장 폴더 권한이 필요합니다',
+          message:
+              'macOS 보안 정책 때문에 저장 폴더 접근 권한을 다시 받아야 합니다.\n'
+              '설정에서 녹음 파일 저장 위치를 다시 선택한 뒤 녹음을 시작해주세요.\n\n'
+              '현재 폴더: $recordingsDirPath',
         );
       }
       final recordingsDir = Directory(recordingsDirPath);

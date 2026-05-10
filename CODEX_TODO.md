@@ -4,13 +4,14 @@
 
 ## 현재 확인된 상태
 
-- 프로젝트는 Git 저장소가 아니므로 변경 이력 기반 비교는 불가.
+- 프로젝트는 Git 저장소이며 원격 `origin/main`과 연결되어 있다.
 - 현재 앱 버전은 `2.1.1+26`.
 - `flutter analyze` 통과: 0 issues.
 - `flutter test` 통과: 90/90.
+- `flutter build macos --debug` 통과.
 - 최근 안정 산출물은 `dist/적자생존_v2.1.1_build26.dmg`.
 - 핵심 제품 기능은 대부분 완료 상태.
-- 다음 우선순위는 신규 기능 추가보다 App Store 제출 리스크 제거.
+- 다음 우선순위는 Apple Distribution 인증서 준비 후 App Store archive 생성/업로드.
 
 ## P0 — App Store 제출 차단 요소
 
@@ -99,21 +100,22 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 ### 6. 저장 폴더 security-scoped bookmark 검토
 
-현재 첫 실행 저장 폴더는 path 문자열만 저장한다.
+첫 실행/설정 화면의 저장 폴더 선택 시 path 문자열과 함께 macOS security-scoped bookmark를 저장한다.
 
 관련 파일:
 
 - `lib/presentation/screens/storage_setup_screen.dart`
 - `lib/core/services/app_settings.dart`
+- `lib/core/services/security_scoped_bookmark_service.dart`
+- `macos/Runner/MainFlutterWindow.swift`
 - `macos/Runner/Release.entitlements`
 
 할 일:
 
-- [ ] App Store sandbox release 환경에서 앱 재실행 후 선택 폴더 쓰기 권한이 유지되는지 테스트.
-- [ ] 권한이 유지되지 않으면 security-scoped bookmark 저장/복원 구현 검토.
-- [ ] 구현 시 macOS native channel 또는 적절한 플러그인 방식 선택.
+- [x] security-scoped bookmark 저장/복원 구현.
+- [x] 권한 복원 실패 시 폴더 재선택 요청 UX 추가.
 - [ ] 저장 폴더 변경, 앱 재실행, 녹음 저장, 내보내기 저장 시나리오 테스트.
-- [ ] 실패 시 사용자에게 폴더 재선택을 요청하는 복구 UX 추가.
+- [ ] App Store sandbox release 환경에서 앱 재실행 후 선택 폴더 쓰기 권한이 유지되는지 테스트.
 
 완료 조건:
 
@@ -124,14 +126,15 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 ### 7. App Store Connect 메타데이터 최종화
 
-- [ ] 앱 이름: `적자생존`.
-- [ ] 부제: `내 Mac에서 처리하는 AI 회의록`.
-- [ ] 키워드 100바이트 이하 재확인.
-- [ ] 앱 설명 최종 교정.
+- [x] 앱 이름: `적자생존`.
+- [x] 부제: `내 Mac에서 처리하는 AI 회의록`.
+- [x] 키워드 100바이트 이하 재확인.
+- [x] 앱 설명 최종 교정.
+- [x] App Store Connect 복사용 문서 `APP_STORE_CONNECT_COPY.md` 작성.
 - [x] 가격 정책 확정: 유료 앱 `19,000원`.
-- [ ] 카테고리 Productivity / Business 확정.
-- [ ] 연령 등급 4+ 입력.
-- [ ] App Review Notes 복사 전 최신 기능과 불일치 없는지 확인.
+- [x] 카테고리 Productivity / Business 확정.
+- [x] 연령 등급 4+ 입력값 정리.
+- [x] App Review Notes 복사 전 최신 기능과 불일치 없는지 확인.
 
 완료 조건:
 
@@ -143,15 +146,18 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 - [ ] Tracking 없음으로 입력.
 - [ ] Calendar/AppleEvent 미사용 설명 유지.
 - [ ] 모델 다운로드 네트워크 사용 설명과 Privacy Policy 내용 일치 확인.
+- [x] `macos/Runner/PrivacyInfo.xcprivacy` 추가 및 빌드 산출물 포함 확인.
 
 완료 조건:
 
 - App Store Connect App Privacy 섹션 입력 완료.
+- 업로드 경고가 있으면 privacy manifest 항목과 SDK 요구사항을 재확인.
 
 ### 9. 스크린샷 준비
 
 권장 구성:
 
+- [x] 촬영용 데모 시나리오 `DEMO_SCREENSHOT_SCRIPT.md` 작성.
 - [ ] 첫 실행 온보딩: 로컬 처리/외부 미전송 메시지.
 - [ ] 녹음 준비 화면: 제목, 말할 사람 수, 마이크, 회의 유형.
 - [ ] 녹음/처리 진행 화면: 진행률, 중지 버튼, 예상 시간.
@@ -167,10 +173,11 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 ### 10. App Store safe mode 회귀 테스트
 
-- [ ] `APP_STORE_COMPLIANCE_MODE=true` 빌드에서 EXAONE 노출 없음 확인.
+- [x] `APP_STORE_COMPLIANCE_MODE=true` 빌드에서 EXAONE 노출 없음 테스트 통과.
 - [ ] Calendar/AppleEvent 관련 UI 노출 없음 확인.
-- [ ] 과거 `selectedLlmModel=exaone35_7b` 저장값이 안전 모델로 정리되는지 확인.
-- [ ] 모델 다운로드 카드/카운트/선택 다이얼로그가 안전 모드와 일치하는지 확인.
+- [x] 과거 `selectedLlmModel=exaone35_7b` 저장값이 안전 모델로 정리되는지 테스트 통과.
+- [x] 모델 다운로드 화면에서 App Store 모드의 Hugging Face 토큰/URL 편집 기본 노출 제거.
+- [ ] 실제 앱 UI에서 모델 다운로드 카드/선택 다이얼로그가 안전 모드와 일치하는지 수동 확인.
 
 완료 조건:
 
@@ -179,8 +186,8 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 ### 11. 모델 다운로드 심사 환경 점검
 
-- [ ] 심사자가 계정 없이 필요한 모델을 다운로드할 수 있는지 확인.
-- [ ] Hugging Face/GitHub 다운로드 URL 접근성 확인.
+- [x] Hugging Face/GitHub 다운로드 URL의 공개 접근성 1차 확인.
+- [ ] 실제 앱에서 심사자가 계정 없이 필요한 모델을 다운로드할 수 있는지 확인.
 - [ ] 모델 용량과 다운로드 시간이 Review Notes 설명과 어긋나지 않는지 확인.
 - [ ] 다운로드 실패 시 사용자 메시지가 일반 사용자용 문구인지 확인.
 
@@ -191,6 +198,7 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 ### 12. 실제 사용자 흐름 최종 QA
 
 - [ ] 새 설치 상태에서 저장 폴더 선택.
+- [ ] 앱 재실행 후 저장 폴더 bookmark 권한 복원 확인.
 - [ ] 모델 준비 화면 진입.
 - [ ] 마이크 권한 요청 및 녹음 시작.
 - [ ] 녹음 종료 후 자동 요약이 실행되지 않는지 확인.
@@ -202,6 +210,10 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 완료 조건:
 
 - 첫 실행부터 회의록 내보내기까지 심사자가 막히지 않는 흐름 확인.
+
+상세 절차:
+
+- `APP_STORE_PREP_CHECKLIST.md` 참고.
 
 ## P2 — 선택적 마감 품질
 

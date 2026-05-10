@@ -1,6 +1,6 @@
 # App Store Compliance Notes
 
-Last updated: 2026-04-30
+Last updated: 2026-05-10
 
 ## Build Mode
 
@@ -75,9 +75,21 @@ not include them.
 - Network client: enabled for model downloads and links
 - Microphone: enabled for recording
 - User-selected read/write files: enabled for user-chosen storage/export paths
-- App-scope security bookmarks: enabled for future persistent folder access
+- App-scope security bookmarks: enabled for persistent recording folder access
 - Calendar entitlement: removed
 - AppleEvent temporary exception: removed
+
+Persistent recording folder access is implemented through a Flutter method
+channel:
+
+- Dart service: `lib/core/services/security_scoped_bookmark_service.dart`
+- Native channel: `app/security_scoped_bookmark`
+- macOS host code: `macos/Runner/MainFlutterWindow.swift`
+
+The app stores a security-scoped bookmark when the user selects the recording
+folder and attempts to restore it on app startup and before recording starts.
+If access cannot be restored, recording start asks the user to reselect the
+folder.
 
 ## Minimum macOS Version
 
@@ -128,6 +140,8 @@ Prepared App Store privacy materials:
 - `APP_STORE_PRIVACY_ANSWERS.md`: App Store Connect privacy label and review
   notes draft
 - `APP_STORE_SUBMISSION_NOTES.md`: copy/paste App Review Notes draft
+- `macos/Runner/PrivacyInfo.xcprivacy`: app privacy manifest included in the
+  built app resources
 
 Core privacy position:
 
@@ -145,4 +159,5 @@ The release build is now safer, but final App Store submission still needs:
 - Apple Developer team signing profile
 - App Store Connect privacy nutrition labels
 - Full legal review of model redistribution/download flow
-- Security-scoped bookmark implementation test for persistent custom save folders
+- App Store-signed QA of persistent custom save folders
+- Screenshot capture with non-sensitive demo data

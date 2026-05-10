@@ -274,7 +274,9 @@ class _SetupScreenState extends State<SetupScreen> {
       }
       if (e.needsAuth) {
         _setDl(target, _DlState(status: _Status.error, errorMsg: e.message));
-        setState(() => _showTokenField = true);
+        if (!AppBuildConfig.appStoreComplianceMode) {
+          setState(() => _showTokenField = true);
+        }
         _showSnack(e.message, isError: true);
         return;
       }
@@ -667,22 +669,24 @@ class _SetupScreenState extends State<SetupScreen> {
                         ),
                         const SizedBox(height: 20),
 
-                        // ── HuggingFace 토큰 ──────────────────────────────
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 200),
-                          child: _showTokenField
-                              ? _buildTokenField(scheme)
-                              : const SizedBox.shrink(),
-                        ),
-                        if (!_showTokenField)
-                          TextButton.icon(
-                            onPressed: () => setState(
-                              () => _showTokenField = !_showTokenField,
-                            ),
-                            icon: const Icon(Icons.key, size: 16),
-                            label: const Text('HuggingFace 토큰 입력 (요약 모델 필수)'),
+                        if (!AppBuildConfig.appStoreComplianceMode) ...[
+                          // ── HuggingFace 토큰 ──────────────────────────────
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 200),
+                            child: _showTokenField
+                                ? _buildTokenField(scheme)
+                                : const SizedBox.shrink(),
                           ),
-                        const SizedBox(height: 16),
+                          if (!_showTokenField)
+                            TextButton.icon(
+                              onPressed: () => setState(
+                                () => _showTokenField = !_showTokenField,
+                              ),
+                              icon: const Icon(Icons.key, size: 16),
+                              label: const Text('HuggingFace 토큰 입력'),
+                            ),
+                          const SizedBox(height: 16),
+                        ],
 
                         // ── 설치 경로 ─────────────────────────────────────
                         Text(
@@ -819,8 +823,8 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Gemma 4 다운로드는 HuggingFace 로그인 + 모델 사용 동의가 필요합니다.\n'
-            'huggingface.co → Settings → Access Tokens에서 발급하세요.',
+            '일부 모델 제공 사이트가 권한 확인을 요구할 때만 사용합니다.\n'
+            'huggingface.co → Settings → Access Tokens에서 발급할 수 있습니다.',
             style: TextStyle(
               fontSize: 11,
               color: Colors.amber.shade900,
@@ -933,6 +937,7 @@ class _ModelDownloadCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isDownloading = dlState.status == _Status.downloading;
     final hasError = dlState.status == _Status.error;
+    const allowUrlEditing = !AppBuildConfig.appStoreComplianceMode;
 
     Color borderColor = scheme.outlineVariant;
     Color bgColor = scheme.surfaceContainerLow;
@@ -1108,7 +1113,7 @@ class _ModelDownloadCard extends StatelessWidget {
           ],
 
           // ── URL 편집 토글 + 입력 필드 ─────────────────────────
-          if (!isDownloading) ...[
+          if (!isDownloading && allowUrlEditing) ...[
             const SizedBox(height: 6),
             GestureDetector(
               onTap: onToggleUrl,
