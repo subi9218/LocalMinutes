@@ -9,7 +9,7 @@ PRODUCT_NAME = 적자생존
 EXECUTABLE_NAME = meeting_assistant2
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.meetingAssistant2
+PRODUCT_BUNDLE_IDENTIFIER = com.subi9218.localminutes
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 subi9218. All rights reserved.

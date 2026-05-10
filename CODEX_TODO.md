@@ -16,11 +16,11 @@
 
 ### 1. 실제 Bundle ID 확정 및 적용
 
-- [ ] App Store Connect에 등록할 실제 Bundle ID 확정.
-- [ ] `macos/Runner/Configs/AppInfo.xcconfig`의 `PRODUCT_BUNDLE_IDENTIFIER` 교체.
-- [ ] `PRODUCT_COPYRIGHT`의 `com.example` 문구 교체.
-- [ ] `macos/Runner.xcodeproj/project.pbxproj`의 RunnerTests Bundle ID도 필요 시 실제 ID 기반으로 정리.
-- [ ] `APP_STORE_METADATA_KO.md`, `APP_STORE_COMPLIANCE.md`의 예시 Bundle ID 문구 업데이트.
+- [x] App Store Connect에 등록할 실제 Bundle ID 확정: `com.subi9218.localminutes`.
+- [x] `macos/Runner/Configs/AppInfo.xcconfig`의 `PRODUCT_BUNDLE_IDENTIFIER` 교체.
+- [x] `PRODUCT_COPYRIGHT`의 `com.example` 문구 교체.
+- [x] `macos/Runner.xcodeproj/project.pbxproj`의 RunnerTests Bundle ID도 실제 ID 기반으로 정리.
+- [x] `APP_STORE_METADATA_KO.md`의 예시 Bundle ID 문구 업데이트.
 
 완료 조건:
 
@@ -30,9 +30,9 @@
 ### 2. Privacy Policy URL / Support URL 확정
 
 - [ ] `PRIVACY_POLICY.md` 내용을 실제 공개 URL에 게시.
-- [ ] Support URL에 실제 문의 가능한 이메일 또는 연락 양식 게시.
-- [ ] `APP_STORE_METADATA_KO.md`의 TODO URL 교체.
-- [ ] `APP_STORE_SUBMISSION_NOTES.md`의 TODO URL 교체.
+- [x] Support URL에 실제 문의 가능한 이메일 또는 연락 양식 게시.
+- [x] `APP_STORE_METADATA_KO.md`의 TODO URL 교체.
+- [x] `APP_STORE_SUBMISSION_NOTES.md`의 TODO URL 교체.
 - [ ] App Store Connect 입력값과 문서의 URL이 일치하는지 확인.
 
 완료 조건:

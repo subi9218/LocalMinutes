@@ -42,7 +42,7 @@ void main() {
 
     PackageInfo.setMockInitialValues(
       appName: '적자생존',
-      packageName: 'com.example.meetingAssistant2',
+      packageName: 'com.subi9218.localminutes',
       version: '2.1.1',
       buildNumber: '1',
       buildSignature: '',

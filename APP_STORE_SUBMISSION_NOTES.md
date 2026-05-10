@@ -43,7 +43,7 @@ App Store Connect에서 Paid Apps Agreement, 세금, 은행 정보 입력을 완
 게시 후 App Store Connect에 입력할 URL:
 
 ```text
-TODO: https://example.com/privacy
+https://subi9218.github.io/LocalMinutes/privacy.html
 ```
 
 ## App Privacy 입력값
