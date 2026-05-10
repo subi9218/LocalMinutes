@@ -1,17 +1,41 @@
 # Codex TODO — 적자생존 App Store 제출 마무리
 
-기준일: 2026-05-10
+기준일: 2026-05-11
 
 ## 현재 확인된 상태
 
 - 프로젝트는 Git 저장소이며 원격 `origin/main`과 연결되어 있다.
-- 현재 앱 버전은 `2.1.1+26`.
+- 현재 앱 버전은 `2.1.1+28`.
 - `flutter analyze` 통과: 0 issues.
 - `flutter test` 통과: 90/90.
 - `flutter build macos --debug` 통과.
-- 최근 안정 산출물은 `dist/적자생존_v2.1.1_build26.dmg`.
+- 최근 QA 산출물은 `dist/적자생존_v2.1.1_build28.dmg`.
 - 핵심 제품 기능은 대부분 완료 상태.
-- 다음 우선순위는 Apple Distribution 인증서 준비 후 App Store archive 생성/업로드.
+- 다음 우선순위는 수익 모델을 `무료 앱 + Pro Unlock 19,000원 비소모성 IAP`로 전환할지 최종 확정하고 구현하는 것.
+- Freemium 전환 상세 작업은 `FREEMIUM_TODO.md` 참고.
+
+## P0 — 수익 모델 변경 검토/구현
+
+### 0. 무료 앱 + Pro Unlock 전환
+
+- [ ] 최종 정책 확정: 무료 다운로드 + `Pro Unlock` 19,000원 일회성 구매.
+- [ ] App Store Connect 앱 가격을 무료로 변경.
+- [ ] Non-Consumable IAP `com.subi9218.localminutes.pro` 생성.
+- [ ] `in_app_purchase` 기반 결제/복원 구현.
+- [ ] `EntitlementService` hardcoded Pro 제거.
+- [ ] 무료 회의 3개 + Pro 무제한 정책 적용.
+- [ ] Paywall UI 추가.
+- [ ] 설정 화면에 Pro 상태/구매/복원 추가.
+- [ ] 문서/메타데이터의 `유료 앱 19,000원` 문구를 freemium 기준으로 교체.
+- [ ] StoreKit sandbox QA.
+
+완료 조건:
+
+- 새 설치 사용자는 Free 상태로 시작한다.
+- 무료 사용자는 회의 3개까지 테스트할 수 있다.
+- Pro Unlock 구매/복원이 동작한다.
+- Pro 상태에서는 제한 없이 녹음/요약/내보내기/고급 분석을 사용할 수 있다.
+- App Store Connect 문서와 앱 내부 가격/기능 설명이 일치한다.
 
 ## P0 — App Store 제출 차단 요소
 

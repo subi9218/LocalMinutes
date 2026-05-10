@@ -1,6 +1,6 @@
 # Account Handoff — LocalMinutes / 적자생존
 
-Last updated: 2026-05-10
+Last updated: 2026-05-11
 
 This document is for continuing App Store submission work from another Apple/GitHub account or another AI assistant.
 
@@ -9,7 +9,7 @@ This document is for continuing App Store submission work from another Apple/Git
 - Local path: `/Users/channy/LocalMinutes`
 - GitHub repo: `https://github.com/subi9218/LocalMinutes`
 - Branch: `main`
-- Current git state at handoff: local App Store risk-reduction changes are pending commit
+- Current git state at handoff: latest App Store prep and QA build changes are pushed
 - Important: a GitHub PAT was pasted in chat during setup. If still active, revoke it when no longer needed.
 
 ## Completed So Far
@@ -32,11 +32,12 @@ This document is for continuing App Store submission work from another Apple/Git
 Recent pushed commits:
 
 ```text
+c7c3385 Remove credit label and speed up folder selection
+2e5df1e Bump version for QA build 27
+02f153d Prepare App Store submission checklist and sandbox fixes
 1b7cdbb Document Apple Developer enrollment blocker
 b742823 Mark public support pages ready
 99d1945 Prepare App Store metadata
-1b3a93a Merge remote initial commit
-fc1a6a7 Initial import
 ```
 
 ### GitHub Pages
@@ -92,6 +93,11 @@ Results:
 - `flutter build macos --debug`: succeeded
   - Built app: `build/macos/Build/Products/Debug/적자생존.app`
 - `macos/Runner/PrivacyInfo.xcprivacy`: included in built app resources
+- Latest direct-distribution QA DMG:
+  - `dist/적자생존_v2.1.1_build28.dmg`
+  - `hdiutil verify`: VALID
+  - `by 수비짱` credit removed from version widget
+  - non-sandbox QA builds skip security-scoped bookmark creation to avoid slow folder selection
 
 Note: the first debug build after folder migration failed because stale Flutter/Xcode files still referenced `/Users/channy/meeting_assistant2`. Running `flutter clean` fixed it.
 
@@ -121,6 +127,18 @@ returned:
 If using another Apple account, repeat the certificate setup under that account.
 
 ## Next Required Apple Account Steps
+
+Before continuing App Store submission, decide whether to keep the previous paid-app policy or switch to freemium.
+
+Current product direction requested by the user:
+
+```text
+Free download + Pro Unlock 19,000원 one-time non-consumable IAP
+```
+
+Implementation checklist:
+
+- `FREEMIUM_TODO.md`
 
 ### 1. Confirm Apple Developer Program Enrollment
 

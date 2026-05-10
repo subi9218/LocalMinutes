@@ -63,6 +63,7 @@ APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 - `APP_STORE_PRIVACY_ANSWERS.md`: App Privacy 답변
 - `APP_STORE_SUBMISSION_NOTES.md`: App Review Notes
 - `DEMO_SCREENSHOT_SCRIPT.md`: 스크린샷/QA용 데모 회의 대본
+- `FREEMIUM_TODO.md`: 무료 앱 + Pro Unlock 전환 작업 목록
 - `ACCOUNT_HANDOFF.md`: 계정/서명 인수인계
 - `CODEX_TODO.md`: 남은 작업 우선순위
 
