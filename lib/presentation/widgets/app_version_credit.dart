@@ -29,7 +29,6 @@ class AppVersionCredit extends StatelessWidget {
     final effectiveVersionColor =
         versionColor ??
         (compact ? primary.withValues(alpha: 0.7) : Colors.grey.shade500);
-    final effectiveCreditColor = creditColor ?? Colors.grey.shade400;
 
     return FutureBuilder<PackageInfo>(
       future: _packageInfo,
@@ -67,22 +66,6 @@ class AppVersionCredit extends StatelessWidget {
                     letterSpacing: 0.5,
                   ),
                 ),
-              ),
-            ),
-            SizedBox(width: compact ? 6 : 8),
-            if (!compact) ...[
-              Text(
-                '·',
-                style: TextStyle(fontSize: 11, color: effectiveCreditColor),
-              ),
-              const SizedBox(width: 8),
-            ],
-            Text(
-              'by 수비짱',
-              style: TextStyle(
-                fontSize: compact ? 10 : 11,
-                color: effectiveCreditColor,
-                fontStyle: FontStyle.italic,
               ),
             ),
           ],

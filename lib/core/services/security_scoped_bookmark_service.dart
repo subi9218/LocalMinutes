@@ -8,18 +8,31 @@ class SecurityScopedBookmarkService {
   SecurityScopedBookmarkService._();
 
   static const _channel = MethodChannel('app/security_scoped_bookmark');
+  static Future<bool>? _sandboxed;
+
+  static Future<bool> isSandboxed() {
+    if (!Platform.isMacOS) return Future.value(false);
+    return _sandboxed ??= _channel
+        .invokeMethod<bool>('isSandboxed')
+        .timeout(const Duration(seconds: 2), onTimeout: () => false)
+        .then((value) => value ?? false)
+        .catchError((_) => false);
+  }
 
   static Future<String?> createBookmarkForPath(String path) async {
     if (!Platform.isMacOS) return null;
-    return _channel.invokeMethod<String>('createBookmark', {'path': path});
+    return _channel
+        .invokeMethod<String>('createBookmark', {'path': path})
+        .timeout(const Duration(seconds: 3));
   }
 
   static Future<bool> startAccessingBookmark(String bookmark) async {
     if (!Platform.isMacOS || bookmark.isEmpty) return true;
-    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
-      'startAccessingBookmark',
-      {'bookmark': bookmark},
-    );
+    final result = await _channel
+        .invokeMethod<Map<Object?, Object?>>('startAccessingBookmark', {
+          'bookmark': bookmark,
+        })
+        .timeout(const Duration(seconds: 3));
     return result?['accessing'] == true;
   }
 
@@ -31,6 +44,7 @@ class SecurityScopedBookmarkService {
   }
 
   static Future<bool> restoreRecordingsFolderAccess() async {
+    if (!await isSandboxed()) return true;
     final bookmark = AppSettings.instance.recordingsSaveBookmark;
     if (bookmark.isEmpty) {
       return AppSettings.instance.recordingsSavePath.isEmpty;
@@ -43,7 +57,7 @@ class SecurityScopedBookmarkService {
   }
 
   static Future<void> saveRecordingsFolderSelection(String path) async {
-    if (Platform.isMacOS) {
+    if (await isSandboxed()) {
       final bookmark = await createBookmarkForPath(path);
       if (bookmark == null || bookmark.isEmpty) {
         throw const FileSystemException('선택한 폴더 권한을 저장하지 못했습니다.');

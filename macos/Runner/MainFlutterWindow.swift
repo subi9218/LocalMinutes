@@ -1,5 +1,6 @@
 import Cocoa
 import FlutterMacOS
+import Security
 
 class MainFlutterWindow: NSWindow {
   // Flutter ↔ native 사이 채널: themeMode 동기화용.
@@ -62,6 +63,13 @@ class MainFlutterWindow: NSWindow {
       }
 
       switch call.method {
+      case "isSandboxed":
+        let task = SecTaskCreateFromSelf(nil)
+        let value = task.flatMap {
+          SecTaskCopyValueForEntitlement($0, "com.apple.security.app-sandbox" as CFString, nil)
+        }
+        result((value as? Bool) == true)
+
       case "createBookmark":
         guard
           let args = call.arguments as? [String: Any],

@@ -1,7 +1,7 @@
 name: meeting_assistant2
 description: "온디바이스 AI 회의록 앱 - macOS 전용 1차 버전"
 publish_to: 'none'
-version: 2.1.1+27
+version: 2.1.1+28
 
 environment:
   sdk: ^3.11.5
