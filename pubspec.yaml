@@ -1,0 +1,132 @@
+name: meeting_assistant2
+description: "온디바이스 AI 회의록 앱 - macOS 전용 1차 버전"
+publish_to: 'none'
+version: 2.1.1+26
+
+environment:
+  sdk: ^3.11.5
+
+# ============================================================
+# 패키지 실존/호환 확인 결과 (2026-04-17 기준)
+# ============================================================
+# ✅ 실존 확인, macOS Flutter 3.x 호환
+# ⚠️ 확인 필요 (Step 진입 전 검증 후 추가)
+# ❌ Flutter/Dart 패키지 없음 → 대안 명시
+# ============================================================
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── 상태 관리 ────────────────────────────────────────────
+  # ✅ pub.dev 실존, macOS 지원
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # ── 로컬 DB ──────────────────────────────────────────────
+  # ✅ pub.dev 실존 (v3.1.0+1), macOS 지원
+  # ⚠️ Isar 4.x 개발 중단 가능성 있음 — flutter pub outdated로 최신 버전 확인 권장
+  # 대안: drift (sqlite 기반, 완전 지원) / objectbox (macOS 지원)
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
+  path_provider: ^2.1.4
+
+  # ── 오디오 녹음 ──────────────────────────────────────────
+  # ✅ pub.dev 실존 (v5.x), macOS 지원 (AVAudioRecorder 기반)
+  # entitlement: com.apple.security.device.audio-input 필수
+  record: ^5.1.2
+
+  # ── TTS ──────────────────────────────────────────────────
+  # ✅ pub.dev 실존, macOS 지원 (AVSpeechSynthesizer)
+  flutter_tts: ^4.0.2
+
+  # ── 내보내기 / 공유 ───────────────────────────────────────
+  # ✅ pub.dev 실존 (v10+), macOS 지원
+  share_plus: ^10.0.3
+  # ✅ pub.dev 실존, macOS 지원 (mailto: 링크)
+  url_launcher: ^6.3.1
+  # ✅ pub.dev 실존 (v3.x), 순수 Dart PDF 생성 (플랫폼 무관)
+  pdf: ^3.11.1
+  # ✅ pub.dev 실존, PDF 미리보기/저장 — macOS 지원
+  printing: ^5.13.1
+
+  # ── 오디오 재생 (WAV 파일 재생 + seek) ──────────────────────
+  # ✅ pub.dev 실존 (v0.9.x), macOS 지원 (AVPlayer 기반)
+  just_audio: ^0.9.36
+
+  # ── FFI (네이티브 dylib 로드 공통) ────────────────────────
+  # ✅ Dart SDK 내장
+  ffi: ^2.1.3
+
+  # ── STT: whisper.cpp 바인딩 ────────────────────────────────
+  # ✅ Step 2 결정: ffi + dylib 직접 바인딩 채택
+  #   (whisper_flutter_new macOS 유지보수 불명확 → native/whisper_wrapper/ 자체 구현)
+
+  # ── LLM: llama.cpp 바인딩 ──────────────────────────────────
+  # ✅ Step 1 결정: ffi + dylib 직접 바인딩 채택
+  #   (llama_cpp_dart Gemma 4/Metal 지원 미검증 → native/llama_wrapper/ 자체 구현)
+
+  # ── 파일 선택 (WAV 파일 피커 + 폴더 선택) ───────────────────
+  # ✅ pub.dev 실존 (v1.x), macOS 지원
+  file_selector: ^1.0.3
+
+  # ── 설정 영구 저장 ────────────────────────────────────────
+  # ✅ pub.dev 실존, macOS 지원
+  shared_preferences: ^2.3.0
+
+  # ── VAD ────────────────────────────────────────────────────
+  # ❌ silero_vad Flutter/Dart 전용 패키지 없음
+  #   대안 1 (Step 4): onnxruntime Flutter 패키지 + silero_vad ONNX 모델
+  #   대안 2 (Step 4): RMS 에너지 기반 간단 VAD 자체 구현 (충분히 단순한 경우)
+  # → Step 4 진입 전 승인 요청
+
+  # ── 화자 분리 (Speaker Diarization) ─────────────────────────
+  # ✅ pub.dev 실존 (v1.12.40+), macOS arm64/x64 지원
+  # sherpa-onnx의 OfflineSpeakerDiarization (pyannote seg + 3d-speaker emb + clustering)
+  sherpa_onnx: ^1.12.40
+
+  # ── 코드 생성 annotation ──────────────────────────────────
+  # ✅ pub.dev 실존
+  # ⚠️ json_annotation 4.9+는 json_serializable 6.8+에서만 지원
+  #    isar_generator와의 충돌로 json_serializable <6.8.0 고정 → json_annotation 4.8.x 사용
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.8.1
+  tray_manager: ^0.5.2
+  window_manager: ^0.5.1
+  archive: ^4.0.9
+  package_info_plus: ^9.0.1
+  macos_ui: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # ✅ pub.dev 실존
+  # ⚠️ isar_generator 3.x는 analyzer >=4.6.0 <6.0.0 요구
+  #    → analyzer ^6.x를 쓰는 최신 generator들과 충돌
+  #    isar_generator 3.x와 호환되는 버전으로 고정:
+  #      freezed <2.5.0 (2.5.x부터 analyzer ^6.x)
+  #      riverpod_generator <2.4.2 (2.4.2부터 analyzer ^6.5.0)
+  #      json_serializable 6.7.x (analyzer >=5.12.0 <7.0.0 → isar와 교집합 있음)
+  build_runner: ^2.4.13
+  isar_generator: ^3.1.0+1
+  freezed: '>=2.4.7 <2.5.0'
+  json_serializable: '>=6.7.0 <6.8.0'
+  riverpod_generator: '>=2.3.0 <2.4.2'
+
+# ── record_linux 패치 ──────────────────────────────────────────────
+# record_linux 0.7.2가 record_platform_interface 1.5.0의
+# startStream() / hasPermission({bool request}) 을 구현하지 않아
+# 컴파일 오류 발생 → 로컬 패치 버전으로 대체
+dependency_overrides:
+  record_linux:
+    path: packages/record_linux
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/
+    - assets/fonts/
+    - assets/tray/

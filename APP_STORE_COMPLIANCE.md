@@ -1,0 +1,148 @@
+# App Store Compliance Notes
+
+Last updated: 2026-04-30
+
+## Build Mode
+
+Default Dart build mode is App Store safe:
+
+```bash
+flutter build macos --release --dart-define=APP_STORE_COMPLIANCE_MODE=true
+```
+
+Convenience script:
+
+```bash
+./scripts/build_app_store.sh
+```
+
+The Flutter local release build may be signed with a development identity and
+show `com.apple.security.get-task-allow=true` in the generated `.app`. The
+source release entitlement explicitly sets it to false. For the final upload,
+archive/sign with an Apple Distribution profile in Xcode and run the strict
+check:
+
+```bash
+STRICT_CODESIGN_CHECK=1 ./scripts/build_app_store.sh
+```
+
+## Xcode Archive Verification
+
+Use this script after creating an Apple Developer account, App Store Connect
+Bundle ID, and Apple Distribution certificate:
+
+```bash
+APPLE_TEAM_ID=ABCDE12345 \
+APP_STORE_BUNDLE_ID=com.company.app \
+./scripts/archive_app_store.sh
+```
+
+What it checks:
+
+- Apple Distribution or Mac App Store signing identity exists locally
+- Bundle ID is not `com.example.*`
+- Release entitlements file is used
+- App Sandbox is enabled
+- `get-task-allow` is not true
+- Calendar/AppleEvent entitlements are absent
+- `LSMinimumSystemVersion` is `15.5`
+- Xcode archive app passes `codesign --verify --strict --deep`
+
+Current local machine status:
+
+- `security find-identity -v -p codesigning` returns `0 valid identities found`
+- Actual Apple Distribution Archive cannot be completed until the signing
+  certificate/team/profile are installed through Xcode.
+
+Internal testing only:
+
+```bash
+flutter run -d macos \
+  --dart-define=APP_STORE_COMPLIANCE_MODE=false \
+  --dart-define=ALLOW_RESTRICTED_MODELS=true \
+  --dart-define=ENABLE_CALENDAR_INTEGRATION=true
+```
+
+Internal Calendar testing also requires matching Info.plist usage strings and
+AppleEvent/Calendar entitlements. The App Store release files intentionally do
+not include them.
+
+## Release Entitlements
+
+`macos/Runner/Release.entitlements` is configured for App Store review:
+
+- App Sandbox: enabled
+- Network client: enabled for model downloads and links
+- Microphone: enabled for recording
+- User-selected read/write files: enabled for user-chosen storage/export paths
+- App-scope security bookmarks: enabled for future persistent folder access
+- Calendar entitlement: removed
+- AppleEvent temporary exception: removed
+
+## Minimum macOS Version
+
+The app uses `sherpa_onnx_macos 1.12.40`, which bundles
+`libonnxruntime.1.24.4.dylib`. That dylib is built with macOS `minos 15.5`, so
+the App Store release target is intentionally set to macOS 15.5:
+
+- `macos/Podfile`: `platform :osx, '15.5'`
+- `macos/Runner.xcodeproj`: `MACOSX_DEPLOYMENT_TARGET = 15.5`
+- `Info.plist`: `LSMinimumSystemVersion` inherits the same build setting
+
+Do not lower the deployment target unless sherpa-onnx/onnxruntime is replaced
+with binaries built for the lower target.
+
+## Restricted Models
+
+EXAONE 3.5 is hidden in App Store mode because its official model card states
+that it is licensed under `EXAONE AI Model License Agreement 1.1 - NC`.
+
+App Store mode behavior:
+
+- EXAONE download card is not shown
+- EXAONE is not counted as an installed usable model
+- EXAONE is not offered in summary model pickers
+- Old saved `selectedLlmModel=exaone35_7b` falls back to Gemma
+
+## User-Facing License Notice
+
+Settings now includes:
+
+- `라이선스와 개인정보`
+- `사용 모델 및 라이선스`
+- `앱스토어 안전 모드`
+
+The notice lists local engines/models and their source/license summary:
+
+- whisper.cpp / Whisper models
+- llama.cpp
+- Gemma
+- Qwen 2.5 7B Instruct
+- sherpa-onnx
+
+## Privacy Documents
+
+Prepared App Store privacy materials:
+
+- `PRIVACY_POLICY.md`: user-facing privacy policy draft
+- `APP_STORE_PRIVACY_ANSWERS.md`: App Store Connect privacy label and review
+  notes draft
+- `APP_STORE_SUBMISSION_NOTES.md`: copy/paste App Review Notes draft
+
+Core privacy position:
+
+- Meeting audio, transcripts, summaries, notes, tags, and logs are not uploaded
+  to the developer's server.
+- AI processing runs on the user's Mac.
+- Network is used for user-requested model downloads and external links.
+- User-initiated export/share/email actions may pass selected content to the
+  destination app or service.
+
+## Remaining Pre-Submission Check
+
+The release build is now safer, but final App Store submission still needs:
+
+- Apple Developer team signing profile
+- App Store Connect privacy nutrition labels
+- Full legal review of model redistribution/download flow
+- Security-scoped bookmark implementation test for persistent custom save folders

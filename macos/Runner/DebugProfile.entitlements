@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Debug 빌드: Release와 동일하게 sandbox 비활성화 -->
+	<!-- 이유: Process.run('osascript', ...)로 Calendar.app 제어 시  -->
+	<!--      sandbox + temporary-exception.apple-events 조합으로도   -->
+	<!--      -10004 privilege violation이 발생하는 케이스가 있음.    -->
+	<!--      App Store 배포 시점에는 별도 entitlements 검토 후 복원.  -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+	<array>
+		<string>/tmp/</string>
+	</array>
+	<!-- 캘린더 연동 — Calendar.app으로 AppleEvent 전송 허용 -->
+	<key>com.apple.security.temporary-exception.apple-events</key>
+	<array>
+		<string>com.apple.iCal</string>
+	</array>
+	<!-- macOS 14+ 캘린더 데이터 접근 -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>적자생존 개인정보 처리방침</title>
+  <meta name="description" content="적자생존(macOS 회의록 앱) 개인정보 처리방침">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #1d1d1f;
+      --muted: #6e6e73;
+      --bg: #ffffff;
+      --accent: #0066cc;
+      --border: #d2d2d7;
+      --table-bg: #f5f5f7;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #f5f5f7;
+        --muted: #a1a1a6;
+        --bg: #1d1d1f;
+        --accent: #2997ff;
+        --border: #424245;
+        --table-bg: #2c2c2e;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font: 16px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Apple SD Gothic Neo", "Pretendard", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 40px 0 12px;
+      letter-spacing: -0.01em;
+    }
+    .effective {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 24px;
+    }
+    .lead {
+      color: var(--fg);
+      font-size: 16px;
+      margin: 0 0 32px;
+    }
+    p { margin: 0 0 14px; }
+    ul {
+      margin: 0 0 14px;
+      padding-left: 22px;
+    }
+    li { margin-bottom: 6px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 24px;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--table-bg);
+      font-weight: 600;
+    }
+    code {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.9em;
+      background: var(--table-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>적자생존 개인정보 처리방침</h1>
+    <p class="effective">시행일: 2026년 5월 1일</p>
+
+    <p class="lead">
+      적자생존은 사용자의 회의 내용을 보호하기 위해 음성 인식, 발화자 라벨, 회의록 요약을 사용자의 Mac 안에서
+      처리하도록 설계된 macOS 앱입니다. 이 방침은 적자생존이 어떤 정보를 처리하고, 어디에 저장하며, 언제
+      네트워크를 사용하는지 설명합니다.
+    </p>
+
+    <h2>1. 핵심 원칙</h2>
+    <ul>
+      <li>회의 음성, 전사 텍스트, 요약 내용은 기본적으로 사용자의 Mac 안에서만 처리됩니다.</li>
+      <li>적자생존은 회의 음성, 전사본, 요약본을 개발자 서버로 업로드하지 않습니다.</li>
+      <li>적자생존은 광고 추적, 사용자 프로파일링, 제3자 광고 SDK를 사용하지 않습니다.</li>
+      <li>사용자가 직접 내보내기, 공유, 메일 발송, 로그 복사 등을 실행한 경우에는 사용자가 선택한 대상 앱
+        또는 서비스로 해당 내용이 전달될 수 있습니다.</li>
+    </ul>
+
+    <h2>2. 처리하는 정보</h2>
+    <p>적자생존은 앱 기능 제공을 위해 다음 정보를 사용자의 Mac에 저장하거나 처리할 수 있습니다.</p>
+    <table>
+      <thead>
+        <tr><th>항목</th><th>사용 목적</th><th>저장 위치/방식</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>회의 녹음 파일</td><td>회의 재생, 음성 인식, 재전사</td><td>사용자가 첫 실행 시 선택한 저장 폴더</td></tr>
+        <tr><td>전사 텍스트</td><td>회의 내용 검색, 요약 생성, 근거 보기</td><td>앱의 로컬 데이터베이스</td></tr>
+        <tr><td>회의 요약</td><td>회의록 확인, 내보내기, 공유</td><td>앱의 로컬 데이터베이스</td></tr>
+        <tr><td>회의 제목, 일시, 태그, 메모, 어젠다</td><td>회의록 정리와 검색</td><td>앱의 로컬 데이터베이스</td></tr>
+        <tr><td>발화자 라벨</td><td>“화자 A/B/C”처럼 발화 흐름 구분</td><td>앱의 로컬 데이터베이스</td></tr>
+        <tr><td>앱 설정</td><td>저장 폴더, 모델 선택, 표시 설정 등</td><td>macOS 로컬 설정 저장소</td></tr>
+        <tr><td>오류 및 진단 로그</td><td>사용자가 문제 해결을 위해 확인하거나 공유</td><td>앱 지원 폴더의 로컬 로그 파일</td></tr>
+        <tr><td>모델 파일</td><td>음성 인식, 요약, 발화자 라벨 처리</td><td>앱 지원 폴더의 <code>models</code> 폴더</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. 로컬 AI 처리</h2>
+    <p>적자생존은 음성 인식과 요약을 클라우드 API가 아니라 사용자가 설치한 로컬 모델로 처리합니다.</p>
+    <ul>
+      <li>음성 인식 모델은 녹음 파일을 텍스트로 변환합니다.</li>
+      <li>요약 모델은 전사 텍스트와 사용자가 입력한 메모를 바탕으로 회의 요약, 결정사항, 액션아이템 등을 생성합니다.</li>
+      <li>발화자 라벨 모델은 사람 이름을 식별하지 않고, 발화 구간을 A/B/C 같은 라벨로 구분하는 데 사용됩니다.</li>
+    </ul>
+    <p>앱스토어용 기본 빌드에서는 상업 배포에 라이선스 리스크가 있는 모델을 숨기며, 설정 화면에서 사용 모델
+      및 라이선스 정보를 확인할 수 있습니다.</p>
+
+    <h2>4. 네트워크 사용</h2>
+    <p>적자생존은 기본 회의 처리 과정에서 회의 내용을 개발자 서버로 전송하지 않습니다. 다만 다음 경우에는
+      네트워크가 사용될 수 있습니다.</p>
+    <ul>
+      <li>사용자가 앱 안에서 음성 인식, 요약, 발화자 라벨 모델을 다운로드할 때 Hugging Face 또는 GitHub
+        같은 모델 제공 사이트에 접속합니다.</li>
+      <li>사용자가 모델 제공 사이트의 토큰을 입력하는 경우, 해당 토큰은 모델 다운로드 요청에만 사용됩니다.</li>
+      <li>사용자가 도움말, 라이선스, 외부 링크를 여는 경우 기본 브라우저가 열릴 수 있습니다.</li>
+      <li>사용자가 macOS 공유 시트, 메일 앱, Notion, Slack 등 외부 앱으로 회의록을 직접 공유하는 경우
+        해당 외부 앱 또는 서비스의 개인정보 처리방침이 적용됩니다.</li>
+    </ul>
+
+    <h2>5. 권한 사용</h2>
+    <p>적자생존은 다음 macOS 권한을 사용할 수 있습니다.</p>
+    <table>
+      <thead>
+        <tr><th>권한</th><th>사용 이유</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>마이크</td><td>회의 녹음을 위해 필요합니다.</td></tr>
+        <tr><td>사용자 선택 파일/폴더 접근</td><td>사용자가 선택한 저장 폴더에 녹음 파일을 저장하거나 회의록을 내보내기 위해 필요합니다.</td></tr>
+        <tr><td>네트워크 접근</td><td>사용자가 요청한 모델 파일 다운로드와 외부 링크 열기에 필요합니다.</td></tr>
+      </tbody>
+    </table>
+    <p>앱스토어용 기본 빌드에서는 Calendar.app 자동화 및 AppleEvent 권한을 사용하지 않습니다.</p>
+
+    <h2>6. 로그와 진단 정보</h2>
+    <p>적자생존은 앱 오류 분석을 위해 로컬 진단 로그를 남길 수 있습니다. 이 로그는 사용자의 Mac 안에 저장되며
+      자동으로 개발자에게 전송되지 않습니다.</p>
+    <p>로그에는 오류 메시지, 앱 내부 처리 단계, 스택 트레이스 등이 포함될 수 있습니다. 오류가 회의 처리 중
+      발생한 경우 파일 경로, 회의 제목, 일부 오류 문맥이 포함될 수 있으므로, 사용자가 로그를 공유하기 전에
+      내용을 확인하는 것을 권장합니다.</p>
+    <p>사용자는 설정 화면에서 로그 내용을 확인, 복사, 삭제할 수 있습니다.</p>
+
+    <h2>7. 사용자가 직접 공유하는 정보</h2>
+    <p>사용자가 다음 기능을 실행하면 선택한 대상 앱 또는 서비스로 회의 정보가 전달될 수 있습니다.</p>
+    <ul>
+      <li>회의록 내보내기</li>
+      <li>PDF, Markdown 등 파일 저장</li>
+      <li>macOS 공유 시트 사용</li>
+      <li>이메일 작성</li>
+      <li>로그 복사 또는 공유</li>
+      <li>Finder에서 파일 열기</li>
+    </ul>
+    <p>이 경우 적자생존은 사용자가 선택한 동작을 수행할 뿐이며, 전달된 정보는 대상 앱 또는 서비스의 정책을
+      따릅니다.</p>
+
+    <h2>8. 데이터 보관과 삭제</h2>
+    <ul>
+      <li>녹음 파일은 사용자가 선택한 저장 폴더에 저장됩니다.</li>
+      <li>전사, 요약, 회의 메타데이터는 앱의 로컬 데이터베이스에 저장됩니다.</li>
+      <li>사용자는 앱 안에서 회의록을 삭제하거나, 저장 폴더의 녹음 파일을 직접 삭제할 수 있습니다.</li>
+      <li>자동 삭제 기능을 켠 경우, 설정한 기간보다 오래된 녹음 파일이 삭제될 수 있습니다. 회의록, 전사,
+        요약 데이터는 별도로 유지될 수 있습니다.</li>
+      <li>앱을 삭제해도 사용자가 선택한 외부 저장 폴더에 있는 녹음 파일은 macOS 정책에 따라 남아 있을 수
+        있습니다.</li>
+    </ul>
+
+    <h2>9. 제3자 제공</h2>
+    <p>적자생존은 개발자 서버를 통해 회의 데이터, 전사본, 요약본을 제3자에게 판매하거나 제공하지 않습니다.</p>
+    <p>사용자가 직접 외부 앱으로 공유하거나 모델 제공 사이트에서 모델을 다운로드하는 경우, 해당 외부 서비스와의
+      통신은 사용자의 선택에 따라 발생합니다.</p>
+
+    <h2>10. 아동의 개인정보</h2>
+    <p>적자생존은 어린이를 대상으로 설계된 앱이 아니며, 어린이의 개인정보를 의도적으로 수집하지 않습니다.</p>
+
+    <h2>11. 보안</h2>
+    <p>적자생존은 회의 데이터를 로컬 Mac에 저장하고, 외부 서버 전송을 기본 동작에 포함하지 않는 방식으로
+      개인정보 노출 위험을 줄입니다. 다만 사용자의 Mac 계정, 저장 폴더 접근 권한, 백업 서비스, 외부 공유
+      앱의 보안 설정은 사용자 환경에 따라 달라질 수 있습니다.</p>
+    <p>민감한 회의의 경우 다음을 권장합니다.</p>
+    <ul>
+      <li>신뢰할 수 있는 저장 폴더를 선택합니다.</li>
+      <li>macOS 계정 잠금과 디스크 암호화를 사용합니다.</li>
+      <li>회의록 또는 로그를 외부 앱으로 공유하기 전에 내용을 확인합니다.</li>
+      <li>더 이상 필요 없는 녹음 파일은 삭제합니다.</li>
+    </ul>
+
+    <h2>12. 방침 변경</h2>
+    <p>개인정보 처리방침이 변경될 경우 앱 업데이트, 앱스토어 설명, 또는 배포 페이지를 통해 변경 내용을
+      안내할 수 있습니다.</p>
+
+    <h2>13. 문의</h2>
+    <p>개인정보 처리와 관련한 문의는 앱스토어 등록 정보에 기재된 개발자 연락처로 보내주시기 바랍니다.</p>
+
+    <footer>
+      © 적자생존. 본 문서의 원본은 저장소의 <code>PRIVACY_POLICY.md</code>이며, 이 페이지는 동일 내용을 호스팅용으로 정리한 사본입니다.
+    </footer>
+  </main>
+</body>
+</html>
