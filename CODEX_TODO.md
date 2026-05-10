@@ -29,11 +29,11 @@
 
 ### 2. Privacy Policy URL / Support URL 확정
 
-- [ ] `PRIVACY_POLICY.md` 내용을 실제 공개 URL에 게시.
+- [x] `PRIVACY_POLICY.md` 내용을 실제 공개 URL에 게시.
 - [x] Support URL에 실제 문의 가능한 이메일 또는 연락 양식 게시.
 - [x] `APP_STORE_METADATA_KO.md`의 TODO URL 교체.
 - [x] `APP_STORE_SUBMISSION_NOTES.md`의 TODO URL 교체.
-- [ ] App Store Connect 입력값과 문서의 URL이 일치하는지 확인.
+- [x] App Store Connect에 입력할 URL과 문서의 URL이 일치하는지 확인.
 
 완료 조건:
 
