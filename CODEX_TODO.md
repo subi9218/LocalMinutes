@@ -42,11 +42,18 @@
 
 ### 3. Apple Distribution 서명 준비
 
+- [ ] Apple Developer Program 가입/승인 완료.
 - [ ] Apple Developer Team ID 확인.
 - [ ] Xcode > Settings > Accounts에서 Apple Distribution 인증서 설치.
 - [ ] App Store Connect에서 Bundle ID / App record 생성.
 - [ ] Provisioning profile이 Xcode 자동 서명으로 잡히는지 확인.
 - [ ] `security find-identity -v -p codesigning`에서 유효한 Apple Distribution identity 확인.
+
+현재 메모:
+
+- 2026-05-10 기준 Apple Developer Certificates/Identifiers/Profiles 접근 시 `Access Unavailable` 표시.
+- 원인: 현재 Apple ID가 유료 Apple Developer Program에 등록되어 있지 않음.
+- 가입/승인 전에는 Bundle ID 등록, App Store Connect 앱 생성, Apple Distribution 인증서 생성, Archive 업로드가 불가.
 
 완료 조건:
 
