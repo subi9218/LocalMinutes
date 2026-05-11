@@ -63,12 +63,12 @@ APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 - `APP_STORE_PRIVACY_ANSWERS.md`: App Privacy 답변
 - `APP_STORE_SUBMISSION_NOTES.md`: App Review Notes
 - `DEMO_SCREENSHOT_SCRIPT.md`: 스크린샷/QA용 데모 회의 대본
-- `FREEMIUM_TODO.md`: 무료 앱 + Pro Unlock 전환 작업 목록
+- `FREEMIUM_TODO.md`: 출시 후 무료 앱 + Pro Unlock 전환 검토 메모
 - `ACCOUNT_HANDOFF.md`: 계정/서명 인수인계
 - `CODEX_TODO.md`: 남은 작업 우선순위
 
 ## 주의
 
 - App Store 빌드에는 `APP_STORE_COMPLIANCE_MODE=true`를 유지합니다.
-- 제한 모델, Calendar AppleEvent 연동, 개발용 다운로드 옵션은 App Store 제출 빌드에서 켜지 않습니다.
+- Calendar AppleEvent 연동, 개발용 다운로드 옵션은 App Store 제출 빌드에서 켜지 않습니다.
 - 실제 회의 데이터, 토큰, 개인 키, 인증 정보는 커밋하거나 스크린샷에 노출하지 않습니다.

@@ -46,13 +46,12 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   // ── 모델 다운로드 상태 ───────────────────────────────────────────
   // 음성 인식은 빠른/정확 모델을 각각 다운로드
-  // 요약은 기본/고품질/한국어 특화 모델을 각각 다운로드
+  // 요약은 기본/고품질 모델을 각각 다운로드
   final _sttFastDlService = ModelDownloadService();
   final _sttFastCoreMlDlService = ModelDownloadService();
   final _sttAccurateDlService = ModelDownloadService();
   final _llmGemmaDlService = ModelDownloadService();
   final _llmQwenDlService = ModelDownloadService();
-  final _llmExaoneDlService = ModelDownloadService();
   final _diarSegDlService = ModelDownloadService();
   final _diarEmbDlService = ModelDownloadService();
   _DlState _sttFastDl = const _DlState();
@@ -60,7 +59,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   _DlState _sttAccurateDl = const _DlState();
   _DlState _llmGemmaDl = const _DlState();
   _DlState _llmQwenDl = const _DlState();
-  _DlState _llmExaoneDl = const _DlState();
   _DlState _diarSegDl = const _DlState();
   _DlState _diarEmbDl = const _DlState();
   bool _sttFastExists = false;
@@ -68,7 +66,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   bool _sttAccurateExists = false;
   bool _llmGemmaExists = false;
   bool _llmQwenExists = false;
-  bool _llmExaoneExists = false;
   bool _diarSegExists = false;
   bool _diarEmbExists = false;
 
@@ -93,7 +90,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     _sttAccurateDlService.cancel();
     _llmGemmaDlService.cancel();
     _llmQwenDlService.cancel();
-    _llmExaoneDlService.cancel();
     _diarSegDlService.cancel();
     _diarEmbDlService.cancel();
     super.dispose();
@@ -160,9 +156,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     _llmQwenExists = await File(
       '$dir/${AppConstants.llmModelFileQwen25_7B}',
     ).exists();
-    _llmExaoneExists = await File(
-      '$dir/${AppConstants.llmModelFileExaone35_7B}',
-    ).exists();
     _diarSegExists = await File(
       '$dir/${AppConstants.diarSegModelFile}',
     ).exists();
@@ -174,10 +167,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   // ── 모델 재다운로드 ───────────────────────────────────────────────
   Future<void> _downloadModel({required _DlTarget target}) async {
-    if (target == _DlTarget.llmExaone &&
-        !AppBuildConfig.allowRestrictedModels) {
-      return;
-    }
     final appSupport = await getApplicationSupportDirectory();
     final dir = Directory('${appSupport.path}/models');
     await dir.create(recursive: true);
@@ -210,10 +199,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         filename = AppConstants.llmModelFileQwen25_7B;
         url = AppConstants.llmDownloadUrlQwen25_7B;
         service = _llmQwenDlService;
-      case _DlTarget.llmExaone:
-        filename = AppConstants.llmModelFileExaone35_7B;
-        url = AppConstants.llmDownloadUrlExaone35_7B;
-        service = _llmExaoneDlService;
       case _DlTarget.diarSeg:
         filename = AppConstants.diarSegModelFile;
         url = AppConstants.diarSegDownloadUrl;
@@ -307,8 +292,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           _llmGemmaDl = state;
         case _DlTarget.llmQwen:
           _llmQwenDl = state;
-        case _DlTarget.llmExaone:
-          _llmExaoneDl = state;
         case _DlTarget.diarSeg:
           _diarSegDl = state;
         case _DlTarget.diarEmb:
@@ -1048,21 +1031,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           },
         ),
         const SizedBox(height: 12),
-        if (AppBuildConfig.allowRestrictedModels) ...[
-          _ModelRow(
-            name: '내부 테스트 요약 모델',
-            size: '~4.8 GB',
-            subtitle: '앱스토어 빌드에서는 라이선스 리스크로 숨겨집니다.',
-            exists: _llmExaoneExists,
-            dlState: _llmExaoneDl,
-            onDownload: () => _downloadModel(target: _DlTarget.llmExaone),
-            onCancel: () {
-              _llmExaoneDlService.cancel();
-              setState(() => _llmExaoneDl = const _DlState());
-            },
-          ),
-          const SizedBox(height: 12),
-        ],
         const SizedBox(height: 4),
         _buildDefaultLlmPicker(),
         const SizedBox(height: 12),
@@ -1077,15 +1045,12 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     final installed = <String, bool>{
       'gemma4_e2b': _llmGemmaExists,
       'qwen25_7b': _llmQwenExists,
-      if (AppBuildConfig.allowRestrictedModels) 'exaone35_7b': _llmExaoneExists,
     };
 
     String labelOf(String id) {
       switch (id) {
         case 'qwen25_7b':
           return '고품질';
-        case 'exaone35_7b':
-          return '내부 테스트';
         default:
           return '기본';
       }
@@ -1095,8 +1060,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       switch (id) {
         case 'qwen25_7b':
           return '회의 내용을 항목별로 정리하는 데 유리합니다.';
-        case 'exaone35_7b':
-          return '앱스토어 빌드에서는 숨겨지는 내부 테스트 모델입니다.';
         default:
           return '가볍고 빠르게 요약합니다.';
       }
@@ -1185,11 +1148,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           _AdvancedInfoLine('정확도 높은 음성 인식', AppConstants.sttModelFileAccurate),
           _AdvancedInfoLine('기본 요약', AppConstants.llmModelFileGemma4E2B),
           _AdvancedInfoLine('고품질 요약', AppConstants.llmModelFileQwen25_7B),
-          if (AppBuildConfig.allowRestrictedModels)
-            _AdvancedInfoLine(
-              '내부 테스트 요약',
-              AppConstants.llmModelFileExaone35_7B,
-            ),
         ],
       ),
     );
@@ -1202,8 +1160,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       children: [
         _SettingRow(
           title: '사용 모델 및 라이선스',
-          subtitle:
-              '음성 인식과 요약은 로컬 Mac에서 실행됩니다. 앱스토어 빌드에서는 상업 배포 리스크가 큰 모델을 숨깁니다.',
+          subtitle: '음성 인식과 요약은 사용자가 설치한 로컬 모델로 Mac에서 실행됩니다.',
           trailing: OutlinedButton.icon(
             icon: const Icon(Icons.article_outlined, size: 16),
             label: const Text('보기'),
@@ -1211,19 +1168,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               visualDensity: VisualDensity.compact,
             ),
             onPressed: _showLicenseNotices,
-          ),
-        ),
-        const Divider(height: 20),
-        _SettingRow(
-          title: '앱스토어 안전 모드',
-          subtitle: AppBuildConfig.appStoreComplianceMode
-              ? '켜짐 · EXAONE, 캘린더 자동화, AppleEvent 기능을 기본 화면에서 숨깁니다.'
-              : '꺼짐 · 내부 테스트용 빌드 플래그가 적용되어 있습니다.',
-          trailing: Icon(
-            AppBuildConfig.appStoreComplianceMode
-                ? Icons.lock_outline
-                : Icons.science_outlined,
-            size: 18,
           ),
         ),
       ],
@@ -1266,23 +1210,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade200),
-                  ),
-                  child: SelectableText(
-                    LegalNotices.restrictedModelNote,
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.35,
-                      color: Colors.brown.shade700,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -2101,7 +2028,6 @@ enum _DlTarget {
   sttAccurate,
   llmGemma,
   llmQwen,
-  llmExaone,
   diarSeg,
   diarEmb,
 }

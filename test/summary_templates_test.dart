@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/summary_templates.dart';
+import 'package:local_minutes/core/services/summary_templates.dart';
 
 void main() {
   test('topic report template is available as a preset', () {

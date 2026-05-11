@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/meeting_keyword_search.dart';
-import 'package:meeting_assistant2/domain/entities/meeting.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
+import 'package:local_minutes/core/services/meeting_keyword_search.dart';
+import 'package:local_minutes/domain/entities/meeting.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
 
 void main() {
   test('키워드 매칭 점수로 정렬 — 빅쿼리 언급 회의가 위로', () {

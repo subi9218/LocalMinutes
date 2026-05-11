@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/domain/entities/meeting_processing_report.dart';
+import 'package:local_minutes/domain/entities/meeting_processing_report.dart';
 
 void main() {
   test('processing report preserves STT language', () {

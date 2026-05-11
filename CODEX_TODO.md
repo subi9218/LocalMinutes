@@ -7,35 +7,45 @@
 - 프로젝트는 Git 저장소이며 원격 `origin/main`과 연결되어 있다.
 - 현재 앱 버전은 `2.1.1+28`.
 - `flutter analyze` 통과: 0 issues.
-- `flutter test` 통과: 90/90.
+- `flutter test` 통과: 89/89.
 - `flutter build macos --debug` 통과.
 - 최근 QA 산출물은 `dist/적자생존_v2.1.1_build28.dmg`.
 - 핵심 제품 기능은 대부분 완료 상태.
-- 다음 우선순위는 수익 모델을 `무료 앱 + Pro Unlock 19,000원 비소모성 IAP`로 전환할지 최종 확정하고 구현하는 것.
-- Freemium 전환 상세 작업은 `FREEMIUM_TODO.md` 참고.
+- 현재 1차 제출 권장 수익 모델은 `유료 앱 19,000원 / IAP 없음`.
+- `무료 앱 + Pro Unlock` 전환은 출시 후 또는 별도 작업으로 보류.
+- EXAONE 관련 소스/테스트/제출 문서 참조는 제거 완료.
 
-## P0 — 수익 모델 변경 검토/구현
+## P0 — 제출 정책 확정
 
-### 0. 무료 앱 + Pro Unlock 전환
+### 0. 유료 앱 19,000원 기준으로 제출 자료 정렬
 
-- [ ] 최종 정책 확정: 무료 다운로드 + `Pro Unlock` 19,000원 일회성 구매.
-- [ ] App Store Connect 앱 가격을 무료로 변경.
-- [ ] Non-Consumable IAP `com.subi9218.localminutes.pro` 생성.
-- [ ] `in_app_purchase` 기반 결제/복원 구현.
-- [ ] `EntitlementService` hardcoded Pro 제거.
-- [ ] 무료 회의 3개 + Pro 무제한 정책 적용.
-- [ ] Paywall UI 추가.
-- [ ] 설정 화면에 Pro 상태/구매/복원 추가.
-- [ ] 문서/메타데이터의 `유료 앱 19,000원` 문구를 freemium 기준으로 교체.
-- [ ] StoreKit sandbox QA.
+- [x] 1차 제출 정책: 유료 앱 `19,000원`, 구독/IAP 없음.
+- [x] 현재 코드 상태는 모든 기능 잠금 해제 기준.
+- [x] `FREEMIUM_TODO.md`와 freemium 관련 문구를 “출시 후 검토”로 낮추기.
+- [x] App Store Connect 입력 문서가 유료 앱/IAP 없음 기준으로 일치하는지 재확인.
+- [x] App Review Notes에서 Pro Unlock / IAP 테스트 문구가 없도록 확인.
 
 완료 조건:
 
-- 새 설치 사용자는 Free 상태로 시작한다.
-- 무료 사용자는 회의 3개까지 테스트할 수 있다.
-- Pro Unlock 구매/복원이 동작한다.
-- Pro 상태에서는 제한 없이 녹음/요약/내보내기/고급 분석을 사용할 수 있다.
-- App Store Connect 문서와 앱 내부 가격/기능 설명이 일치한다.
+- App Store Connect 앱 가격이 유료 앱 `19,000원`으로 설정됨.
+- 앱 안에 구매/구독/복원/외부 결제 유도 UI가 없음.
+- 제출 문서가 `유료 앱 19,000원 / IAP 없음`으로 일관됨.
+
+### 0-1. EXAONE 제거 후 문서 정리
+
+- [x] 코드/테스트에서 EXAONE 관련 참조 제거.
+- [x] `ALLOW_RESTRICTED_MODELS` / `allowRestrictedModels` 제거.
+- [x] 지원 요약 모델을 Gemma / Qwen 2종으로 단순화.
+- [x] `APP_STORE_CONNECT_COPY.md`의 “라이선스 리스크 모델 숨김” 문구 제거.
+- [x] `APP_STORE_SUBMISSION_NOTES.md`의 “라이선스 리스크 모델 숨김” 문구 제거.
+- [x] `APP_STORE_METADATA_KO.md`의 “앱스토어 안전 모드/제한 모델” 문구 순화.
+- [x] `APP_STORE_PRIVACY_ANSWERS.md`, `APP_STORE_PREP_CHECKLIST.md`, `APP_STORE_COMPLIANCE.md`의 EXAONE/제한 모델/ALLOW_RESTRICTED 문구 제거.
+- [x] `PRIVACY_POLICY.md`, `docs/privacy.html`의 “라이선스 리스크 모델” 문구 제거.
+
+완료 조건:
+
+- `rg -n "EXAONE|ALLOW_RESTRICTED|제한 모델|라이선스 리스크" *.md docs` 결과가 제출 문서에는 남지 않음.
+- App Review Notes에는 지원 모델과 Calendar/AppleEvent 미포함 사실만 간단히 기재.
 
 ## P0 — App Store 제출 차단 요소
 
@@ -197,16 +207,16 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 ### 10. App Store safe mode 회귀 테스트
 
-- [x] `APP_STORE_COMPLIANCE_MODE=true` 빌드에서 EXAONE 노출 없음 테스트 통과.
+- [x] EXAONE 관련 소스/테스트 참조 제거 완료.
 - [ ] Calendar/AppleEvent 관련 UI 노출 없음 확인.
-- [x] 과거 `selectedLlmModel=exaone35_7b` 저장값이 안전 모델로 정리되는지 테스트 통과.
+- [x] 지원하지 않는 LLM 저장값이 안전 기본 모델로 정리되는지 테스트 통과.
 - [x] 모델 다운로드 화면에서 App Store 모드의 Hugging Face 토큰/URL 편집 기본 노출 제거.
 - [ ] 실제 앱 UI에서 모델 다운로드 카드/선택 다이얼로그가 안전 모드와 일치하는지 수동 확인.
 
 완료 조건:
 
 - `test/app_settings_compliance_test.dart` 통과.
-- 실제 앱 UI에서도 제한 모델/권한 기능이 숨겨짐.
+- 실제 앱 UI에서도 지원 모델/권한 기능이 제출 설명과 일치함.
 
 ### 11. 모델 다운로드 심사 환경 점검
 
@@ -319,7 +329,7 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 - 자동 요약을 되살리지 않는다.
 - 첫 실행 저장 폴더 선택 필수 정책을 되돌리지 않는다.
 - STT/화자 라벨/요약 네이티브 작업을 동시에 실행하지 않는다.
-- App Store safe mode에서 EXAONE, Calendar AppleEvent 등 심사 리스크 기능을 노출하지 않는다.
+- App Store safe mode에서 Calendar AppleEvent 등 심사 리스크 기능을 노출하지 않는다.
 - OpenAI/GPT STT 재시도는 하지 않는다.
 
 ## 기본 검증 명령

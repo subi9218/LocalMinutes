@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/utils/auto_bullet.dart';
+import 'package:local_minutes/core/utils/auto_bullet.dart';
 
 void main() {
   late TextEditingController ctrl;

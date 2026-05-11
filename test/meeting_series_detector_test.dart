@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/meeting_series_detector.dart';
-import 'package:meeting_assistant2/domain/entities/meeting.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
+import 'package:local_minutes/core/services/meeting_series_detector.dart';
+import 'package:local_minutes/domain/entities/meeting.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
 
 void main() {
   test('suggests a recurring series from title and participants', () {

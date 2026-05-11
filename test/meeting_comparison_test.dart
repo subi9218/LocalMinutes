@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/meeting_comparison.dart';
-import 'package:meeting_assistant2/domain/entities/meeting.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
+import 'package:local_minutes/core/services/meeting_comparison.dart';
+import 'package:local_minutes/domain/entities/meeting.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
 
 void main() {
   test('두 요약이 모두 비어있으면 hasContent false', () {

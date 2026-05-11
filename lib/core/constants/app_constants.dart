@@ -1,20 +1,15 @@
 class AppConstants {
   // ── LLM 모델 (v1.9.9+3) ─────────────────────────────────────────
-  // 3종 지원. 사용자가 AppSettings.selectedLlmModel 로 선택.
+  // 2종 지원. 사용자가 AppSettings.selectedLlmModel 로 선택.
   //   gemma4_e2b  : 기본. Q8_0 ~3GB, 빠름, 품질 기본급
   //   qwen25_7b   : Q4_K_M ~4.7GB, 한국어·구조화 출력 강함
-  //   exaone35_7b : Q4_K_M ~4.8GB, 한국어 특화 (LG AI)
   static const String llmModelFileGemma4E2B = 'gemma-4-e2b-it-q8_0.gguf';
   static const String llmModelFileQwen25_7B = 'Qwen2.5-7B-Instruct-Q4_K_M.gguf';
-  static const String llmModelFileExaone35_7B =
-      'EXAONE-3.5-7.8B-Instruct-Q4_K_M.gguf';
 
   static const String llmDownloadUrlGemma4E2B =
       'https://huggingface.co/bartowski/google_gemma-4-E2B-it-GGUF/resolve/main/google_gemma-4-E2B-it-Q8_0.gguf?download=true';
   static const String llmDownloadUrlQwen25_7B =
       'https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf?download=true';
-  static const String llmDownloadUrlExaone35_7B =
-      'https://huggingface.co/bartowski/EXAONE-3.5-7.8B-Instruct-GGUF/resolve/main/EXAONE-3.5-7.8B-Instruct-Q4_K_M.gguf?download=true';
 
   /// 하위호환용 기본값 (기존 호출부가 남아있을 때 E2B를 가리킴).
   /// 런타임 선택은 [AppSettings.instance.currentLlmModelFile] 사용.
@@ -73,7 +68,6 @@ class AppConstants {
   static const int sttCoreMlEncoderBytesFast = 1200 * 1024 * 1024;
   static const int llmModelBytesGemma4E2B = 3000 * 1024 * 1024;
   static const int llmModelBytesQwen25_7B = 4700 * 1024 * 1024;
-  static const int llmModelBytesExaone35_7B = 4800 * 1024 * 1024;
   static const int diarSegModelBytes = 6 * 1024 * 1024;
   static const int diarEmbModelBytes = 26 * 1024 * 1024;
 
@@ -84,7 +78,6 @@ class AppConstants {
     sttCoreMlEncoderFileFast => sttCoreMlEncoderBytesFast,
     llmModelFileGemma4E2B => llmModelBytesGemma4E2B,
     llmModelFileQwen25_7B => llmModelBytesQwen25_7B,
-    llmModelFileExaone35_7B => llmModelBytesExaone35_7B,
     diarSegModelFile => diarSegModelBytes,
     diarEmbModelFile => diarEmbModelBytes,
     _ => 0,

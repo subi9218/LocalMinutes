@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/entitlement_service.dart';
+import 'package:local_minutes/core/services/entitlement_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

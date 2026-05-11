@@ -55,9 +55,9 @@
 복사 전 확인:
 
 - [ ] “로그인이나 계정 생성은 필요하지 않습니다” 문구와 실제 App Store 빌드 UI가 일치
-- [ ] Hugging Face 토큰 입력 UI가 App Store compliance mode에서 기본 노출되지 않음
-- [ ] Calendar/AppleEvent 기능이 App Store compliance mode에서 노출되지 않음
-- [ ] EXAONE 선택지가 App Store compliance mode에서 노출되지 않음
+- [ ] Hugging Face 토큰 입력 UI가 App Store 제출 빌드에서 기본 노출되지 않음
+- [ ] Calendar/AppleEvent 기능이 App Store 제출 빌드에서 노출되지 않음
+- [ ] 지원 모델 목록이 Gemma/Qwen 기준으로 표시됨
 - [ ] 테스트 방법 1~5단계가 실제 앱 흐름과 일치
 
 ## 4. 스크린샷 촬영 구성
@@ -172,8 +172,8 @@ APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 - [ ] STT 모델 다운로드 가능
 - [ ] 요약 모델 다운로드 가능
 - [ ] 계정/토큰 없이 기본 모델 다운로드 가능
-- [ ] App Store mode에서 EXAONE 노출 없음
-- [ ] App Store mode에서 Hugging Face 토큰 입력/URL 편집 기본 노출 없음
+- [ ] App Store 제출 빌드에서 지원 모델 목록이 Gemma/Qwen 기준으로 표시됨
+- [ ] App Store 제출 빌드에서 Hugging Face 토큰 입력/URL 편집 기본 노출 없음
 
 회의 흐름:
 
@@ -196,7 +196,6 @@ APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 
 ## 7. 제출 직전 금지 사항
 
-- App Store archive에 `ALLOW_RESTRICTED_MODELS=true`를 넣지 않음
 - App Store archive에 `ENABLE_CALENDAR_INTEGRATION=true`를 넣지 않음
 - App Store archive에 `APP_STORE_COMPLIANCE_MODE=false`를 넣지 않음
 - `com.example.*` Bundle ID 사용 금지

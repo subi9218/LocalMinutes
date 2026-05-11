@@ -1,52 +1,37 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/constants/app_build_config.dart';
-import 'package:meeting_assistant2/core/constants/app_constants.dart';
-import 'package:meeting_assistant2/core/services/app_settings.dart';
+import 'package:local_minutes/core/constants/app_build_config.dart';
+import 'package:local_minutes/core/constants/app_constants.dart';
+import 'package:local_minutes/core/services/app_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('app store build excludes restricted model choices', () async {
+  test('app store compliance mode is enabled by default', () async {
     expect(AppBuildConfig.appStoreComplianceMode, isTrue);
-    expect(AppBuildConfig.allowRestrictedModels, isFalse);
-    expect(AppSettings.availableLlmModelIds, isNot(contains('exaone35_7b')));
+    expect(AppSettings.availableLlmModelIds, ['gemma4_e2b', 'qwen25_7b']);
   });
 
-  test(
-    'init rewrites persisted restricted LLM selection to safe default',
-    () async {
-      SharedPreferences.setMockInitialValues({
-        'selectedLlmModel': 'exaone35_7b',
-        'autoAddToCalendar': true,
-      });
+  test('init rewrites unsupported LLM selection to safe default', () async {
+    SharedPreferences.setMockInitialValues({
+      'selectedLlmModel': 'unsupported_model',
+      'autoAddToCalendar': true,
+    });
 
-      await AppSettings.init();
+    await AppSettings.init();
 
-      expect(
-        AppSettings.instance.selectedLlmModel,
-        AppSettings.defaultLlmModelId,
-      );
-      expect(
-        AppSettings.instance.rawSelectedLlmModelForDiagnostics,
-        AppSettings.defaultLlmModelId,
-      );
-      expect(
-        AppSettings.instance.currentLlmModelFile,
-        AppConstants.llmModelFileGemma4E2B,
-      );
-      expect(AppSettings.instance.autoAddToCalendar, isFalse);
-    },
-  );
-
-  test('restricted LLM file and URL helpers fall back in app store mode', () {
     expect(
-      AppSettings.llmModelFileFor('exaone35_7b'),
+      AppSettings.instance.selectedLlmModel,
+      AppSettings.defaultLlmModelId,
+    );
+    expect(
+      AppSettings.instance.rawSelectedLlmModelForDiagnostics,
+      AppSettings.defaultLlmModelId,
+    );
+    expect(
+      AppSettings.instance.currentLlmModelFile,
       AppConstants.llmModelFileGemma4E2B,
     );
-    expect(
-      AppSettings.llmDownloadUrlFor('exaone35_7b'),
-      AppConstants.llmDownloadUrlGemma4E2B,
-    );
+    expect(AppSettings.instance.autoAddToCalendar, isFalse);
   });
 }

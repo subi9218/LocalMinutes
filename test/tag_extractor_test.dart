@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/tag_extractor.dart';
+import 'package:local_minutes/core/services/tag_extractor.dart';
 
 void main() {
   test('mergeTags keeps manual tags and appends unique suggestions', () {

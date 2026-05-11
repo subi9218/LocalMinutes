@@ -24,7 +24,7 @@
 4. 녹음을 종료한 뒤 사용자가 직접 요약 버튼을 눌러 전사/요약을 실행합니다.
 5. 회의 상세 화면에서 요약, 주요 논의, 결정사항, 액션아이템, 전사 근거, 내보내기 기능을 확인할 수 있습니다.
 
-앱스토어 빌드에서는 Calendar/AppleEvent 자동화 기능과 라이선스 리스크가 있는 모델 선택지를 숨겼습니다. 설정 > 라이선스와 개인정보에서 사용 모델 및 라이선스 고지를 확인할 수 있습니다.
+앱스토어 빌드에는 Calendar/AppleEvent 자동화 기능이 포함되어 있지 않습니다. 설정 > 라이선스와 개인정보에서 사용 모델 및 라이선스 고지를 확인할 수 있습니다.
 
 로컬 오류 로그는 자동 전송되지 않으며, 사용자가 직접 복사하거나 공유할 때만 앱 밖으로 나갈 수 있습니다.
 ```
@@ -60,4 +60,4 @@ Privacy Label: Data Not Collected
 
 - App Store compliance mode에서 Hugging Face 토큰 입력과 다운로드 URL 편집 UI는 기본 노출되지 않습니다.
 - 저장 폴더는 security-scoped bookmark로 저장/복원합니다.
-- App Store archive에는 Calendar/AppleEvent entitlement와 제한 모델 선택지가 포함되지 않아야 합니다.
+- App Store archive에는 Calendar/AppleEvent entitlement가 포함되지 않아야 합니다.

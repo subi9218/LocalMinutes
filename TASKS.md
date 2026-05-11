@@ -1,4 +1,4 @@
-# 적자생존 (meeting_assistant2) 작업 로그
+# 적자생존 (LocalMinutes) 작업 로그
 
 > 토큰 한계로 세션이 끊겨도 이어서 작업할 수 있도록 유지하는 파일.
 > 새 작업 시작 → **In Progress** 이동, 끝나면 **Completed** 최상단에 날짜와 함께 기록.
@@ -551,11 +551,11 @@ _(태그 자동 추천/다국어 회의 지원/요약 신뢰도 v3 1차 완료. 
   - `flutter test`: 통과
   - `flutter build macos --debug`: 성공
 - ✅ **앱 실행 확인**
-  - Debug 앱 실행: `/Users/channy/meeting_assistant2/build/macos/Build/Products/Debug/적자생존.app`
-  - 프로세스 확인: `meeting_assistant2` 실행 중
+  - Debug 앱 실행: `/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/적자생존.app`
+  - 프로세스 확인: `LocalMinutes` 실행 중
 - ✅ **실행 직후 로그 확인**
   - 앱 내부 crash log 수정 시각이 2026-04-30으로, 이번 실행에서 새 crash log 기록 없음
-  - macOS `DiagnosticReports`에 이번 실행 직후 새 `meeting_assistant2` 크래시 없음
+  - macOS `DiagnosticReports`에 이번 실행 직후 새 `LocalMinutes` 크래시 없음
 - ⚠️ **남은 수동 QA**
   - 현재 환경에서 `osascript` 보조 접근 권한이 없어 녹음 준비 버튼 클릭과 마이크 레벨 움직임 자동 검증은 불가
   - 사용자가 실제 화면에서 마이크 레벨 바, 마이크 변경, 새로고침, 시작/취소 충돌 여부를 최종 확인해야 함
@@ -949,8 +949,8 @@ _(태그 자동 추천/다국어 회의 지원/요약 신뢰도 v3 1차 완료. 
   - `flutter test`: 통과
   - `flutter analyze`: No issues found
   - `flutter build macos --debug`: 성공
-  - Debug 앱 실행 확인: `/Users/channy/meeting_assistant2/build/macos/Build/Products/Debug/적자생존.app`
-  - 프로세스 확인: `meeting_assistant2` 실행 중
+  - Debug 앱 실행 확인: `/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/적자생존.app`
+  - 프로세스 확인: `LocalMinutes` 실행 중
   - 최근 시스템 로그 확인: 앱 크래시 로그 없음
 - ⚠️ **자동 클릭 QA 제한**
   - macOS가 `osascript` 보조 접근 권한을 허용하지 않아 트레이 아이콘/메뉴 항목을 스크립트로 직접 클릭하는 검증은 수행하지 못함
@@ -1133,7 +1133,7 @@ _(태그 자동 추천/다국어 회의 지원/요약 신뢰도 v3 1차 완료. 
 ### 2026-04-30 (요약 중 네이티브 종료 안정화)
 
 - ✅ **LLM/Metal SIGABRT race condition 완화**
-  - 확인 로그: `/Users/channy/Library/Logs/DiagnosticReports/meeting_assistant2-2026-04-30-162946.ips`
+  - 확인 로그: `/Users/channy/Library/Logs/DiagnosticReports/LocalMinutes-2026-04-30-162946.ips`
   - 원인: `DartWorker`가 `llama_decode`/`ggml_metal_get_tensor_async` 실행 중인데 메인 스레드가 `llama_free`/`ggml_backend_metal_free`를 호출해 abort
   - `OnDeviceModelManager`: LLM 생성 카운터 추가, `unloadLlm()`이 진행 중 decode 종료까지 대기
   - `LlmService`: 같은 llama context를 동시에 쓰지 않도록 동시 생성 요청을 즉시 차단

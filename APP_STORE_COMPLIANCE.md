@@ -59,7 +59,6 @@ Internal testing only:
 ```bash
 flutter run -d macos \
   --dart-define=APP_STORE_COMPLIANCE_MODE=false \
-  --dart-define=ALLOW_RESTRICTED_MODELS=true \
   --dart-define=ENABLE_CALENDAR_INTEGRATION=true
 ```
 
@@ -104,17 +103,14 @@ the App Store release target is intentionally set to macOS 15.5:
 Do not lower the deployment target unless sherpa-onnx/onnxruntime is replaced
 with binaries built for the lower target.
 
-## Restricted Models
+## Supported Summary Models
 
-EXAONE 3.5 is hidden in App Store mode because its official model card states
-that it is licensed under `EXAONE AI Model License Agreement 1.1 - NC`.
+The App Store build supports public distribution summary models only:
 
-App Store mode behavior:
+- Gemma 4 E2B
+- Qwen 2.5 7B Instruct
 
-- EXAONE download card is not shown
-- EXAONE is not counted as an installed usable model
-- EXAONE is not offered in summary model pickers
-- Old saved `selectedLlmModel=exaone35_7b` falls back to Gemma
+Unsupported saved `selectedLlmModel` values fall back to Gemma.
 
 ## User-Facing License Notice
 
@@ -122,7 +118,6 @@ Settings now includes:
 
 - `라이선스와 개인정보`
 - `사용 모델 및 라이선스`
-- `앱스토어 안전 모드`
 
 The notice lists local engines/models and their source/license summary:
 

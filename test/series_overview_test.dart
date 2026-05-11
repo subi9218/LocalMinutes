@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/series_overview.dart';
-import 'package:meeting_assistant2/domain/entities/meeting.dart';
-import 'package:meeting_assistant2/domain/entities/meeting_group.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
-import 'package:meeting_assistant2/domain/repositories/meeting_repository.dart';
+import 'package:local_minutes/core/services/series_overview.dart';
+import 'package:local_minutes/domain/entities/meeting.dart';
+import 'package:local_minutes/domain/entities/meeting_group.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
+import 'package:local_minutes/domain/repositories/meeting_repository.dart';
 
 void main() {
   test('빈 그룹 → 빈 결과', () async {

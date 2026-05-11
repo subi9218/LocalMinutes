@@ -270,19 +270,14 @@ class AppSettings {
   // ── LLM 모델 선택 (v1.9.9+3) ──────────────────────────────────────
   static const String defaultLlmModelId = 'gemma4_e2b';
 
-  /// App Store mode excludes restricted/non-commercial model choices.
-  static List<String> get availableLlmModelIds => [
-    'gemma4_e2b',
-    'qwen25_7b',
-    if (AppBuildConfig.allowRestrictedModels) 'exaone35_7b',
-  ];
+  static List<String> get availableLlmModelIds => ['gemma4_e2b', 'qwen25_7b'];
 
   static bool isLlmModelAvailable(String id) =>
       availableLlmModelIds.contains(id);
 
   /// 요약·추론에 사용할 LLM id.
   ///
-  /// 앱스토어 모드에서 과거 저장값이 `exaone35_7b`이면 안전한 기본값으로 fallback.
+  /// 저장된 값이 현재 지원 모델이 아니면 안전한 기본값으로 fallback.
   String get selectedLlmModel {
     final saved = _prefs.getString('selectedLlmModel') ?? defaultLlmModelId;
     return isLlmModelAvailable(saved) ? saved : defaultLlmModelId;
@@ -308,10 +303,6 @@ class AppSettings {
     switch (id) {
       case 'qwen25_7b':
         return AppConstants.llmModelFileQwen25_7B;
-      case 'exaone35_7b':
-        return AppBuildConfig.allowRestrictedModels
-            ? AppConstants.llmModelFileExaone35_7B
-            : AppConstants.llmModelFileGemma4E2B;
       case 'gemma4_e2b':
       default:
         return AppConstants.llmModelFileGemma4E2B;
@@ -349,10 +340,6 @@ class AppSettings {
     switch (id) {
       case 'qwen25_7b':
         return AppConstants.llmDownloadUrlQwen25_7B;
-      case 'exaone35_7b':
-        return AppBuildConfig.allowRestrictedModels
-            ? AppConstants.llmDownloadUrlExaone35_7B
-            : AppConstants.llmDownloadUrlGemma4E2B;
       case 'gemma4_e2b':
       default:
         return AppConstants.llmDownloadUrlGemma4E2B;

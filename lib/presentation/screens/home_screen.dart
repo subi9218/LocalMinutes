@@ -120,6 +120,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // 녹음 중이면 정지 신호
         ref.read(isRecordingActiveProvider.notifier).state = true;
         ref.read(selectedMeetingIdProvider.notifier).state = null;
+        ref.read(selectedGroupIdProvider.notifier).state = null;
         ref.read(pendingTrayStopProvider.notifier).state = true;
         ref.read(trayStopRecordingSignalProvider.notifier).update((s) => s + 1);
       } else {
@@ -127,6 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // 녹음 시작
         ref.read(isRecordingActiveProvider.notifier).state = true;
         ref.read(selectedMeetingIdProvider.notifier).state = null;
+        ref.read(selectedGroupIdProvider.notifier).state = null;
         ref.read(pendingTrayQuickStartProvider.notifier).state = true;
         ref.read(pendingTrayQuickStartFromTrayProvider.notifier).state = false;
         ref
@@ -419,6 +421,7 @@ class _WelcomeView extends ConsumerWidget {
               }
               ref.read(isRecordingActiveProvider.notifier).state = true;
               ref.read(selectedMeetingIdProvider.notifier).state = null;
+              ref.read(selectedGroupIdProvider.notifier).state = null;
             },
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8),

@@ -109,7 +109,6 @@ class DiagnosticExportService {
         'version': package.version,
         'buildNumber': package.buildNumber,
         'appStoreComplianceMode': AppBuildConfig.appStoreComplianceMode,
-        'allowRestrictedModels': AppBuildConfig.allowRestrictedModels,
         'calendarIntegrationEnabled': AppBuildConfig.enableCalendarIntegration,
       },
       'system': {
@@ -174,11 +173,6 @@ class DiagnosticExportService {
         label: 'summaryHighQuality',
         filename: AppConstants.llmModelFileQwen25_7B,
       ),
-      if (AppBuildConfig.allowRestrictedModels)
-        (
-          label: 'summaryRestricted',
-          filename: AppConstants.llmModelFileExaone35_7B,
-        ),
       (label: 'speakerSegment', filename: AppConstants.diarSegModelFile),
       (label: 'speakerEmbedding', filename: AppConstants.diarEmbModelFile),
     ];

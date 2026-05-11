@@ -64,7 +64,7 @@
 앱을 처음 실행하면 **모델 파일이 없다는 안내**가 나옵니다. 팀에서 전달받은 두 개의 GGUF 파일을 아래 경로에 넣으세요:
 
 ```
-~/Library/Application Support/meeting_assistant2/models/
+~/Library/Application Support/LocalMinutes/models/
 ```
 
 필요한 파일:
@@ -285,7 +285,7 @@ M3 Mac 기준 **10분 녹음 → 총 3~4분 처리**.
 ### 고급
 - 모델 파일 경로 확인
 - 녹음 파일 저장 경로 확인
-- **Isar DB 위치**: `~/Library/Application Support/meeting_assistant2/`
+- **Isar DB 위치**: `~/Library/Application Support/LocalMinutes/`
 
 ---
 
@@ -295,7 +295,7 @@ M3 Mac 기준 **10분 녹음 → 총 3~4분 처리**.
 **A.** 네. 모델 파일만 미리 받아두면 비행기/보안 회의실에서도 동작합니다.
 
 ### Q. 녹음 파일은 어디 저장되나요?
-**A.** `~/Library/Application Support/meeting_assistant2/recordings/` 에 WAV로 저장. 회의 삭제 시 함께 삭제됩니다.
+**A.** `~/Library/Application Support/LocalMinutes/recordings/` 에 WAV로 저장. 회의 삭제 시 함께 삭제됩니다.
 
 ### Q. 회의 데이터가 외부로 전송되나요?
 **A.** 아니요. 전사·요약 모두 로컬 모델로 처리됩니다. 네트워크 요청이 0건임을 Little Snitch 등으로 확인 가능합니다.
@@ -328,7 +328,7 @@ M3 Mac 기준 **10분 녹음 → 총 3~4분 처리**.
 - 안 됐다면 터미널에서: `xattr -rd com.apple.quarantine /Applications/적자생존.app`
 
 ### "Whisper 모델을 찾을 수 없습니다"
-- `~/Library/Application Support/meeting_assistant2/models/` 경로 존재 확인
+- `~/Library/Application Support/LocalMinutes/models/` 경로 존재 확인
 - 파일명이 정확히 `whisper-large-v3-turbo-q8_0.gguf` 인지 확인 (대소문자, 하이픈)
 
 ### 요약이 중간에 잘립니다
@@ -352,7 +352,7 @@ M3 Mac 기준 **10분 녹음 → 총 3~4분 처리**.
 
 ### DB를 초기화하고 싶어요
 - 앱 종료 후 다음 폴더 삭제:
-  `~/Library/Application Support/meeting_assistant2/`
+  `~/Library/Application Support/LocalMinutes/`
 - 주의: **모든 회의 기록이 사라집니다**. 중요한 데이터는 먼저 PDF/TXT로 내보내기
 
 ---

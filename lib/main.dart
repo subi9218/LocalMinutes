@@ -7,7 +7,6 @@ import 'package:macos_ui/macos_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:async';
-import 'core/constants/app_build_config.dart';
 import 'core/constants/app_constants.dart';
 import 'core/ffi/on_device_model_manager.dart';
 import 'core/services/app_settings.dart';
@@ -66,20 +65,13 @@ Future<bool> _checkModels() async {
     final sttAccurate = await File(
       '$dir/${AppConstants.sttModelFileAccurate}',
     ).exists();
-    // 앱스토어 모드에서는 제한 모델을 설치해도 시작 조건으로 보지 않는다.
     final llmGemma = await File(
       '$dir/${AppConstants.llmModelFileGemma4E2B}',
     ).exists();
     final llmQwen = await File(
       '$dir/${AppConstants.llmModelFileQwen25_7B}',
     ).exists();
-    final llmExaone = await File(
-      '$dir/${AppConstants.llmModelFileExaone35_7B}',
-    ).exists();
-    return (sttFast || sttAccurate) &&
-        (llmGemma ||
-            llmQwen ||
-            (AppBuildConfig.allowRestrictedModels && llmExaone));
+    return (sttFast || sttAccurate) && (llmGemma || llmQwen);
   } catch (_) {
     return false;
   }

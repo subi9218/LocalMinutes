@@ -3,8 +3,8 @@ class AppBuildConfig {
 
   /// App Store submission safe mode.
   ///
-  /// Default is true so normal release builds do not expose restricted models,
-  /// Calendar AppleEvents, or other review-sensitive features.
+  /// Default is true so normal release builds do not expose Calendar
+  /// AppleEvents or other review-sensitive features.
   static const bool appStoreComplianceMode = bool.fromEnvironment(
     'APP_STORE_COMPLIANCE_MODE',
     defaultValue: true,
@@ -12,10 +12,6 @@ class AppBuildConfig {
 
   /// Internal/dev builds may opt in with:
   /// --dart-define=APP_STORE_COMPLIANCE_MODE=false
-  /// --dart-define=ALLOW_RESTRICTED_MODELS=true
-  static const bool allowRestrictedModels =
-      !appStoreComplianceMode &&
-      bool.fromEnvironment('ALLOW_RESTRICTED_MODELS', defaultValue: false);
 
   /// Calendar integration uses Calendar.app AppleEvents, so it is disabled in
   /// App Store mode. Re-enable only for internal builds that carry matching

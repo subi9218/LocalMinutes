@@ -25,14 +25,12 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   // ── 모델 존재 여부 ──────────────────────────────────────────────
   // STT는 Fast/Accurate 각각 독립. 최소 둘 중 하나는 설치 필요.
-  // LLM은 앱스토어 안전 모델 중 최소 하나 필요.
-  // 제한 모델은 내부 빌드 플래그가 켜진 경우에만 설치/선택 대상으로 본다.
+  // LLM은 지원 모델 중 최소 하나 필요.
   bool _sttFastOk = false;
   bool _sttFastCoreMlOk = false;
   bool _sttAccurateOk = false;
   bool _llmGemmaOk = false;
   bool _llmQwenOk = false;
-  bool _llmExaoneOk = false;
   bool _diarSegOk = false;
   bool _diarEmbOk = false;
   bool _checking = false;
@@ -44,7 +42,6 @@ class _SetupScreenState extends State<SetupScreen> {
   final _sttAccurateService = ModelDownloadService();
   final _llmGemmaService = ModelDownloadService();
   final _llmQwenService = ModelDownloadService();
-  final _llmExaoneService = ModelDownloadService();
   final _diarSegService = ModelDownloadService();
   final _diarEmbService = ModelDownloadService();
 
@@ -53,7 +50,6 @@ class _SetupScreenState extends State<SetupScreen> {
   _DlState _sttAccurateDl = const _DlState();
   _DlState _llmGemmaDl = const _DlState();
   _DlState _llmQwenDl = const _DlState();
-  _DlState _llmExaoneDl = const _DlState();
   _DlState _diarSegDl = const _DlState();
   _DlState _diarEmbDl = const _DlState();
 
@@ -67,7 +63,6 @@ class _SetupScreenState extends State<SetupScreen> {
   late final TextEditingController _sttAccurateUrlCtrl;
   late final TextEditingController _llmGemmaUrlCtrl;
   late final TextEditingController _llmQwenUrlCtrl;
-  late final TextEditingController _llmExaoneUrlCtrl;
   late final TextEditingController _diarSegUrlCtrl;
   late final TextEditingController _diarEmbUrlCtrl;
   bool _showSttFastUrl = false;
@@ -75,7 +70,6 @@ class _SetupScreenState extends State<SetupScreen> {
   bool _showSttAccurateUrl = false;
   bool _showLlmGemmaUrl = false;
   bool _showLlmQwenUrl = false;
-  bool _showLlmExaoneUrl = false;
   bool _showDiarSegUrl = false;
   bool _showDiarEmbUrl = false;
 
@@ -97,11 +91,6 @@ class _SetupScreenState extends State<SetupScreen> {
     _llmQwenUrlCtrl = TextEditingController(
       text: AppConstants.llmDownloadUrlQwen25_7B,
     );
-    _llmExaoneUrlCtrl = TextEditingController(
-      text: AppBuildConfig.allowRestrictedModels
-          ? AppConstants.llmDownloadUrlExaone35_7B
-          : '',
-    );
     _diarSegUrlCtrl = TextEditingController(
       text: AppConstants.diarSegDownloadUrl,
     );
@@ -118,7 +107,6 @@ class _SetupScreenState extends State<SetupScreen> {
     _sttAccurateService.cancel();
     _llmGemmaService.cancel();
     _llmQwenService.cancel();
-    _llmExaoneService.cancel();
     _diarSegService.cancel();
     _diarEmbService.cancel();
     _tokenCtrl.dispose();
@@ -127,7 +115,6 @@ class _SetupScreenState extends State<SetupScreen> {
     _sttAccurateUrlCtrl.dispose();
     _llmGemmaUrlCtrl.dispose();
     _llmQwenUrlCtrl.dispose();
-    _llmExaoneUrlCtrl.dispose();
     _diarSegUrlCtrl.dispose();
     _diarEmbUrlCtrl.dispose();
     super.dispose();
@@ -154,9 +141,6 @@ class _SetupScreenState extends State<SetupScreen> {
       _llmQwenOk = await File(
         '${dir.path}/${AppConstants.llmModelFileQwen25_7B}',
       ).exists();
-      _llmExaoneOk = await File(
-        '${dir.path}/${AppConstants.llmModelFileExaone35_7B}',
-      ).exists();
       _diarSegOk = await File(
         '${dir.path}/${AppConstants.diarSegModelFile}',
       ).exists();
@@ -174,9 +158,6 @@ class _SetupScreenState extends State<SetupScreen> {
 
   // ── 다운로드 ─────────────────────────────────────────────────────
   Future<void> _startDownload({required _Target target}) async {
-    if (target == _Target.llmExaone && !AppBuildConfig.allowRestrictedModels) {
-      return;
-    }
     final dir = await _modelsDirectory();
     await dir.create(recursive: true);
 
@@ -208,10 +189,6 @@ class _SetupScreenState extends State<SetupScreen> {
         filename = AppConstants.llmModelFileQwen25_7B;
         url = _llmQwenUrlCtrl.text.trim();
         service = _llmQwenService;
-      case _Target.llmExaone:
-        filename = AppConstants.llmModelFileExaone35_7B;
-        url = _llmExaoneUrlCtrl.text.trim();
-        service = _llmExaoneService;
       case _Target.diarSeg:
         filename = AppConstants.diarSegModelFile;
         url = _diarSegUrlCtrl.text.trim();
@@ -315,8 +292,6 @@ class _SetupScreenState extends State<SetupScreen> {
         _llmGemmaService.cancel();
       case _Target.llmQwen:
         _llmQwenService.cancel();
-      case _Target.llmExaone:
-        _llmExaoneService.cancel();
       case _Target.diarSeg:
         _diarSegService.cancel();
       case _Target.diarEmb:
@@ -339,8 +314,6 @@ class _SetupScreenState extends State<SetupScreen> {
           _llmGemmaDl = state;
         case _Target.llmQwen:
           _llmQwenDl = state;
-        case _Target.llmExaone:
-          _llmExaoneDl = state;
         case _Target.diarSeg:
           _diarSegDl = state;
         case _Target.diarEmb:
@@ -354,17 +327,13 @@ class _SetupScreenState extends State<SetupScreen> {
     await _check();
     // STT/LLM 각각 최소 하나 이상 설치 필요
     final anyStt = _sttFastOk || _sttAccurateOk;
-    final anyLlm =
-        _llmGemmaOk ||
-        _llmQwenOk ||
-        (AppBuildConfig.allowRestrictedModels && _llmExaoneOk);
+    final anyLlm = _llmGemmaOk || _llmQwenOk;
     if (anyStt && anyLlm) {
       // 설치된 LLM 중 하나를 기본으로 설정 (아직 미설정 시)
       final current = AppSettings.instance.selectedLlmModel;
       final installed = {
         if (_llmGemmaOk) 'gemma4_e2b',
         if (_llmQwenOk) 'qwen25_7b',
-        if (AppBuildConfig.allowRestrictedModels && _llmExaoneOk) 'exaone35_7b',
       };
       if (!installed.contains(current)) {
         await AppSettings.instance.setSelectedLlmModel(installed.first);
@@ -406,18 +375,13 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final anyStt = _sttFastOk || _sttAccurateOk;
-    final anyLlm =
-        _llmGemmaOk ||
-        _llmQwenOk ||
-        (AppBuildConfig.allowRestrictedModels && _llmExaoneOk);
+    final anyLlm = _llmGemmaOk || _llmQwenOk;
     final allOk = anyStt && anyLlm;
     final anyDownloading =
         _sttFastDl.status == _Status.downloading ||
         _sttAccurateDl.status == _Status.downloading ||
         _llmGemmaDl.status == _Status.downloading ||
         _llmQwenDl.status == _Status.downloading ||
-        (AppBuildConfig.allowRestrictedModels &&
-            _llmExaoneDl.status == _Status.downloading) ||
         _diarSegDl.status == _Status.downloading ||
         _diarEmbDl.status == _Status.downloading;
 
@@ -592,29 +556,6 @@ class _SetupScreenState extends State<SetupScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // ── LLM EXAONE 3.5 7.8B (내부 빌드 전용) ────────────
-                        if (AppBuildConfig.allowRestrictedModels) ...[
-                          _ModelDownloadCard(
-                            label: '내부 테스트 요약 모델 · EXAONE 3.5 7.8B',
-                            filename: AppConstants.llmModelFileExaone35_7B,
-                            size: '~4.8 GB',
-                            tooltip:
-                                '내부 테스트 빌드 전용\n'
-                                '앱스토어 빌드에서는 라이선스 리스크로 숨김',
-                            isOk: _llmExaoneOk,
-                            dlState: _llmExaoneDl,
-                            urlCtrl: _llmExaoneUrlCtrl,
-                            showUrl: _showLlmExaoneUrl,
-                            onToggleUrl: () => setState(
-                              () => _showLlmExaoneUrl = !_showLlmExaoneUrl,
-                            ),
-                            onInstall: () =>
-                                _startDownload(target: _Target.llmExaone),
-                            onCancel: () =>
-                                _cancelDownload(target: _Target.llmExaone),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
                         const SizedBox(height: 8),
 
                         // ── 발화자 라벨 (선택) ────────────────────────────
@@ -864,7 +805,6 @@ enum _Target {
   sttAccurate,
   llmGemma,
   llmQwen,
-  llmExaone,
   diarSeg,
   diarEmb,
 }

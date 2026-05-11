@@ -7,15 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:meeting_assistant2/core/services/app_settings.dart';
-import 'package:meeting_assistant2/core/services/diagnostic_export_service.dart';
-import 'package:meeting_assistant2/core/services/isar_service.dart';
-import 'package:meeting_assistant2/data/repositories/meeting_repository_impl.dart';
-import 'package:meeting_assistant2/data/repositories/summary_repository_impl.dart';
-import 'package:meeting_assistant2/data/repositories/transcript_repository_impl.dart';
-import 'package:meeting_assistant2/domain/entities/meeting.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
-import 'package:meeting_assistant2/domain/entities/transcript.dart';
+import 'package:local_minutes/core/services/app_settings.dart';
+import 'package:local_minutes/core/services/diagnostic_export_service.dart';
+import 'package:local_minutes/core/services/isar_service.dart';
+import 'package:local_minutes/data/repositories/meeting_repository_impl.dart';
+import 'package:local_minutes/data/repositories/summary_repository_impl.dart';
+import 'package:local_minutes/data/repositories/transcript_repository_impl.dart';
+import 'package:local_minutes/domain/entities/meeting.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
+import 'package:local_minutes/domain/entities/transcript.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

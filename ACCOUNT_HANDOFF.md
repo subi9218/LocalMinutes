@@ -9,136 +9,102 @@ This document is for continuing App Store submission work from another Apple/Git
 - Local path: `/Users/channy/LocalMinutes`
 - GitHub repo: `https://github.com/subi9218/LocalMinutes`
 - Branch: `main`
-- Current git state at handoff: latest App Store prep and QA build changes are pushed
-- Important: a GitHub PAT was pasted in chat during setup. If still active, revoke it when no longer needed.
+- Bundle ID for App Store: `com.subi9218.localminutes`
+- Current app version: `2.1.1+28`
+- Important: a GitHub PAT was pasted in chat during earlier setup. If still active, revoke it.
 
-## Completed So Far
+## Current Working Tree
 
-### Git / GitHub
+There are intentional uncommitted changes. Commit these before handing off or pushing:
 
-- Initialized Git in `/Users/channy/LocalMinutes`.
-- Added remote:
-  - `origin https://github.com/subi9218/LocalMinutes.git`
-- Created initial import commit with source, docs, scripts, macOS project, tests, and native wrapper dylibs.
-- Excluded large/generated artifacts via `.gitignore`:
-  - `build/`
-  - `.dart_tool/`
-  - `dist/`
-  - `exports/`
-  - root `*.dmg`
-  - native third-party checkouts/build folders (`native/llama.cpp`, `native/whisper.cpp`, `native/build*`, `native/whisper_build`)
-- Pushed all work to GitHub.
+- Removed all EXAONE-related source/test references and App Store submission wording.
+- Removed `ALLOW_RESTRICTED_MODELS` / `allowRestrictedModels`.
+- Simplified supported summary models to:
+  - Gemma 4 E2B
+  - Qwen 2.5 7B Instruct
+- Updated setup/settings/recording/detail/model selection flows accordingly.
+- Updated compliance tests for the new two-model policy.
+- Improved the “회의 유형 / 재생성 스타일” dialog from a narrow alert into a wider two-column modal.
 
-Recent pushed commits:
-
-```text
-c7c3385 Remove credit label and speed up folder selection
-2e5df1e Bump version for QA build 27
-02f153d Prepare App Store submission checklist and sandbox fixes
-1b7cdbb Document Apple Developer enrollment blocker
-b742823 Mark public support pages ready
-99d1945 Prepare App Store metadata
-```
-
-### GitHub Pages
-
-GitHub Pages is enabled from:
-
-- Branch: `main`
-- Folder: `/docs`
-
-Public URLs verified with HTTP 200:
-
-- Privacy Policy: `https://subi9218.github.io/LocalMinutes/privacy.html`
-- Support: `https://subi9218.github.io/LocalMinutes/support.html`
-
-### Bundle ID / App Store Metadata
-
-Chosen App Store Bundle ID:
-
-```text
-com.subi9218.localminutes
-```
-
-Updated:
-
-- `macos/Runner/Configs/AppInfo.xcconfig`
-  - `PRODUCT_BUNDLE_IDENTIFIER = com.subi9218.localminutes`
-  - `PRODUCT_COPYRIGHT = Copyright © 2026 subi9218. All rights reserved.`
-- `macos/Runner.xcodeproj/project.pbxproj`
-  - RunnerTests bundle IDs changed to `com.subi9218.localminutes.RunnerTests`
-- `APP_STORE_METADATA_KO.md`
-  - Privacy/Support URLs updated
-- `APP_STORE_SUBMISSION_NOTES.md`
-  - Privacy URL updated
-- `CODEX_TODO.md`
-  - Bundle ID and public URL tasks marked/annotated
-- `test/diagnostic_export_test.dart`
-  - Mock package name changed to `com.subi9218.localminutes`
-
-### Local Verification
-
-Commands run successfully after moving the project to `/Users/channy/LocalMinutes` and after the latest App Store risk-reduction changes:
+Verification already run after these changes:
 
 ```bash
 flutter analyze
 flutter test
-flutter build macos --debug
 ```
 
 Results:
 
 - `flutter analyze`: no issues
-- `flutter test`: all tests passed (`90/90`)
-- `flutter build macos --debug`: succeeded
-  - Built app: `build/macos/Build/Products/Debug/적자생존.app`
-- `macos/Runner/PrivacyInfo.xcprivacy`: included in built app resources
-- Latest direct-distribution QA DMG:
-  - `dist/적자생존_v2.1.1_build28.dmg`
-  - `hdiutil verify`: VALID
-  - `by 수비짱` credit removed from version widget
-  - non-sandbox QA builds skip security-scoped bookmark creation to avoid slow folder selection
+- `flutter test`: all tests passed (`89/89`)
 
-Note: the first debug build after folder migration failed because stale Flutter/Xcode files still referenced `/Users/channy/meeting_assistant2`. Running `flutter clean` fixed it.
-
-## Apple Developer Status
-
-At the time this handoff was written:
-
-- The user said Apple Developer registration was done or in progress.
-- Earlier access to Certificates/Identifiers/Profiles showed:
-
-```text
-Access Unavailable
-```
-
-- Local machine still had no valid signing identities:
+Code search after removal:
 
 ```bash
-security find-identity -v -p codesigning
+rg -n "exaone|EXAONE|ALLOW_RESTRICTED|allowRestrictedModels|restrictedModel|llmExaone|summaryRestricted" lib test macos scripts pubspec.yaml
 ```
 
-returned:
+Expected: no matches.
+
+## Product / Pricing Direction
+
+Use the paid-app path for the first App Store submission:
 
 ```text
-0 valid identities found
+App download: paid
+Korea price: 19,000원
+IAP/subscriptions: none for first release
 ```
 
-If using another Apple account, repeat the certificate setup under that account.
+The code currently matches this better than freemium:
 
-## Next Required Apple Account Steps
+- `EntitlementService.currentTier` still returns `EntitlementTier.pro`.
+- There is no StoreKit / `in_app_purchase` implementation.
+- There is no restore purchases UI.
 
-Before continuing App Store submission, decide whether to keep the previous paid-app policy or switch to freemium.
+Do not submit as “Free + Pro Unlock” unless the freemium implementation is completed first.
 
-Current product direction requested by the user:
+## Completed App Store Prep
+
+### Public URLs
+
+GitHub Pages is enabled from branch `main`, folder `/docs`.
+
+Public URLs previously verified:
+
+- Privacy Policy: `https://subi9218.github.io/LocalMinutes/privacy.html`
+- Support: `https://subi9218.github.io/LocalMinutes/support.html`
+
+### Bundle ID / Metadata
+
+Chosen Bundle ID:
 
 ```text
-Free download + Pro Unlock 19,000원 one-time non-consumable IAP
+com.subi9218.localminutes
 ```
 
-Implementation checklist:
+Relevant files:
 
-- `FREEMIUM_TODO.md`
+- `macos/Runner/Configs/AppInfo.xcconfig`
+- `macos/Runner.xcodeproj/project.pbxproj`
+- `APP_STORE_CONNECT_COPY.md`
+- `APP_STORE_METADATA_KO.md`
+- `APP_STORE_SUBMISSION_NOTES.md`
+
+### Release Entitlements
+
+`macos/Runner/Release.entitlements` is configured for App Store review:
+
+- App sandbox: enabled
+- Network client: enabled, for model downloads
+- Audio input: enabled, for recording
+- User-selected file read/write: enabled
+- App-scope bookmarks: enabled, for persistent selected recording folder
+- Calendar/AppleEvent entitlements: absent
+
+Archive script checks these again.
+
+## Apple Developer Account Steps
 
 ### 1. Confirm Apple Developer Program Enrollment
 
@@ -155,7 +121,7 @@ Ready when:
 
 ### 2. Register Bundle ID
 
-In Apple Developer > Certificates, Identifiers & Profiles:
+Apple Developer > Certificates, Identifiers & Profiles:
 
 - Type: App ID
 - Platform: macOS
@@ -166,8 +132,6 @@ In Apple Developer > Certificates, Identifiers & Profiles:
 com.subi9218.localminutes
 ```
 
-If using a different developer account/brand, choose a new stable Bundle ID and update the repo accordingly.
-
 ### 3. Create App Store Connect App
 
 In App Store Connect:
@@ -175,12 +139,7 @@ In App Store Connect:
 - Platform: macOS
 - App name: `적자생존`
 - Bundle ID: `com.subi9218.localminutes`
-- SKU suggestion:
-
-```text
-localminutes-macos-001
-```
-
+- SKU suggestion: `localminutes-macos-001`
 - Primary language: Korean
 - Price plan: paid app, Korea price `19,000원`
 
@@ -232,87 +191,57 @@ This script checks:
 - no Calendar/AppleEvent entitlement
 - archive Bundle ID
 
-## App Store Review Risk Notes
+## Remaining App Review Risks
 
-The latest review pass found no obvious fatal App Store blocker in release entitlements. The two main code risks previously identified were addressed locally and still need App Store-signed QA once certificates are ready.
+### 1. Submission Docs Cleaned
 
-### Model Download Flow
+App Store submission docs no longer use removed model / restricted model / NC license-risk wording. Keep App Review Notes simple:
 
-Previous risk:
+```text
+App Store build supports public distribution models only: Whisper, Gemma, Qwen, and sherpa-onnx.
+Calendar/AppleEvent automation is not included in the App Store build.
+```
 
-- The setup screen could show Hugging Face token UI with copy implying a token was required for the summary model.
+Do not add removed model, restricted model, or NC license-risk wording back into App Review Notes.
 
-Current state:
+### 2. Model Download 401/403 Wording Cleaned
 
-- `lib/presentation/screens/setup_screen.dart`
-- `lib/core/services/model_download_service.dart`
+`lib/core/services/model_download_service.dart` no longer tells App Store users to enter a Hugging Face token on 401/403. It now asks users to check the model provider page and access conditions.
 
-- App Store compliance mode hides the token input and custom download URL UI by default.
-- The "token required" wording was removed.
-- Public Hugging Face/GitHub model URLs were checked with unauthenticated range requests.
-- Still test the in-app download flow before upload.
+### 3. Sandbox Folder Access Needs App Store-Signed QA
 
-### Sandbox Persistent Folder Access
-
-Previous risk:
-
-- Storage selection stored only the folder path, so sandbox access could be lost after relaunch.
-
-Current state:
+Relevant files:
 
 - `lib/presentation/screens/storage_setup_screen.dart`
 - `lib/core/services/app_settings.dart`
 - `lib/core/services/security_scoped_bookmark_service.dart`
 - `macos/Runner/MainFlutterWindow.swift`
-
-Release entitlements include app-scope bookmarks:
-
 - `macos/Runner/Release.entitlements`
 
-- The app now stores/restores a security-scoped bookmark for the selected recording folder.
-- If restore fails, recording start asks the user to reselect the save folder.
-- Still test with an App Store-signed/sandboxed build:
-  - choose save folder
-  - record
-  - quit app
-  - reopen
-  - record again to the same folder
+Test with an App Store-signed/sandboxed build:
 
-### Privacy Manifest
+1. Choose recording save folder.
+2. Record one meeting.
+3. Quit app.
+4. Reopen app.
+5. Record again to the same folder.
+6. Export Markdown/PDF/DOCX.
 
-- Added `macos/Runner/PrivacyInfo.xcprivacy`.
-- It declares no tracking and no collected data.
-- It includes the UserDefaults required reason entry used by `shared_preferences`.
-- The manifest was verified as included in the built app resources.
+### 4. Privacy / Diagnostics Explanation
 
-### Calendar / AppleEvent
+Privacy manifest says no tracking and no collected data.
 
-Calendar AppleScript code exists:
+This is consistent with local-only processing if:
 
-- `lib/core/services/calendar_service.dart`
+- Meeting audio/transcripts/summaries are not automatically uploaded.
+- Diagnostic ZIP export remains user-initiated.
 
-But it is gated by:
-
-- `AppBuildConfig.enableCalendarIntegration == false` in App Store mode
-
-Release entitlements do not include Calendar/AppleEvent permissions.
-
-Keep archive builds using:
+In Review Notes, say:
 
 ```text
-APP_STORE_COMPLIANCE_MODE=true
+The app does not upload meeting audio, transcripts, summaries, or diagnostics to developer servers.
+Diagnostic export is manual and user-initiated only.
 ```
-
-### EXAONE Restricted Model
-
-EXAONE references remain in code for internal builds, but App Store mode hides/blocks them:
-
-- `AppBuildConfig.allowRestrictedModels`
-- `AppSettings.availableLlmModelIds`
-- setup/settings UI conditionals
-- compliance tests
-
-Do not enable `ALLOW_RESTRICTED_MODELS=true` for App Store builds.
 
 ## Useful Commands
 
@@ -333,11 +262,11 @@ APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 
 ## Files To Read First
 
+- `ACCOUNT_HANDOFF.md`
 - `CODEX_TODO.md`
+- `APP_STORE_CONNECT_COPY.md`
 - `APP_STORE_METADATA_KO.md`
 - `APP_STORE_PRIVACY_ANSWERS.md`
 - `APP_STORE_SUBMISSION_NOTES.md`
-- `APP_STORE_COMPLIANCE.md`
 - `APP_STORE_PREP_CHECKLIST.md`
-- `AI_HANDOFF.md`
-- `NEXT_AI_TASKS.md`
+- `APP_STORE_COMPLIANCE.md`

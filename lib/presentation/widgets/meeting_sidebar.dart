@@ -555,9 +555,12 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
           // ── 녹음 중 복귀 배너 ────────────────────────────────────
           if (isRecording)
             GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () {
                 // 클릭하면 RecordingView로 복귀
+                ref.read(isRecordingActiveProvider.notifier).state = true;
                 ref.read(selectedMeetingIdProvider.notifier).state = null;
+                ref.read(selectedGroupIdProvider.notifier).state = null;
               },
               child: Container(
                 width: double.infinity,

@@ -1,8 +1,8 @@
 // VAD sanity check — SilenceGate를 실제 WAV에 적용하고 통계 출력.
 // 실행: dart run tool/vad_sanity.dart "<wav_path>"
 import 'dart:io';
-import 'package:meeting_assistant2/core/utils/silence_gate.dart';
-import 'package:meeting_assistant2/core/utils/wav_loader.dart';
+import 'package:local_minutes/core/utils/silence_gate.dart';
+import 'package:local_minutes/core/utils/wav_loader.dart';
 
 Future<void> main(List<String> args) async {
   final path = args.isNotEmpty

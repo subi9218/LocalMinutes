@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/digest_report.dart';
-import 'package:meeting_assistant2/domain/entities/meeting.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
-import 'package:meeting_assistant2/domain/repositories/meeting_repository.dart';
+import 'package:local_minutes/core/services/digest_report.dart';
+import 'package:local_minutes/domain/entities/meeting.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
+import 'package:local_minutes/domain/repositories/meeting_repository.dart';
 
 void main() {
   test('week range — 월요일 시작, 다음 월요일 미포함', () {

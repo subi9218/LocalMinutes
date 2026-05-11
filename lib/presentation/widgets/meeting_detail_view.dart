@@ -32,7 +32,6 @@ import '../../data/repositories/summary_version_repository_impl.dart';
 import '../../data/repositories/transcript_repository_impl.dart';
 import '../../domain/entities/summary_version.dart';
 import 'package:path_provider/path_provider.dart';
-import '../../core/constants/app_build_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/entities/meeting.dart';
 import '../../domain/entities/meeting_group.dart';
@@ -566,8 +565,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     // null = 전역 설정 따라감, customId = 설정의 커스텀 프롬프트
     String? selected = currentId;
     SummaryStyleMode style = SummaryStyleMode.standard;
-    final result = await showMacosAlertDialog<_TemplatePickResult>(
+    final result = await showDialog<_TemplatePickResult>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setStateDialog) {
@@ -575,6 +575,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               return RadioListTile<String?>(
                 value: id,
                 dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                 title: Text(label, style: const TextStyle(fontSize: 13)),
                 subtitle: Text(
                   desc,
@@ -583,141 +584,222 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               );
             }
 
-            return MacosAlertDialog(
-              appIcon: const Icon(Icons.auto_awesome, size: 48),
-              title: const Text('회의 유형 / 재생성 스타일'),
-              message: SizedBox(
-                width: 460,
-                height: 480,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── 회의 유형 ───────────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                        child: Text(
-                          '회의 유형',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                      RadioGroup<String?>(
-                        groupValue: selected,
-                        onChanged: (v) => setStateDialog(() => selected = v),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            tile(null, '설정값 사용', '설정 화면에서 지정한 회의 유형을 그대로 적용'),
-                            const Divider(height: 8),
-                            for (final t in SummaryTemplates.presets)
-                              tile(t.id, t.name, t.description),
-                            tile(
-                              SummaryTemplates.customId1,
-                              '커스텀1',
-                              '설정에 저장된 사용자 지침 슬롯 1 사용',
-                            ),
-                            tile(
-                              SummaryTemplates.customId2,
-                              '커스텀2',
-                              '설정에 저장된 사용자 지침 슬롯 2 사용',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 16),
-                      // ── 재생성 스타일 ───────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                        child: Row(
-                          children: [
-                            Text(
-                              '재생성 스타일',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            MacosTooltip(
-                              message:
-                                  '같은 전사본을 다른 톤/길이로 다시 분석합니다.\n'
-                                  '회의 유형 위에 누적 적용됩니다.',
-                              child: Icon(
-                                Icons.info_outline,
-                                size: 13,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final m in SummaryStyleMode.values)
-                              ChoiceChip(
-                                label: Text(
-                                  m.displayName,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                selected: style == m,
-                                visualDensity: VisualDensity.compact,
-                                onSelected: (_) =>
-                                    setStateDialog(() => style = m),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(ctx)
-                                .colorScheme
-                                .surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            style.description,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade700,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
+            final scheme = Theme.of(ctx).colorScheme;
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 40,
+                vertical: 32,
+              ),
+              backgroundColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 780,
+                  maxHeight: 620,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: scheme.outlineVariant),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.16),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
                       ),
                     ],
                   ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.auto_awesome, size: 34),
+                            SizedBox(width: 12),
+                            Text(
+                              '회의 유형 / 재생성 스타일',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Flexible(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 6,
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          10,
+                                          0,
+                                          10,
+                                          4,
+                                        ),
+                                        child: Text(
+                                          '회의 유형',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                      RadioGroup<String?>(
+                                        groupValue: selected,
+                                        onChanged: (v) =>
+                                            setStateDialog(() => selected = v),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            tile(
+                                              null,
+                                              '설정값 사용',
+                                              '설정 화면에서 지정한 회의 유형을 그대로 적용',
+                                            ),
+                                            const Divider(height: 8),
+                                            for (final t
+                                                in SummaryTemplates.presets)
+                                              tile(t.id, t.name, t.description),
+                                            tile(
+                                              SummaryTemplates.customId1,
+                                              '커스텀1',
+                                              '설정에 저장된 사용자 지침 슬롯 1 사용',
+                                            ),
+                                            tile(
+                                              SummaryTemplates.customId2,
+                                              '커스텀2',
+                                              '설정에 저장된 사용자 지침 슬롯 2 사용',
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 22),
+                              Container(width: 1, color: scheme.outlineVariant),
+                              const SizedBox(width: 22),
+                              Expanded(
+                                flex: 5,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '재생성 스타일',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        MacosTooltip(
+                                          message:
+                                              '같은 전사본을 다른 톤/길이로 다시 분석합니다.\n'
+                                              '회의 유형 위에 누적 적용됩니다.',
+                                          child: Icon(
+                                            Icons.info_outline,
+                                            size: 14,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        for (final m in SummaryStyleMode.values)
+                                          ChoiceChip(
+                                            label: Text(
+                                              m.displayName,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            selected: style == m,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            onSelected: (_) =>
+                                                setStateDialog(() => style = m),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: scheme.surfaceContainerHighest
+                                            .withValues(alpha: 0.55),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        style.description,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade700,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            const Spacer(),
+                            SizedBox(
+                              width: 150,
+                              child: PushButton(
+                                controlSize: ControlSize.large,
+                                secondary: true,
+                                onPressed: () => Navigator.of(
+                                  ctx,
+                                ).pop(const _TemplatePickResult.cancelled()),
+                                child: const Text('취소'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              width: 170,
+                              child: PushButton(
+                                controlSize: ControlSize.large,
+                                onPressed: () => Navigator.of(ctx).pop(
+                                  _TemplatePickResult(
+                                    selected,
+                                    styleMode: style,
+                                  ),
+                                ),
+                                child: const Text('요약 실행'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              primaryButton: PushButton(
-                controlSize: ControlSize.large,
-                onPressed: () => Navigator.of(
-                  ctx,
-                ).pop(_TemplatePickResult(selected, styleMode: style)),
-                child: const Text('요약 실행'),
-              ),
-              secondaryButton: PushButton(
-                controlSize: ControlSize.large,
-                secondary: true,
-                onPressed: () => Navigator.of(
-                  ctx,
-                ).pop(const _TemplatePickResult.cancelled()),
-                child: const Text('취소'),
               ),
             );
           },
@@ -749,10 +831,6 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       switch (id) {
         case 'qwen25_7b':
           return 'Qwen 2.5 7B';
-        case 'exaone35_7b':
-          return AppBuildConfig.allowRestrictedModels
-              ? 'EXAONE 3.5 7.8B'
-              : '지원되지 않는 모델';
         default:
           return 'Gemma 4 E2B';
       }
@@ -762,8 +840,6 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       switch (id) {
         case 'qwen25_7b':
           return 'Qwen 2.5 7B Instruct Q4_K_M (~4.7GB)\n한국어·구조화 출력 강함';
-        case 'exaone35_7b':
-          return '내부 테스트 빌드 전용 모델입니다.';
         default:
           return 'Gemma 4 E2B Q8_0 (~3GB)\n빠름, 기본 품질';
       }
@@ -1190,8 +1266,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           appIcon: const Icon(Icons.timer_outlined, size: 48),
           title: const Text('음성 인식 다시 돌리기'),
           message: SizedBox(
-            width: 500,
-            height: 520,
+            width: 680,
+            height: 560,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -4016,8 +4092,6 @@ class _AdvancedReportInfo extends StatelessWidget {
 
   String _llmDisplayName(String id) => switch (id) {
     'qwen25_7b' => 'Qwen 2.5 7B',
-    'exaone35_7b' =>
-      AppBuildConfig.allowRestrictedModels ? 'EXAONE 3.5 7.8B' : '지원되지 않는 모델',
     'gemma4_e2b' => 'Gemma 4 E2B',
     _ => id.isEmpty ? '-' : id,
   };

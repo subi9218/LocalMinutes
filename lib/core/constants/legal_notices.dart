@@ -61,9 +61,4 @@ class LegalNotices {
       note: '사람 이름 식별이 아닌 A/B/C 발화자 라벨 보조 기능에 사용합니다.',
     ),
   ];
-
-  static const String restrictedModelNote =
-      'EXAONE 3.5 계열은 NC 성격의 라이선스 리스크가 있어 앱스토어용 빌드에서는 '
-      '다운로드, 선택, 기본 설정 노출을 비활성화했습니다. 내부 테스트 빌드에서만 '
-      '명시적인 빌드 플래그로 다시 켤 수 있습니다.';
 }

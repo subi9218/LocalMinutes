@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 
+import '../constants/app_build_config.dart';
+
 /// 모델 파일 다운로드 서비스
 ///
 /// - dart:io HttpClient 사용 (추가 패키지 없음)
@@ -89,15 +91,21 @@ class ModelDownloadService {
 
       // 상태 코드 확인
       if (response.statusCode == 401) {
-        throw const ModelDownloadException.authRequired(
-          '로그인이 필요한 모델입니다.\n'
-          'Hugging Face 토큰을 입력하거나 모델 페이지에서 사용 동의 후 다시 시도하세요.',
+        throw ModelDownloadException.authRequired(
+          AppBuildConfig.appStoreComplianceMode
+              ? '모델 제공 사이트에서 접근 확인이 필요한 파일입니다.\n'
+                    '모델 페이지에서 사용 조건을 확인한 뒤 다시 시도하세요.'
+              : '로그인이 필요한 모델입니다.\n'
+                    '모델 페이지에서 사용 동의 또는 접근 조건을 확인한 뒤 다시 시도하세요.',
         );
       }
       if (response.statusCode == 403) {
-        throw const ModelDownloadException.authRequired(
-          '모델 파일 접근 권한이 없습니다.\n'
-          '모델 페이지에서 사용 약관에 동의했는지 확인하고, 필요하면 토큰을 다시 입력하세요.',
+        throw ModelDownloadException.authRequired(
+          AppBuildConfig.appStoreComplianceMode
+              ? '모델 파일 접근 권한을 확인할 수 없습니다.\n'
+                    '모델 제공 페이지에서 사용 조건을 확인한 뒤 다시 시도하세요.'
+              : '모델 파일 접근 권한이 없습니다.\n'
+                    '모델 페이지에서 사용 약관과 접근 조건을 확인한 뒤 다시 시도하세요.',
         );
       }
       if (response.statusCode == 404) {
@@ -319,7 +327,7 @@ class ModelDownloadService {
       if (bearerToken != null) {
         req.headers.set('Authorization', 'Bearer $bearerToken');
       }
-      req.headers.set('User-Agent', 'meeting_assistant2/1.0');
+      req.headers.set('User-Agent', 'LocalMinutes/1.0');
 
       final res = await req.close();
 

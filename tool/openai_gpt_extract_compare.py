@@ -75,7 +75,7 @@ def main() -> None:
         raise SystemExit(f"로컬 기준 결과 폴더를 찾을 수 없습니다: {local_dir}")
 
     stamp = time.strftime("%Y-%m-%dT%H%M%S")
-    out_dir = pathlib.Path("/Users/channy/meeting_assistant2/exports") / (
+    out_dir = pathlib.Path("/Users/channy/LocalMinutes/exports") / (
         f"{wav_path.stem}_openai_gpt_{stamp}"
     )
     out_dir.mkdir(parents=True, exist_ok=True)

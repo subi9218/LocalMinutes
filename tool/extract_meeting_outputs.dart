@@ -11,10 +11,10 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:meeting_assistant2/core/utils/silence_gate.dart';
-import 'package:meeting_assistant2/core/utils/summary_parser.dart';
-import 'package:meeting_assistant2/core/utils/wav_loader.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
+import 'package:local_minutes/core/utils/silence_gate.dart';
+import 'package:local_minutes/core/utils/summary_parser.dart';
+import 'package:local_minutes/core/utils/wav_loader.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as so;
 
 typedef _LoadModelC = Pointer<Void> Function(Pointer<Utf8>);
@@ -78,7 +78,7 @@ typedef _SamplerAcceptDart = void Function(Pointer<Void>, int);
 const _modelDir =
     '/Users/channy/Library/Containers/com.example.meetingAssistant2/Data/Library/Application Support/com.example.meetingAssistant2/models';
 const _frameworksDir =
-    '/Users/channy/meeting_assistant2/build/macos/Build/Products/Debug/적자생존.app/Contents/Frameworks';
+    '/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/적자생존.app/Contents/Frameworks';
 const _sttModelFile = 'ggml-large-v3-q5_0.bin';
 const _llmModelId = 'exaone35_7b';
 const _llmModelFile = 'EXAONE-3.5-7.8B-Instruct-Q4_K_M.gguf';
@@ -261,7 +261,7 @@ Future<void> main(List<String> args) async {
       .replaceAll('.', '_');
   final baseName = wavFile.uri.pathSegments.last.replaceAll('.wav', '');
   final outDir = Directory(
-    '/Users/channy/meeting_assistant2/exports/${baseName}_reference_$runStamp',
+    '/Users/channy/LocalMinutes/exports/${baseName}_reference_$runStamp',
   );
   await outDir.create(recursive: true);
 

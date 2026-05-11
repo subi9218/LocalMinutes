@@ -1,4 +1,4 @@
-name: meeting_assistant2
+name: local_minutes
 description: "온디바이스 AI 회의록 앱 - macOS 전용 1차 버전"
 publish_to: 'none'
 version: 2.1.1+28

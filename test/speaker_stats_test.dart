@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/speaker_stats.dart';
-import 'package:meeting_assistant2/domain/entities/transcript.dart';
+import 'package:local_minutes/core/services/speaker_stats.dart';
+import 'package:local_minutes/domain/entities/transcript.dart';
 
 void main() {
   test('빈 입력 → empty report', () {

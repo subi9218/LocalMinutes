@@ -71,12 +71,11 @@ class LlmService {
       '사용자가 요청한 형식만 출력하세요.';
 
   /// 선택된 LLM에 맞는 채팅 템플릿 적용.
-  /// Qwen/EXAONE Instruct 계열은 ChatML 형식이 구조화 출력에 안정적이고,
+  /// Qwen Instruct 계열은 ChatML 형식이 구조화 출력에 안정적이고,
   /// Gemma 계열은 기존 Gemma turn marker를 유지한다.
   static String buildPromptForModel(String modelId, String userMessage) {
     switch (modelId) {
       case 'qwen25_7b':
-      case 'exaone35_7b':
         return '<|im_start|>system\n$_summarySystemPrompt<|im_end|>\n'
             '<|im_start|>user\n$userMessage<|im_end|>\n'
             '<|im_start|>assistant\n';

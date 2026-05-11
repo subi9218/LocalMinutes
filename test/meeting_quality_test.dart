@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/meeting_quality.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
-import 'package:meeting_assistant2/domain/entities/transcript.dart';
+import 'package:local_minutes/core/services/meeting_quality.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
+import 'package:local_minutes/domain/entities/transcript.dart';
 
 void main() {
   test('null summary → empty report', () {

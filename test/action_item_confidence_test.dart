@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
 
 void main() {
   test('action item marks missing owner and deadline as unconfirmed', () {

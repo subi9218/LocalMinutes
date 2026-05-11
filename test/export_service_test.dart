@@ -2,10 +2,10 @@ import 'dart:convert';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meeting_assistant2/core/services/export_service.dart';
-import 'package:meeting_assistant2/domain/entities/meeting.dart';
-import 'package:meeting_assistant2/domain/entities/summary.dart';
-import 'package:meeting_assistant2/domain/entities/transcript.dart';
+import 'package:local_minutes/core/services/export_service.dart';
+import 'package:local_minutes/domain/entities/meeting.dart';
+import 'package:local_minutes/domain/entities/summary.dart';
+import 'package:local_minutes/domain/entities/transcript.dart';
 
 void main() {
   test('buildActionItemsMarkdown exports only action checklist', () {
