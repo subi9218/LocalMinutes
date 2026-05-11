@@ -1,19 +1,49 @@
 # Codex TODO — 적자생존 App Store 제출 마무리
 
-기준일: 2026-05-11
+기준일: 2026-05-12
 
 ## 현재 확인된 상태
 
 - 프로젝트는 Git 저장소이며 원격 `origin/main`과 연결되어 있다.
+- 최신 로컬 커밋은 `9d41be9 Prepare App Store submission build`.
+- 현재 워킹트리는 clean 상태.
 - 현재 앱 버전은 `2.1.1+28`.
 - `flutter analyze` 통과: 0 issues.
 - `flutter test` 통과: 89/89.
-- `flutter build macos --debug` 통과.
+- `flutter build macos` 통과.
 - 최근 QA 산출물은 `dist/적자생존_v2.1.1_build28.dmg`.
 - 핵심 제품 기능은 대부분 완료 상태.
 - 현재 1차 제출 권장 수익 모델은 `유료 앱 19,000원 / IAP 없음`.
 - `무료 앱 + Pro Unlock` 전환은 출시 후 또는 별도 작업으로 보류.
 - EXAONE 관련 소스/테스트/제출 문서 참조는 제거 완료.
+- macOS 내부 실행 파일명은 `LocalMinutes`, 사용자 표시 앱 이름은 `적자생존`.
+
+## P0 — 다른 계정 인수인계
+
+### -1. GitHub 최신화
+
+- [ ] 현재 커밋 `9d41be9`를 원격 `origin/main`에 push.
+- [ ] 다른 계정에서 clone/pull 후 `git log -1 --oneline`이 `9d41be9 Prepare App Store submission build`인지 확인.
+- [ ] 이전 대화에 노출된 GitHub PAT가 아직 살아 있다면 revoke.
+
+완료 조건:
+
+- 다른 계정에서 `/Users/channy/LocalMinutes` 없이도 GitHub repo 기준으로 동일 상태를 받을 수 있음.
+- `git status --short`가 clean.
+
+### -0. Apple Developer 계정 준비
+
+- [ ] Apple Developer Program 가입/승인 완료.
+- [ ] Team ID 확인.
+- [ ] Paid Apps Agreement 수락.
+- [ ] 세금/은행 정보 입력.
+- [ ] Xcode > Settings > Accounts에서 Apple Distribution 인증서 설치.
+- [ ] App Store Connect 앱 record 생성.
+
+완료 조건:
+
+- `security find-identity -v -p codesigning`에서 유효한 `Apple Distribution` identity가 보임.
+- `com.subi9218.localminutes` Bundle ID로 Archive 생성 준비 완료.
 
 ## P0 — 제출 정책 확정
 

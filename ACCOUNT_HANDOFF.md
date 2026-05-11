@@ -1,6 +1,6 @@
 # Account Handoff — LocalMinutes / 적자생존
 
-Last updated: 2026-05-11
+Last updated: 2026-05-12
 
 This document is for continuing App Store submission work from another Apple/GitHub account or another AI assistant.
 
@@ -9,39 +9,52 @@ This document is for continuing App Store submission work from another Apple/Git
 - Local path: `/Users/channy/LocalMinutes`
 - GitHub repo: `https://github.com/subi9218/LocalMinutes`
 - Branch: `main`
+- Latest local commit: `9d41be9 Prepare App Store submission build`
 - Bundle ID for App Store: `com.subi9218.localminutes`
 - Current app version: `2.1.1+28`
 - Important: a GitHub PAT was pasted in chat during earlier setup. If still active, revoke it.
 
 ## Current Working Tree
 
-There are intentional uncommitted changes. Commit these before handing off or pushing:
+Current status:
+
+- `git status --short`: clean
+- Latest changes are committed in `9d41be9`.
+- Push is still needed if the other account will continue from GitHub.
+
+Major changes included in `9d41be9`:
 
 - Removed all EXAONE-related source/test references and App Store submission wording.
 - Removed `ALLOW_RESTRICTED_MODELS` / `allowRestrictedModels`.
-- Simplified supported summary models to:
-  - Gemma 4 E2B
-  - Qwen 2.5 7B Instruct
-- Updated setup/settings/recording/detail/model selection flows accordingly.
-- Updated compliance tests for the new two-model policy.
-- Improved the “회의 유형 / 재생성 스타일” dialog from a narrow alert into a wider two-column modal.
+- Simplified supported summary models to Gemma 4 E2B and Qwen 2.5 7B Instruct.
+- Updated setup/settings/recording/detail/model selection flows and compliance tests.
+- Renamed the internal Dart package to `local_minutes`.
+- Renamed the macOS bundle executable to `LocalMinutes`; user-facing app name remains `적자생존`.
+- Improved recording-related UI:
+  - “회의 유형 / 재생성 스타일” dialog is wider/two-column.
+  - “녹음 진행 중” sidebar banner returns to the recording screen.
+  - “녹음 준비” dialog keeps the start/cancel buttons visible in small windows.
+- Cleaned App Store submission docs for paid-app first release.
+- Changed model download 401/403 wording so App Store users are not told to enter a Hugging Face token.
 
-Verification already run after these changes:
+Verification run after these changes:
 
 ```bash
 flutter analyze
 flutter test
+flutter build macos
 ```
 
 Results:
 
 - `flutter analyze`: no issues
 - `flutter test`: all tests passed (`89/89`)
+- `flutter build macos`: success, output `build/macos/Build/Products/Release/적자생존.app`
 
-Code search after removal:
+Code/doc search after removal:
 
 ```bash
-rg -n "exaone|EXAONE|ALLOW_RESTRICTED|allowRestrictedModels|restrictedModel|llmExaone|summaryRestricted" lib test macos scripts pubspec.yaml
+rg -n "exaone|EXAONE|ALLOW_RESTRICTED|allowRestrictedModels|restrictedModel|llmExaone|summaryRestricted" lib test macos scripts pubspec.yaml APP_STORE_*.md PRIVACY_POLICY.md docs/privacy.html
 ```
 
 Expected: no matches.
@@ -191,7 +204,7 @@ This script checks:
 - no Calendar/AppleEvent entitlement
 - archive Bundle ID
 
-## Remaining App Review Risks
+## Remaining App Review / Submission Risks
 
 ### 1. Submission Docs Cleaned
 
@@ -208,7 +221,26 @@ Do not add removed model, restricted model, or NC license-risk wording back into
 
 `lib/core/services/model_download_service.dart` no longer tells App Store users to enter a Hugging Face token on 401/403. It now asks users to check the model provider page and access conditions.
 
-### 3. Sandbox Folder Access Needs App Store-Signed QA
+### 3. Main Remaining Blocker: Apple Developer Account / Signing
+
+The codebase is ready for the next signing step, but App Store upload is blocked until the new Apple Developer account is ready:
+
+- Apple Developer Program enrollment approved
+- Team ID available
+- Paid Apps Agreement accepted
+- Tax and banking information completed
+- Apple Distribution certificate installed in Xcode
+- App Store Connect app record created for `com.subi9218.localminutes`
+
+Run:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+Expected before archive work: at least one valid `Apple Distribution` identity.
+
+### 4. Sandbox Folder Access Needs App Store-Signed QA
 
 Relevant files:
 
@@ -227,7 +259,7 @@ Test with an App Store-signed/sandboxed build:
 5. Record again to the same folder.
 6. Export Markdown/PDF/DOCX.
 
-### 4. Privacy / Diagnostics Explanation
+### 5. Privacy / Diagnostics Explanation
 
 Privacy manifest says no tracking and no collected data.
 
@@ -259,6 +291,20 @@ APPLE_TEAM_ID=<TEAM_ID> \
 APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 ./scripts/archive_app_store.sh
 ```
+
+## Suggested Next Steps For Another Account
+
+1. Push `main` so the other account can pull commit `9d41be9`.
+2. Confirm Apple Developer Program enrollment and Team ID.
+3. Create the explicit macOS Bundle ID `com.subi9218.localminutes`.
+4. Create the App Store Connect app record:
+   - Name: `적자생존`
+   - SKU: `localminutes-macos-001`
+   - Price: paid app, Korea `19,000원`
+   - IAP/subscription: none
+5. Install/create Apple Distribution certificate in Xcode.
+6. Run `./scripts/archive_app_store.sh` with `APPLE_TEAM_ID` and `APP_STORE_BUNDLE_ID`.
+7. Perform App Store-signed QA, especially folder bookmark persistence and model downloads.
 
 ## Files To Read First
 
