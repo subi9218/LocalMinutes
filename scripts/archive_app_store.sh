@@ -96,21 +96,24 @@ fi
 log "서명/entitlements 검사"
 codesign --verify --strict --deep --verbose=2 "${ARCHIVED_APP}"
 ENTITLEMENTS_DUMP="$(codesign -d --entitlements :- "${ARCHIVED_APP}" 2>/dev/null || true)"
+ENTITLEMENTS_PLIST="$(mktemp)"
+printf "%s\n" "${ENTITLEMENTS_DUMP}" > "${ENTITLEMENTS_PLIST}"
+APP_SANDBOX="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "${ENTITLEMENTS_PLIST}" 2>/dev/null || true)"
+GET_TASK_ALLOW="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.get-task-allow' "${ENTITLEMENTS_PLIST}" 2>/dev/null || true)"
 
-echo "${ENTITLEMENTS_DUMP}" | grep -q "<key>com.apple.security.app-sandbox</key>" ||
+[ -n "${APP_SANDBOX}" ] ||
   fail "sandbox entitlement가 없습니다"
-echo "${ENTITLEMENTS_DUMP}" | grep -A1 "<key>com.apple.security.app-sandbox</key>" |
-  grep -q "<true/>" ||
+[ "${APP_SANDBOX}" = "true" ] ||
   fail "sandbox entitlement가 true가 아닙니다"
 
-if echo "${ENTITLEMENTS_DUMP}" | grep -A1 "<key>com.apple.security.get-task-allow</key>" |
-  grep -q "<true/>"; then
+if [ "${GET_TASK_ALLOW}" = "true" ]; then
   fail "get-task-allow가 true입니다. Apple Distribution 서명/프로비저닝을 확인하세요"
 fi
 
 if echo "${ENTITLEMENTS_DUMP}" | grep -q "temporary-exception.apple-events\\|personal-information.calendars"; then
   fail "App Store archive에 AppleEvent/Calendar entitlement가 포함되어 있습니다"
 fi
+rm -f "${ENTITLEMENTS_PLIST}"
 
 log "성공: ${ARCHIVE_PATH}"
 log "다음 단계: Xcode Organizer 또는 Transporter로 App Store Connect에 업로드하세요."

@@ -92,6 +92,11 @@ final summaryVersionsProvider =
 // ── 녹음 활성화 여부 ──────────────────────────────────────────
 final isRecordingActiveProvider = StateProvider<bool>((ref) => false);
 
+// ── 실제 마이크 녹음/일시정지 여부 ───────────────────────────────
+// isRecordingActiveProvider는 "녹음 화면 표시"에도 쓰인다. 사이드바의
+// "녹음 진행 중" 배너처럼 실제 녹음 상태가 필요한 곳은 이 provider를 본다.
+final nativeRecordingActiveProvider = StateProvider<bool>((ref) => false);
+
 // ── 요약 중 여부 (사이드바 표시용) ────────────────────────────
 final isSummarizingProvider = StateProvider<bool>((ref) => false);
 

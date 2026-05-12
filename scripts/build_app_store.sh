@@ -56,13 +56,16 @@ fi
 
 log "빌드 산출물 entitlements 검사"
 ENTITLEMENTS_DUMP="$(codesign -d --entitlements :- "${RELEASE_APP}" 2>/dev/null || true)"
-echo "${ENTITLEMENTS_DUMP}" | grep -q "<key>com.apple.security.app-sandbox</key>" ||
+ENTITLEMENTS_PLIST="$(mktemp)"
+printf "%s\n" "${ENTITLEMENTS_DUMP}" > "${ENTITLEMENTS_PLIST}"
+APP_SANDBOX="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "${ENTITLEMENTS_PLIST}" 2>/dev/null || true)"
+GET_TASK_ALLOW="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.get-task-allow' "${ENTITLEMENTS_PLIST}" 2>/dev/null || true)"
+
+[ -n "${APP_SANDBOX}" ] ||
   fail "산출물에 app sandbox entitlement가 없습니다"
-echo "${ENTITLEMENTS_DUMP}" | grep -A1 "<key>com.apple.security.app-sandbox</key>" |
-  grep -q "<true/>" ||
+[ "${APP_SANDBOX}" = "true" ] ||
   fail "산출물 app sandbox가 true가 아닙니다"
-if echo "${ENTITLEMENTS_DUMP}" | grep -A1 "<key>com.apple.security.get-task-allow</key>" |
-  grep -q "<true/>"; then
+if [ "${GET_TASK_ALLOW}" = "true" ]; then
   if [ "${STRICT_CODESIGN_CHECK:-0}" = "1" ]; then
     fail "산출물 get-task-allow가 true입니다. App Store 배포용 서명을 확인하세요"
   fi
@@ -72,6 +75,7 @@ fi
 if echo "${ENTITLEMENTS_DUMP}" | grep -q "temporary-exception.apple-events\\|personal-information.calendars"; then
   fail "산출물에 AppleEvent/Calendar entitlement가 포함되어 있습니다"
 fi
+rm -f "${ENTITLEMENTS_PLIST}"
 
 log "빌드 산출물 최소 macOS 버전 검사"
 APP_MIN_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${RELEASE_APP}/Contents/Info.plist" 2>/dev/null || true)"

@@ -8,11 +8,13 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/digest_report.dart';
 import '../../core/services/meeting_keyword_search.dart';
+import '../../core/services/recovery_service.dart';
 import '../../core/services/series_overview.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/services/isar_service.dart';
 import '../../core/services/meeting_series_detector.dart';
 import '../../core/services/search_service.dart';
+import '../../data/datasources/microphone_service.dart';
 import '../../data/datasources/llm_service.dart';
 import '../../data/repositories/meeting_repository_impl.dart';
 import '../../data/repositories/meeting_group_repository_impl.dart';
@@ -249,10 +251,22 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
   // 검색 초기화는 SidebarSearchTop 의 clear 버튼이 처리.
 
   // ── 회의 탭 공통 핸들러 ──────────────────────────────────────────
-  void _onTapMeeting(Meeting m) {
-    // 녹음 중에는 isRecordingActive를 끄지 않음 (RecordingView 유지)
-    // selectedId만 바꿔서 녹음 종료 후 자동으로 해당 회의로 이동
-    if (!ref.read(isRecordingActiveProvider)) {
+  Future<void> _onTapMeeting(Meeting m) async {
+    final nativeRecording =
+        ref.read(nativeRecordingActiveProvider) ||
+        MicrophoneService.instance.isRecording ||
+        MicrophoneService.instance.isPaused;
+
+    // 실제 녹음은 끝났는데 DB 상태만 진행 중으로 남은 회의는
+    // 비정상 종료/화면 이탈 복구 대상으로 보고 스피너를 멈춘다.
+    if (!nativeRecording &&
+        m.status != MeetingStatus.done &&
+        m.status != MeetingStatus.error) {
+      await RecoveryService.markAsRecovered(m);
+      ref.invalidate(meetingsProvider);
+    }
+
+    if (!nativeRecording) {
       ref.read(isRecordingActiveProvider.notifier).state = false;
     }
     ref.read(selectedMeetingIdProvider.notifier).state = m.id;
@@ -436,7 +450,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     final groupsAsync = ref.watch(groupsProvider);
     final summariesAsync = ref.watch(allSummariesProvider);
     final selectedId = ref.watch(selectedMeetingIdProvider);
-    final isRecording = ref.watch(isRecordingActiveProvider);
+    final isRecording = ref.watch(nativeRecordingActiveProvider);
     final isSummarizing = ref.watch(isSummarizingProvider);
     final query = ref.watch(searchQueryProvider);
 

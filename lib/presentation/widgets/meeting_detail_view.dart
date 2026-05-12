@@ -969,7 +969,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       final transcriptText = TranscriptTextCleaner.cleanForSummary(
         transcriptTextRaw,
       );
-      debugPrint('=== RESUMMARIZE NOTES (${notes.length} chars): $notes ===');
+      debugPrint('=== RESUMMARIZE NOTES (${notes.length} chars) ===');
 
       // 단어집: 전사본에 등장하는 용어만 필터링
       final glossaryRepo = GlossaryRepositoryImpl(IsarService.instance.db);
@@ -1035,14 +1035,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
 
       // 새 요약 저장 (기존 id 재사용 → unique index 충돌 방지)
       debugPrint(
-        '=== GEMMA RAW OUTPUT (detail, ${rawOutput.length} chars) ===',
+        '=== GEMMA output received (detail, ${rawOutput.length} chars) ===',
       );
-      debugPrint(
-        rawOutput.length > 2000
-            ? '${rawOutput.substring(0, 2000)}...[truncated]'
-            : rawOutput,
-      );
-      debugPrint('=== END GEMMA OUTPUT ===');
 
       final newSummary = SummaryParser.parse(
         rawOutput,

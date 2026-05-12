@@ -150,7 +150,7 @@ JSON:''';
       }
       return tags;
     } catch (e) {
-      debugPrint('[TagExtractor] parse error: $e (raw=$raw)');
+      debugPrint('[TagExtractor] parse error: $e (rawLength=${raw.length})');
       return const [];
     }
   }

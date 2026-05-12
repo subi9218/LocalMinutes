@@ -199,9 +199,11 @@ class _SetupScreenState extends State<SetupScreen> {
         service = _diarEmbService;
     }
     final destPath = '${dir.path}/$filename';
-    final token = _tokenCtrl.text.trim().isEmpty
-        ? null
-        : _tokenCtrl.text.trim();
+    final token =
+        !AppBuildConfig.appStoreComplianceMode &&
+            _tokenCtrl.text.trim().isNotEmpty
+        ? _tokenCtrl.text.trim()
+        : null;
 
     _setDl(target, const _DlState(status: _Status.downloading));
 

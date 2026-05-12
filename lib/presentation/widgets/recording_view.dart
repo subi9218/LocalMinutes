@@ -175,6 +175,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     // (사이드바에서 다른 회의를 봤다가 돌아올 때 위젯이 새로 생성됨)
     final mic = MicrophoneService.instance;
     if (mic.isRecording) {
+      ref.read(nativeRecordingActiveProvider.notifier).state = true;
       _phase = _RecordingPhase.recording;
       _segments.addAll(mic.segments);
       _statusMsg = '녹음 중 (30초마다 자동으로 텍스트 변환)';
@@ -185,12 +186,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         if (mounted) setState(() {});
       });
     } else if (mic.isPaused) {
+      ref.read(nativeRecordingActiveProvider.notifier).state = true;
       _phase = _RecordingPhase.paused;
       _segments.addAll(mic.segments);
       _statusMsg = '일시 정지됨 — "계속하기"로 재개하세요.';
       _sttModelExists = true;
       _llmModelExists = true;
     } else {
+      ref.read(nativeRecordingActiveProvider.notifier).state = false;
       _checkModels();
     }
 
@@ -939,6 +942,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
       _recordingStartedAt = DateTime.now();
       _recordingEndedAt = null;
+      ref.read(nativeRecordingActiveProvider.notifier).state = true;
 
       // 크래시 복구: 녹음 시작 즉시 Meeting을 DB에 저장 (status=recording)
       // 30초마다 부분 transcripts를 flush하여 앱이 비정상 종료돼도 복구 가능
@@ -1113,6 +1117,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     });
     await MicrophoneService.instance.stopRecording();
     _recordingEndedAt = DateTime.now();
+    ref.read(nativeRecordingActiveProvider.notifier).state = false;
     if (mounted) setState(() => _inputLevel = 0);
 
     // 마지막 체크포인트: status=transcribing으로 표기 (요약 전 단계)
@@ -1122,7 +1127,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         final m = await meetingRepo.getMeetingById(_recoveryMeetingId!);
         if (m != null) {
           m
-            ..status = MeetingStatus.transcribing
+            ..status = MeetingStatus.done
             ..endedAt = _recordingEndedAt;
           await meetingRepo.updateMeeting(m);
         }
@@ -1134,6 +1139,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _phase = _RecordingPhase.stopped;
       _statusMsg = '녹음 완료. 요약을 실행하세요.';
     });
+    ref.invalidate(meetingsProvider);
     await _maybeWarnEmptyRecordingAfterStop();
   }
 
@@ -1150,10 +1156,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     var sttLanguage = AppSettings.instance.sttLanguage;
     var guideChecked = AppSettings.instance.micGuideShown;
 
-    final titleCtrl = TextEditingController(
-      text: _titleSuffixController.text.trim(),
-    );
-    final agendaCtrl = TextEditingController();
+    var titleText = _titleSuffixController.text.trim();
+    var agendaText = '';
+    var titleFieldVersion = 0;
+    var agendaFieldVersion = 0;
     Future<void> Function()? stopMicTest;
     final result = await showMacosAlertDialog<_RecordingPrepResult>(
       context: context,
@@ -1183,18 +1189,22 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         _CalendarSuggestionPanel(
                           onPick: (event) {
                             setLocalState(() {
-                              if (titleCtrl.text.trim().isEmpty) {
-                                titleCtrl.text = event.title;
+                              if (titleText.trim().isEmpty) {
+                                titleText = event.title;
+                                titleFieldVersion++;
                               }
-                              if (agendaCtrl.text.trim().isEmpty) {
+                              if (agendaText.trim().isEmpty) {
                                 final t = event.title;
-                                agendaCtrl.text = '- $t';
+                                agendaText = '- $t';
+                                agendaFieldVersion++;
                               }
                             });
                           },
                         ),
-                      TextField(
-                        controller: titleCtrl,
+                      TextFormField(
+                        key: ValueKey('prep-title-$titleFieldVersion'),
+                        initialValue: titleText,
+                        onChanged: (v) => titleText = v,
                         decoration: const InputDecoration(
                           labelText: '회의 제목',
                           hintText: '예: 제품 주간 회의',
@@ -1207,6 +1217,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<int>(
+                              isExpanded: true,
                               initialValue: speakerCount,
                               decoration: const InputDecoration(
                                 labelText: '말할 사람 수',
@@ -1230,6 +1241,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: DropdownButtonFormField<String?>(
+                              isExpanded: true,
                               initialValue: templateId,
                               decoration: const InputDecoration(
                                 labelText: '회의 유형',
@@ -1239,20 +1251,32 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                               items: [
                                 const DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text('설정값 사용'),
+                                  child: Text(
+                                    '설정값 사용',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                                 for (final t in SummaryTemplates.presets)
                                   DropdownMenuItem<String?>(
                                     value: t.id,
-                                    child: Text(t.name),
+                                    child: Text(
+                                      t.name,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 const DropdownMenuItem<String?>(
                                   value: SummaryTemplates.customId1,
-                                  child: Text('커스텀1'),
+                                  child: Text(
+                                    '커스텀1',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                                 const DropdownMenuItem<String?>(
                                   value: SummaryTemplates.customId2,
-                                  child: Text('커스텀2'),
+                                  child: Text(
+                                    '커스텀2',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                               onChanged: (v) {
@@ -1264,8 +1288,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       ),
                       const SizedBox(height: 12),
                       // ── 어젠다 (선택) ──────────────────────────────
-                      TextField(
-                        controller: agendaCtrl,
+                      TextFormField(
+                        key: ValueKey('prep-agenda-$agendaFieldVersion'),
+                        initialValue: agendaText,
+                        onChanged: (v) => agendaText = v,
                         maxLines: 4,
                         minLines: 2,
                         decoration: InputDecoration(
@@ -1290,6 +1316,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: sttLanguage,
                         decoration: const InputDecoration(
                           labelText: '음성 인식 언어',
@@ -1300,7 +1327,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           for (final code in AppSettings.supportedSttLanguages)
                             DropdownMenuItem(
                               value: code,
-                              child: Text(AppSettings.sttLanguageLabel(code)),
+                              child: Text(
+                                AppSettings.sttLanguageLabel(code),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                         ],
                         onChanged: (v) {
@@ -1420,14 +1450,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         }
                         Navigator.of(ctx).pop(
                           _RecordingPrepResult(
-                            titleSuffix: titleCtrl.text.trim(),
+                            titleSuffix: titleText.trim(),
                             speakerCount: speakerCount,
                             device: selectedDevice,
                             summaryTemplateId: templateId,
                             diarizationEnabled: diarizationEnabled,
                             sttLanguage: sttLanguage,
                             markMicGuideShown: guideChecked,
-                            agenda: agendaCtrl.text.trim(),
+                            agenda: agendaText.trim(),
                           ),
                         );
                       },
@@ -1447,7 +1477,6 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         );
       },
     );
-    titleCtrl.dispose();
     return result;
   }
 
@@ -1885,12 +1914,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         throw const SummaryCancelledException();
       }
 
-      debugPrint('=== LLM RAW OUTPUT (${rawOutput.length} chars) ===');
-      debugPrint(
-        rawOutput.length > 2000
-            ? '${rawOutput.substring(0, 2000)}...[truncated]'
-            : rawOutput,
-      );
+      debugPrint('=== LLM output received (${rawOutput.length} chars) ===');
 
       final summary = _parseJsonForMic(
         rawOutput,
@@ -1954,6 +1978,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         ref.read(isSummarizingProvider.notifier).state = false;
         ref.read(selectedMeetingIdProvider.notifier).state = meetingId;
         ref.read(isRecordingActiveProvider.notifier).state = false;
+        ref.read(nativeRecordingActiveProvider.notifier).state = false;
       }
     } catch (e, st) {
       await OnDeviceModelManager.instance.unloadLlm().catchError((_) {});
@@ -2370,6 +2395,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     ref.invalidate(meetingsProvider);
     ref.read(selectedMeetingIdProvider.notifier).state = id;
     ref.read(isRecordingActiveProvider.notifier).state = false;
+    ref.read(nativeRecordingActiveProvider.notifier).state = false;
     setState(() {
       _failedSummaryMeetingId = null;
     });
@@ -2512,6 +2538,50 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             ),
           ),
         ],
+      );
+    }
+
+    if (_phase == _RecordingPhase.checkingModels ||
+        _phase == _RecordingPhase.loadingModel ||
+        _phase == _RecordingPhase.processing) {
+      final label = switch (_phase) {
+        _RecordingPhase.checkingModels => '모델 확인 중...',
+        _RecordingPhase.loadingModel => '모델 로드 중...',
+        _RecordingPhase.processing => '처리 중...',
+        _ => '처리 중...',
+      };
+      return Container(
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: MacosColors.white,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: MacosColors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       );
     }
 

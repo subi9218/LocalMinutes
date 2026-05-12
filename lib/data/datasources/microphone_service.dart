@@ -442,12 +442,12 @@ class MicrophoneService {
       int dup = 0;
       for (final seg in newSegments) {
         if (_isHallucination(seg.text)) {
-          debugPrint('[STT FILTER] 환각 제거: "${seg.text}"');
+          debugPrint('[STT FILTER] 환각 제거 (${seg.text.length} chars)');
           halluc++;
           continue;
         }
         if (_isDuplicateOfRecent(seg)) {
-          debugPrint('[STT DEDUP] 윈도우 경계 중복 제거: "${seg.text}"');
+          debugPrint('[STT DEDUP] 윈도우 경계 중복 제거 (${seg.text.length} chars)');
           dup++;
           continue;
         }

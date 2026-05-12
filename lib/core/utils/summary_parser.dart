@@ -222,27 +222,11 @@ class SummaryParser {
         ..createdAt = DateTime.now();
     }
 
-    // 파싱 완전 실패 — 재발 진단을 위해 raw output 일부를 crash.log에 기록
-    // (debugPrint는 콘솔에만 가고 crash.log엔 안 남기 때문에 별도 캡처)
+    // 파싱 완전 실패. 회의 내용이 crash.log에 남지 않도록 길이만 기록한다.
     try {
-      const rawHeadLimit = 1500;
-      const sanitizedHeadLimit = 500;
-      final rawHead = raw.length > rawHeadLimit
-          ? '${raw.substring(0, rawHeadLimit)}...[총 ${raw.length}자]'
-          : raw;
-      String sanitizedHead;
-      try {
-        final sanitized = sanitizeJson(raw);
-        sanitizedHead = sanitized.length > sanitizedHeadLimit
-            ? '${sanitized.substring(0, sanitizedHeadLimit)}...[총 ${sanitized.length}자]'
-            : sanitized;
-      } catch (e) {
-        sanitizedHead = '<sanitizeJson threw: $e>';
-      }
       CrashLogService.instance.recordCaught(
         'SummaryParser fallback (JSON decode failed)\n'
-        '--- raw head ---\n$rawHead\n'
-        '--- sanitized head ---\n$sanitizedHead',
+        'rawLength=${raw.length}',
         StackTrace.current,
         context: 'summary_parser',
       );
