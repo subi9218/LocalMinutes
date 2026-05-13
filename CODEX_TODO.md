@@ -1,4 +1,4 @@
-# Codex TODO — 적자생존 App Store 제출 마무리
+# Codex TODO — Local Minutes App Store 제출 마무리
 
 기준일: 2026-05-12
 
@@ -11,12 +11,12 @@
 - `flutter analyze` 통과: 0 issues.
 - `flutter test` 통과: 89/89.
 - `flutter build macos` 통과.
-- 최근 QA 산출물은 `dist/적자생존_v2.1.1_build28.dmg`.
+- 최근 QA 산출물은 `dist/LocalMinutes_v2.1.1_build28.dmg`.
 - 핵심 제품 기능은 대부분 완료 상태.
 - 현재 1차 제출 권장 수익 모델은 `유료 앱 19,000원 / IAP 없음`.
 - `무료 앱 + Pro Unlock` 전환은 출시 후 또는 별도 작업으로 보류.
 - EXAONE 관련 소스/테스트/제출 문서 참조는 제거 완료.
-- macOS 내부 실행 파일명은 `LocalMinutes`, 사용자 표시 앱 이름은 `적자생존`.
+- macOS 내부 실행 파일명은 `LocalMinutes`, 사용자 표시 앱 이름은 `Local Minutes`.
 
 ## P0 — 다른 계정 인수인계
 
@@ -190,7 +190,7 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 ### 7. App Store Connect 메타데이터 최종화
 
-- [x] 앱 이름: `적자생존`.
+- [x] 앱 이름: `Local Minutes`.
 - [x] 부제: `내 Mac에서 처리하는 AI 회의록`.
 - [x] 키워드 100바이트 이하 재확인.
 - [x] 앱 설명 최종 교정.
@@ -310,7 +310,7 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 현재 `README.md`는 Flutter 기본 템플릿에 가깝다.
 
-- [ ] 제품 소개를 `적자생존` 기준으로 갱신.
+- [ ] 제품 소개를 `Local Minutes` 기준으로 갱신.
 - [ ] 로컬 AI 처리와 개인정보 보호 원칙 요약.
 - [ ] 개발/검증 명령 정리.
 - [ ] App Store 제출 관련 문서는 별도 문서로 링크.

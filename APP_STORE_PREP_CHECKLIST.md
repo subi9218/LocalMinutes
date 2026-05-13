@@ -1,4 +1,4 @@
-# App Store Prep Checklist — 적자생존
+# App Store Prep Checklist — Local Minutes
 
 기준일: 2026-05-10
 
@@ -8,7 +8,7 @@
 
 `APP_STORE_METADATA_KO.md`를 기준으로 입력합니다.
 
-- 앱 이름: `적자생존`
+- 앱 이름: `Local Minutes - 로컬 회의록`
 - 부제: `내 Mac에서 처리하는 AI 회의록`
 - 기본 언어: Korean
 - 기본 카테고리: Productivity

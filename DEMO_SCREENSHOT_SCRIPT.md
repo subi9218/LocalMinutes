@@ -1,4 +1,4 @@
-# Demo Screenshot Script — 적자생존
+# Demo Screenshot Script — Local Minutes
 
 App Store 스크린샷과 최종 QA에 사용할 데모 시나리오입니다. 실제 회의 데이터, 실제 고객명, 내부 프로젝트명은 사용하지 않습니다.
 

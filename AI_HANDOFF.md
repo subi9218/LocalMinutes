@@ -1,4 +1,4 @@
-# AI Handoff — 적자생존 / LocalMinutes
+# AI Handoff — Local Minutes / LocalMinutes
 
 이 문서는 다른 AI/개발자가 현재 앱의 목적, 구현 상태, 최근 의사결정, 성능 측정, 남은 리스크를 빠르게 이어받기 위한 인수인계 문서입니다.
 
@@ -8,7 +8,7 @@
 
 현재 상태:
 
-- 앱은 macOS용 Flutter 회의록 앱 `적자생존`
+- 앱은 macOS용 Flutter 회의록 앱 `Local Minutes`
 - 로컬 온디바이스 STT/화자 라벨/요약 중심 제품
 - 첫 실행 저장 폴더 선택 필수
 - 자동 요약은 제거됨. 회의 종료 후 사용자가 직접 요약 실행
@@ -82,12 +82,12 @@ flutter build macos --debug
 ./scripts/version.sh show
 ./scripts/version.sh bump-patch
 ./scripts/build_dmg.sh
-open "/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/적자생존.app"
+open "/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/Local Minutes.app"
 ```
 
 ## 프로젝트 개요
 
-- 앱 이름: `적자생존`
+- 앱 이름: `Local Minutes`
 - 플랫폼: Flutter macOS 앱
 - 목적: 맥에서 회의를 녹음하고, 온디바이스 STT/화자 분리/LLM 요약으로 회의록을 생성하는 프라이버시 중심 회의록 앱
 - 핵심 포지셔닝: 클라우드 업로드 없이 로컬 모델로 한국어 회의 전사와 요약을 처리
@@ -1170,7 +1170,7 @@ ZIP 구성:
 내용:
 
 - App Store Connect에 복사해 넣을 한국어 메타데이터 초안 작성
-- 앱 이름: `적자생존`
+- 앱 이름: `Local Minutes`
 - 부제: `내 Mac에서 처리하는 AI 회의록`
 - 홍보 문구: `회의 녹음부터 전사, 요약, 액션아이템까지 내 Mac에서 처리하세요. 외부 서버 업로드 없이 중요한 회의를 정리합니다.`
 - 키워드: `회의록,녹음,음성인식,AI요약,전사,회의요약,액션,메모,업무회의,로컬AI`
@@ -1691,7 +1691,7 @@ flutter build macos --debug
 
 빌드 산출물:
 
-- `/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/적자생존.app`
+- `/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/Local Minutes.app`
 
 ## 주의 사항
 

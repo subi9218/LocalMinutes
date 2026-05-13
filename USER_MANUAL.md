@@ -1,4 +1,4 @@
-# 적자생존 사용자 매뉴얼
+# Local Minutes 사용자 매뉴얼
 
 **버전**: v1.9.1 · **플랫폼**: macOS (Apple Silicon 권장)
 **한줄 소개**: 인터넷 연결 없이 내 Mac에서 돌아가는 AI 한국어 회의록 도우미
@@ -50,8 +50,8 @@
 
 ### 설치 단계
 
-1. 팀에서 받은 `적자생존_v1.9.1.dmg` 파일을 더블클릭
-2. `적자생존.app`을 **Applications 폴더**로 드래그
+1. 팀에서 받은 `LocalMinutes_v2.1.1_build28.dmg` 파일을 더블클릭
+2. `Local Minutes.app`을 **Applications 폴더**로 드래그
 3. DMG 창에 있는 **"⚡ 처음 여기를 먼저 실행하세요"** 를 더블클릭
 4. Mac 비밀번호 입력 → 앱이 자동 실행됩니다
 
@@ -325,7 +325,7 @@ M3 Mac 기준 **10분 녹음 → 총 3~4분 처리**.
 
 ### 앱이 "손상되었다"며 안 열립니다
 - DMG 안의 **"⚡ 처음 여기를 먼저 실행하세요"** 를 실행했는지 확인
-- 안 됐다면 터미널에서: `xattr -rd com.apple.quarantine /Applications/적자생존.app`
+- 안 됐다면 터미널에서: `xattr -rd com.apple.quarantine "/Applications/Local Minutes.app"`
 
 ### "Whisper 모델을 찾을 수 없습니다"
 - `~/Library/Application Support/LocalMinutes/models/` 경로 존재 확인

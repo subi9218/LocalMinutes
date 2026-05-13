@@ -1,10 +1,10 @@
-# Next AI Tasks — 적자생존 앱 이어서 개발하기
+# Next AI Tasks — Local Minutes 앱 이어서 개발하기
 
 이 문서는 다른 AI/개발자가 `/Users/channy/LocalMinutes`에서 바로 이어서 개발할 수 있도록 남은 작업, 우선순위, 관련 파일, 검증 방법을 정리한 문서입니다.
 
 ## 현재 상태 요약
 
-- 앱: Flutter macOS 회의록 앱 `적자생존`
+- 앱: Flutter macOS 회의록 앱 `Local Minutes`
 - 핵심 가치: 녹음, 음성 인식, 발화자 라벨, 요약을 로컬 Mac에서 처리하는 프라이버시 중심 앱
 - 최근 완료:
   - 첫 실행 온보딩과 저장 폴더 필수 선택
@@ -66,7 +66,7 @@
 - 릴리즈/DMG가 필요하면:
   - `./scripts/version.sh show`로 현재 `x.y.z+n` 확인
   - 패치 릴리스는 `./scripts/version.sh bump-patch`, 마이너 릴리스는 `./scripts/version.sh bump-minor`
-  - `./scripts/build_dmg.sh`는 build number를 자동으로 1 올리고 `dist/적자생존_v<version>_build<build>.dmg` 생성
+  - `./scripts/build_dmg.sh`는 build number를 자동으로 1 올리고 `dist/LocalMinutes_v<version>_build<build>.dmg` 생성
   - 같은 버전으로 재빌드만 필요하면 `./scripts/build_dmg.sh --no-bump`
   - DMG 직접 배포용 앱은 `macos/Runner/DirectDistribution.entitlements`로 재서명됨. App Store용 `Release.entitlements`와 섞지 말 것.
 - 최근 릴리즈 검증:
@@ -280,4 +280,4 @@
 - `flutter analyze`: 통과
 - `flutter build macos --debug`: 통과
 - 최근 디버그 앱 경로:
-  - `build/macos/Build/Products/Debug/적자생존.app`
+  - `build/macos/Build/Products/Debug/Local Minutes.app`

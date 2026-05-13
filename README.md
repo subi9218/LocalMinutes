@@ -1,6 +1,6 @@
-# LocalMinutes / 적자생존
+# Local Minutes - 로컬 회의록
 
-적자생존은 macOS용 온디바이스 AI 회의록 앱입니다. 회의 녹음, 음성 인식, 발화자 라벨, 요약 생성을 사용자의 Mac에서 처리하고, 회의 음성이나 전사본을 개발자 서버로 업로드하지 않는 것을 기본 원칙으로 합니다.
+Local Minutes는 macOS용 로컬 AI 회의록 앱입니다. 회의 녹음, 음성 인식, 발화자 라벨, 요약 생성을 사용자의 Mac에서 처리하고, 회의 음성이나 전사본을 개발자 서버로 업로드하지 않는 것을 기본 원칙으로 합니다.
 
 ## 주요 기능
 
@@ -36,7 +36,7 @@ flutter build macos --debug
 앱 실행:
 
 ```bash
-open "build/macos/Build/Products/Debug/적자생존.app"
+open "build/macos/Build/Products/Debug/Local Minutes.app"
 ```
 
 ## 배포

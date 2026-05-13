@@ -1,4 +1,4 @@
-# Account Handoff — LocalMinutes / 적자생존
+# Account Handoff — LocalMinutes / Local Minutes
 
 Last updated: 2026-05-12
 
@@ -29,7 +29,7 @@ Major changes included in `9d41be9`:
 - Simplified supported summary models to Gemma 4 E2B and Qwen 2.5 7B Instruct.
 - Updated setup/settings/recording/detail/model selection flows and compliance tests.
 - Renamed the internal Dart package to `local_minutes`.
-- Renamed the macOS bundle executable to `LocalMinutes`; user-facing app name remains `적자생존`.
+- Renamed the macOS bundle executable to `LocalMinutes`; user-facing app name is now `Local Minutes`.
 - Improved recording-related UI:
   - “회의 유형 / 재생성 스타일” dialog is wider/two-column.
   - “녹음 진행 중” sidebar banner returns to the recording screen.
@@ -49,7 +49,7 @@ Results:
 
 - `flutter analyze`: no issues
 - `flutter test`: all tests passed (`89/89`)
-- `flutter build macos`: success, output `build/macos/Build/Products/Release/적자생존.app`
+- `flutter build macos`: success, output `build/macos/Build/Products/Release/Local Minutes.app`
 
 Code/doc search after removal:
 
@@ -150,7 +150,7 @@ com.subi9218.localminutes
 In App Store Connect:
 
 - Platform: macOS
-- App name: `적자생존`
+- App name: `Local Minutes`
 - Bundle ID: `com.subi9218.localminutes`
 - SKU suggestion: `localminutes-macos-001`
 - Primary language: Korean
@@ -298,7 +298,7 @@ APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 2. Confirm Apple Developer Program enrollment and Team ID.
 3. Create the explicit macOS Bundle ID `com.subi9218.localminutes`.
 4. Create the App Store Connect app record:
-   - Name: `적자생존`
+   - Name: `Local Minutes`
    - SKU: `localminutes-macos-001`
    - Price: paid app, Korea `19,000원`
    - IAP/subscription: none
