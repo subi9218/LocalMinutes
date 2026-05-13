@@ -1,16 +1,16 @@
 # Codex TODO — Local Minutes App Store 제출 마무리
 
-기준일: 2026-05-12
+기준일: 2026-05-14
 
 ## 현재 확인된 상태
 
 - 프로젝트는 Git 저장소이며 원격 `origin/main`과 연결되어 있다.
-- 최신 로컬 커밋은 `9d41be9 Prepare App Store submission build`.
+- UI/브랜딩 반영 기준 커밋은 `d85d175 Align Local Minutes branding docs`.
 - 현재 워킹트리는 clean 상태.
 - 현재 앱 버전은 `2.1.1+28`.
 - `flutter analyze` 통과: 0 issues.
 - `flutter test` 통과: 89/89.
-- `flutter build macos` 통과.
+- `./scripts/build_dmg.sh --no-bump` 통과.
 - 최근 QA 산출물은 `dist/LocalMinutes_v2.1.1_build28.dmg`.
 - 핵심 제품 기능은 대부분 완료 상태.
 - 현재 1차 제출 권장 수익 모델은 `유료 앱 19,000원 / IAP 없음`.
@@ -22,8 +22,8 @@
 
 ### -1. GitHub 최신화
 
-- [ ] 현재 커밋 `9d41be9`를 원격 `origin/main`에 push.
-- [ ] 다른 계정에서 clone/pull 후 `git log -1 --oneline`이 `9d41be9 Prepare App Store submission build`인지 확인.
+- [x] UI/브랜딩 반영 기준 커밋 `d85d175`를 원격 `origin/main`에 push.
+- [ ] 다른 계정에서 clone/pull 후 `git log -1 --oneline`이 `d85d175 Align Local Minutes branding docs`인지 확인.
 - [ ] 이전 대화에 노출된 GitHub PAT가 아직 살아 있다면 revoke.
 
 완료 조건:
