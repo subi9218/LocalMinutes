@@ -36,7 +36,7 @@
   - 명령: `./scripts/build_dmg.sh --no-bump`
 - [x] DMG 검증을 확인한다.
   - 명령: `hdiutil verify dist/LocalMinutes_v2.1.1_build28.dmg`
-- [ ] UI 관련 변경 전후 비교를 위해 주요 파일만 추적한다.
+- [x] UI 관련 변경 전후 비교를 위해 주요 파일만 추적한다.
   - 예상 파일:
     - `lib/presentation/screens/home_screen.dart`
     - `lib/presentation/screens/setup_screen.dart`
@@ -182,7 +182,7 @@ rg -n "적자생존|LocalMinutes_v1|LocalMinutes 허용" README.md INSTALL.md US
   - 명령: `hdiutil verify dist/LocalMinutes_v2.1.1_build28.dmg`
 - [x] 변경 요약 확인.
   - 명령: `git diff --stat`
-- [ ] 커밋 전 사용자에게 변경 범위와 검증 결과를 공유한다.
+- [x] 변경 범위와 검증 결과를 사용자에게 공유한다.
 
 ## 커밋 기준
 
