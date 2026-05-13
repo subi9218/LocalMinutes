@@ -5945,6 +5945,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               const SingleActivator(LogicalKeyboardKey.keyK): () {
                 _seekRelativeSegment(1);
               },
+              // ← / → → 현재 오디오 위치 기준 10초 이동
+              const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
+                _seekRelativeSeconds(-10);
+              },
+              const SingleActivator(LogicalKeyboardKey.arrowRight): () {
+                _seekRelativeSeconds(10);
+              },
             },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6241,6 +6248,79 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
       if (mounted) setState(() => _flashSegmentIdx = null);
     });
     // 스크롤
+    if (_listScrollCtrl.hasClients) {
+      const avgHeight = 60.0;
+      final maxOffset = _listScrollCtrl.position.maxScrollExtent;
+      final off = (target * avgHeight - 80).clamp(0.0, maxOffset);
+      try {
+        _listScrollCtrl.animateTo(
+          off,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// 현재 오디오 위치 기준 [seconds]만큼 이동.
+  /// 검색/편집 입력 포커스 중에는 상위 CallbackShortcuts가 비활성화되므로
+  /// 텍스트 커서 이동과 충돌하지 않는다.
+  Future<void> _seekRelativeSeconds(int seconds) async {
+    final p = _player;
+    if (p == null || !_playerReady) return;
+
+    final duration = p.duration ?? Duration.zero;
+    final maxMs = duration.inMilliseconds;
+    final targetMs = (_position.inMilliseconds + seconds * 1000).clamp(
+      0,
+      maxMs > 0 ? maxMs : 0,
+    );
+
+    try {
+      await p.seek(Duration(milliseconds: targetMs));
+    } catch (_) {
+      return;
+    }
+
+    _flashAndScrollToTime(targetMs / 1000.0);
+  }
+
+  void _flashAndScrollToTime(double sec) {
+    if (widget.segments.isEmpty) return;
+
+    int target = -1;
+    for (int i = 0; i < widget.segments.length; i++) {
+      final s = widget.segments[i];
+      if (sec >= s.startTimeSeconds && sec < s.endTimeSeconds) {
+        target = i;
+        break;
+      }
+    }
+    if (target < 0) {
+      double bestDiff = double.infinity;
+      for (int i = 0; i < widget.segments.length; i++) {
+        final diff = (widget.segments[i].startTimeSeconds - sec).abs();
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          target = i;
+        }
+      }
+    }
+    if (target < 0) return;
+
+    setState(() {
+      _flashSegmentIdx = target;
+      _navHint = '${_secToStr(sec)} 시점으로 이동';
+    });
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _flashSegmentIdx = null);
+    });
+    _navHintTimer?.cancel();
+    _navHintTimer = Timer(const Duration(milliseconds: 1000), () {
+      if (mounted) setState(() => _navHint = null);
+    });
+
     if (_listScrollCtrl.hasClients) {
       const avgHeight = 60.0;
       final maxOffset = _listScrollCtrl.position.maxScrollExtent;
