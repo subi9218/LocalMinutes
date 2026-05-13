@@ -156,8 +156,22 @@ class _SetupScreenState extends State<SetupScreen> {
     return Directory('${base.path}/models');
   }
 
+  bool get _anyDownloading =>
+      _sttFastDl.status == _Status.downloading ||
+      _sttFastCoreMlDl.status == _Status.downloading ||
+      _sttAccurateDl.status == _Status.downloading ||
+      _llmGemmaDl.status == _Status.downloading ||
+      _llmQwenDl.status == _Status.downloading ||
+      _diarSegDl.status == _Status.downloading ||
+      _diarEmbDl.status == _Status.downloading;
+
   // ── 다운로드 ─────────────────────────────────────────────────────
   Future<void> _startDownload({required _Target target}) async {
+    if (_anyDownloading) {
+      _showSnack('이미 다운로드 중인 모델이 있습니다. 완료 후 다음 모델을 설치하세요.');
+      return;
+    }
+
     final dir = await _modelsDirectory();
     await dir.create(recursive: true);
 
@@ -379,13 +393,7 @@ class _SetupScreenState extends State<SetupScreen> {
     final anyStt = _sttFastOk || _sttAccurateOk;
     final anyLlm = _llmGemmaOk || _llmQwenOk;
     final allOk = anyStt && anyLlm;
-    final anyDownloading =
-        _sttFastDl.status == _Status.downloading ||
-        _sttAccurateDl.status == _Status.downloading ||
-        _llmGemmaDl.status == _Status.downloading ||
-        _llmQwenDl.status == _Status.downloading ||
-        _diarSegDl.status == _Status.downloading ||
-        _diarEmbDl.status == _Status.downloading;
+    final anyDownloading = _anyDownloading;
 
     return MacosWindow(
       disableWallpaperTinting: true,
@@ -396,219 +404,222 @@ class _SetupScreenState extends State<SetupScreen> {
               backgroundColor: Colors.transparent,
               body: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 600),
+                  constraints: const BoxConstraints(maxWidth: 680),
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(40),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 36,
+                      vertical: 32,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ── 타이틀 ────────────────────────────────────────
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.settings_outlined,
-                              size: 32,
-                              color: scheme.primary,
+                            Container(
+                              width: 42,
+                              height: 42,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: scheme.primary.withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.edit_note,
+                                size: 24,
+                                color: scheme.primary,
+                              ),
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              '초기 설정',
-                              style: Theme.of(context).textTheme.headlineMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Local Minutes',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '로컬 회의록을 위한 모델 준비',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '음성 인식과 요약 모델을 설치하세요. 자동 다운로드 또는 직접 복사할 수 있습니다.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 26),
 
-                        // ── STT 안내 문구 ─────────────────────────────────
-                        Text(
-                          '음성 인식 모델은 "빠른"과 "정확" 두 종류가 있습니다. 둘 중 '
-                          '하나만 설치해도 앱 시작이 가능하며, 둘 다 설치 시 회의별로 '
-                          '전환해서 사용할 수 있습니다.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            height: 1.4,
-                          ),
+                        _SetupSection(
+                          title: '필수 모델',
+                          subtitle: '음성 인식 1개와 요약 모델 1개가 있으면 시작할 수 있습니다.',
+                          children: [
+                            _ModelDownloadCard(
+                              label: '빠른 음성 인식',
+                              filename: AppConstants.sttModelFileFast,
+                              size: '~900 MB',
+                              isOk: _sttFastOk,
+                              dlState: _sttFastDl,
+                              urlCtrl: _sttFastUrlCtrl,
+                              showUrl: _showSttFastUrl,
+                              onToggleUrl: () => setState(
+                                () => _showSttFastUrl = !_showSttFastUrl,
+                              ),
+                              onInstall: () =>
+                                  _startDownload(target: _Target.sttFast),
+                              onCancel: () =>
+                                  _cancelDownload(target: _Target.sttFast),
+                              installDisabled: anyDownloading,
+                            ),
+                            const SizedBox(height: 10),
+                            _ModelDownloadCard(
+                              label: '기본 요약',
+                              filename: AppConstants.llmModelFileGemma4E2B,
+                              size: '~3 GB',
+                              tooltip:
+                                  '크기: 약 3GB\n'
+                                  '속도: 매우 빠름\n'
+                                  '짧은 회의·메모 요약에 적합',
+                              isOk: _llmGemmaOk,
+                              dlState: _llmGemmaDl,
+                              urlCtrl: _llmGemmaUrlCtrl,
+                              showUrl: _showLlmGemmaUrl,
+                              onToggleUrl: () => setState(
+                                () => _showLlmGemmaUrl = !_showLlmGemmaUrl,
+                              ),
+                              onInstall: () =>
+                                  _startDownload(target: _Target.llmGemma),
+                              onCancel: () =>
+                                  _cancelDownload(target: _Target.llmGemma),
+                              installDisabled: anyDownloading,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 22),
 
-                        // ── STT 빠른 모델 카드 ────────────────────────────
-                        _ModelDownloadCard(
-                          label: '빠른 음성 인식 모델',
-                          filename: AppConstants.sttModelFileFast,
-                          size: '~900 MB',
-                          isOk: _sttFastOk,
-                          dlState: _sttFastDl,
-                          urlCtrl: _sttFastUrlCtrl,
-                          showUrl: _showSttFastUrl,
-                          onToggleUrl: () => setState(
-                            () => _showSttFastUrl = !_showSttFastUrl,
-                          ),
-                          onInstall: () =>
-                              _startDownload(target: _Target.sttFast),
-                          onCancel: () =>
-                              _cancelDownload(target: _Target.sttFast),
-                        ),
-                        const SizedBox(height: 12),
-                        _ModelDownloadCard(
-                          label: '빠른 음성 인식 가속팩',
-                          filename: AppConstants.sttCoreMlEncoderFileFast,
-                          size: '~1.2 GB',
-                          tooltip:
-                              'Apple Silicon에서 긴 녹음 전사를 더 빠르게 처리합니다. 없어도 앱은 기존 방식으로 동작합니다.',
-                          isOk: _sttFastCoreMlOk,
-                          dlState: _sttFastCoreMlDl,
-                          urlCtrl: _sttFastCoreMlUrlCtrl,
-                          showUrl: _showSttFastCoreMlUrl,
-                          onToggleUrl: () => setState(
-                            () =>
-                                _showSttFastCoreMlUrl = !_showSttFastCoreMlUrl,
-                          ),
-                          onInstall: () =>
-                              _startDownload(target: _Target.sttFastCoreMl),
-                          onCancel: () =>
-                              _cancelDownload(target: _Target.sttFastCoreMl),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── STT 정확 모델 카드 ────────────────────────────
-                        _ModelDownloadCard(
-                          label: '정확도 높은 음성 인식 모델',
-                          filename: AppConstants.sttModelFileAccurate,
-                          size: '~1.1 GB',
-                          isOk: _sttAccurateOk,
-                          dlState: _sttAccurateDl,
-                          urlCtrl: _sttAccurateUrlCtrl,
-                          showUrl: _showSttAccurateUrl,
-                          onToggleUrl: () => setState(
-                            () => _showSttAccurateUrl = !_showSttAccurateUrl,
-                          ),
-                          onInstall: () =>
-                              _startDownload(target: _Target.sttAccurate),
-                          onCancel: () =>
-                              _cancelDownload(target: _Target.sttAccurate),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── LLM 안내 문구 ─────────────────────────────────
-                        const SizedBox(height: 20),
-                        Text(
-                          '요약 모델은 최소 하나만 설치하면 됩니다. 회의록 요약 시 '
-                          '어떤 모델을 쓸지 선택할 수 있습니다.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // ── LLM Gemma 4 E2B (빠른/기본) ──────────────────
-                        _ModelDownloadCard(
-                          label: '기본 요약 모델',
-                          filename: AppConstants.llmModelFileGemma4E2B,
-                          size: '~3 GB',
-                          tooltip:
-                              '크기: 약 3GB\n'
-                              '속도: 매우 빠름\n'
-                              '짧은 회의·메모 요약에 적합',
-                          isOk: _llmGemmaOk,
-                          dlState: _llmGemmaDl,
-                          urlCtrl: _llmGemmaUrlCtrl,
-                          showUrl: _showLlmGemmaUrl,
-                          onToggleUrl: () => setState(
-                            () => _showLlmGemmaUrl = !_showLlmGemmaUrl,
-                          ),
-                          onInstall: () =>
-                              _startDownload(target: _Target.llmGemma),
-                          onCancel: () =>
-                              _cancelDownload(target: _Target.llmGemma),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── LLM Qwen 2.5 7B ───────────────────────────────
-                        _ModelDownloadCard(
-                          label: '고품질 요약 모델',
-                          filename: AppConstants.llmModelFileQwen25_7B,
-                          size: '~4.7 GB',
-                          tooltip:
-                              '크기: 약 4.7GB\n'
-                              '속도: 보통\n'
-                              '액션아이템/결정사항 구조화에 적합',
-                          isOk: _llmQwenOk,
-                          dlState: _llmQwenDl,
-                          urlCtrl: _llmQwenUrlCtrl,
-                          showUrl: _showLlmQwenUrl,
-                          onToggleUrl: () => setState(
-                            () => _showLlmQwenUrl = !_showLlmQwenUrl,
-                          ),
-                          onInstall: () =>
-                              _startDownload(target: _Target.llmQwen),
-                          onCancel: () =>
-                              _cancelDownload(target: _Target.llmQwen),
-                        ),
-                        const SizedBox(height: 12),
-
-                        const SizedBox(height: 8),
-
-                        // ── 발화자 라벨 (선택) ────────────────────────────
-                        Text(
-                          '발화자 라벨 모델 (선택). 설치 후 설정에서 활성화하면 전사에 '
-                          'A/B/C... 라벨이 자동 부여됩니다. 사람 이름을 자동 식별하지는 않습니다.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _ModelDownloadCard(
-                          label: '발화자 라벨 · 세그멘테이션',
-                          filename: AppConstants.diarSegModelFile,
-                          size: '~6 MB',
-                          tooltip:
-                              'pyannote-segmentation-3.0 (ONNX)\n'
-                              '음성 활동/발화 경계 검출',
-                          isOk: _diarSegOk,
-                          dlState: _diarSegDl,
-                          urlCtrl: _diarSegUrlCtrl,
-                          showUrl: _showDiarSegUrl,
-                          onToggleUrl: () => setState(
-                            () => _showDiarSegUrl = !_showDiarSegUrl,
-                          ),
-                          onInstall: () =>
-                              _startDownload(target: _Target.diarSeg),
-                          onCancel: () =>
-                              _cancelDownload(target: _Target.diarSeg),
-                        ),
-                        const SizedBox(height: 12),
-                        _ModelDownloadCard(
-                          label: '발화자 라벨 · 스피커 임베딩',
-                          filename: AppConstants.diarEmbModelFile,
-                          size: '~26 MB',
-                          tooltip:
-                              '3D-Speaker eres2net base (ONNX)\n'
-                              '화자별 벡터 임베딩 추출 → 클러스터링',
-                          isOk: _diarEmbOk,
-                          dlState: _diarEmbDl,
-                          urlCtrl: _diarEmbUrlCtrl,
-                          showUrl: _showDiarEmbUrl,
-                          onToggleUrl: () => setState(
-                            () => _showDiarEmbUrl = !_showDiarEmbUrl,
-                          ),
-                          onInstall: () =>
-                              _startDownload(target: _Target.diarEmb),
-                          onCancel: () =>
-                              _cancelDownload(target: _Target.diarEmb),
+                        _SetupSection(
+                          title: '선택 모델',
+                          subtitle: '정확도, 속도, 발화자 라벨이 필요할 때 추가합니다.',
+                          children: [
+                            _ModelDownloadCard(
+                              label: '정확도 높은 음성 인식',
+                              filename: AppConstants.sttModelFileAccurate,
+                              size: '~1.1 GB',
+                              isOk: _sttAccurateOk,
+                              dlState: _sttAccurateDl,
+                              urlCtrl: _sttAccurateUrlCtrl,
+                              showUrl: _showSttAccurateUrl,
+                              onToggleUrl: () => setState(
+                                () =>
+                                    _showSttAccurateUrl = !_showSttAccurateUrl,
+                              ),
+                              onInstall: () =>
+                                  _startDownload(target: _Target.sttAccurate),
+                              onCancel: () =>
+                                  _cancelDownload(target: _Target.sttAccurate),
+                              installDisabled: anyDownloading,
+                            ),
+                            const SizedBox(height: 10),
+                            _ModelDownloadCard(
+                              label: '빠른 음성 인식 가속팩',
+                              filename: AppConstants.sttCoreMlEncoderFileFast,
+                              size: '~1.2 GB',
+                              tooltip:
+                                  'Apple Silicon에서 긴 녹음 전사를 더 빠르게 처리합니다. 없어도 앱은 기존 방식으로 동작합니다.',
+                              isOk: _sttFastCoreMlOk,
+                              dlState: _sttFastCoreMlDl,
+                              urlCtrl: _sttFastCoreMlUrlCtrl,
+                              showUrl: _showSttFastCoreMlUrl,
+                              onToggleUrl: () => setState(
+                                () => _showSttFastCoreMlUrl =
+                                    !_showSttFastCoreMlUrl,
+                              ),
+                              onInstall: () =>
+                                  _startDownload(target: _Target.sttFastCoreMl),
+                              onCancel: () => _cancelDownload(
+                                target: _Target.sttFastCoreMl,
+                              ),
+                              installDisabled: anyDownloading,
+                            ),
+                            const SizedBox(height: 10),
+                            _ModelDownloadCard(
+                              label: '고품질 요약',
+                              filename: AppConstants.llmModelFileQwen25_7B,
+                              size: '~4.7 GB',
+                              tooltip:
+                                  '크기: 약 4.7GB\n'
+                                  '속도: 보통\n'
+                                  '액션아이템/결정사항 구조화에 적합',
+                              isOk: _llmQwenOk,
+                              dlState: _llmQwenDl,
+                              urlCtrl: _llmQwenUrlCtrl,
+                              showUrl: _showLlmQwenUrl,
+                              onToggleUrl: () => setState(
+                                () => _showLlmQwenUrl = !_showLlmQwenUrl,
+                              ),
+                              onInstall: () =>
+                                  _startDownload(target: _Target.llmQwen),
+                              onCancel: () =>
+                                  _cancelDownload(target: _Target.llmQwen),
+                              installDisabled: anyDownloading,
+                            ),
+                            const SizedBox(height: 10),
+                            _ModelDownloadCard(
+                              label: '발화자 라벨 · 세그멘테이션',
+                              filename: AppConstants.diarSegModelFile,
+                              size: '~6 MB',
+                              tooltip:
+                                  'pyannote-segmentation-3.0 (ONNX)\n'
+                                  '음성 활동/발화 경계 검출',
+                              isOk: _diarSegOk,
+                              dlState: _diarSegDl,
+                              urlCtrl: _diarSegUrlCtrl,
+                              showUrl: _showDiarSegUrl,
+                              onToggleUrl: () => setState(
+                                () => _showDiarSegUrl = !_showDiarSegUrl,
+                              ),
+                              onInstall: () =>
+                                  _startDownload(target: _Target.diarSeg),
+                              onCancel: () =>
+                                  _cancelDownload(target: _Target.diarSeg),
+                              installDisabled: anyDownloading,
+                            ),
+                            const SizedBox(height: 10),
+                            _ModelDownloadCard(
+                              label: '발화자 라벨 · 스피커 임베딩',
+                              filename: AppConstants.diarEmbModelFile,
+                              size: '~26 MB',
+                              tooltip:
+                                  '3D-Speaker eres2net base (ONNX)\n'
+                                  '화자별 벡터 임베딩 추출 → 클러스터링',
+                              isOk: _diarEmbOk,
+                              dlState: _diarEmbDl,
+                              urlCtrl: _diarEmbUrlCtrl,
+                              showUrl: _showDiarEmbUrl,
+                              onToggleUrl: () => setState(
+                                () => _showDiarEmbUrl = !_showDiarEmbUrl,
+                              ),
+                              onInstall: () =>
+                                  _startDownload(target: _Target.diarEmb),
+                              onCancel: () =>
+                                  _cancelDownload(target: _Target.diarEmb),
+                              installDisabled: anyDownloading,
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 20),
 
@@ -799,6 +810,45 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 }
 
+class _SetupSection extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  const _SetupSection({
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...children,
+      ],
+    );
+  }
+}
+
 // ── 다운로드 상태 ─────────────────────────────────────────────────────────────
 
 enum _Target {
@@ -859,6 +909,7 @@ class _ModelDownloadCard extends StatelessWidget {
   final VoidCallback onToggleUrl;
   final VoidCallback onInstall;
   final VoidCallback onCancel;
+  final bool installDisabled;
 
   const _ModelDownloadCard({
     required this.label,
@@ -872,6 +923,7 @@ class _ModelDownloadCard extends StatelessWidget {
     required this.onToggleUrl,
     required this.onInstall,
     required this.onCancel,
+    this.installDisabled = false,
   });
 
   @override
@@ -881,24 +933,24 @@ class _ModelDownloadCard extends StatelessWidget {
     final hasError = dlState.status == _Status.error;
     const allowUrlEditing = !AppBuildConfig.appStoreComplianceMode;
 
-    Color borderColor = scheme.outlineVariant;
-    Color bgColor = scheme.surfaceContainerLow;
+    Color borderColor = scheme.outlineVariant.withValues(alpha: 0.8);
+    Color bgColor = scheme.surfaceContainerLowest;
     if (isOk) {
-      borderColor = Colors.green.shade300;
-      bgColor = Colors.green.shade50;
+      borderColor = Colors.green.shade300.withValues(alpha: 0.75);
+      bgColor = Colors.green.withValues(alpha: 0.05);
     } else if (hasError) {
-      borderColor = Colors.red.shade300;
-      bgColor = Colors.red.shade50;
+      borderColor = Colors.red.shade300.withValues(alpha: 0.75);
+      bgColor = Colors.red.withValues(alpha: 0.05);
     } else if (isDownloading) {
       borderColor = scheme.primary.withValues(alpha: 0.4);
-      bgColor = scheme.primaryContainer.withValues(alpha: 0.15);
+      bgColor = scheme.primary.withValues(alpha: 0.06);
     }
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -967,8 +1019,8 @@ class _ModelDownloadCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.green.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     '설치됨',
@@ -996,7 +1048,7 @@ class _ModelDownloadCard extends StatelessWidget {
                 )
               else
                 FilledButton.icon(
-                  onPressed: onInstall,
+                  onPressed: installDisabled ? null : onInstall,
                   icon: const Icon(Icons.download, size: 16),
                   label: Text(hasError ? '재시도' : '설치'),
                   style: FilledButton.styleFrom(

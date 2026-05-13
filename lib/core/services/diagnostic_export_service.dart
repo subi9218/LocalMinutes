@@ -69,7 +69,7 @@ class DiagnosticExportService {
 
   static String _buildReadme(DateTime createdAt) {
     return '''
-적자생존 문제 진단 자료
+Local Minutes 문제 진단 자료
 
 생성 시각: ${createdAt.toIso8601String()}
 

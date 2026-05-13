@@ -78,7 +78,7 @@ typedef _SamplerAcceptDart = void Function(Pointer<Void>, int);
 const _modelDir =
     '/Users/channy/Library/Containers/com.example.meetingAssistant2/Data/Library/Application Support/com.example.meetingAssistant2/models';
 const _frameworksDir =
-    '/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/적자생존.app/Contents/Frameworks';
+    '/Users/channy/LocalMinutes/build/macos/Build/Products/Debug/Local Minutes.app/Contents/Frameworks';
 const _sttModelFile = 'ggml-large-v3-q5_0.bin';
 const _llmModelId = 'exaone35_7b';
 const _llmModelFile = 'EXAONE-3.5-7.8B-Instruct-Q4_K_M.gguf';

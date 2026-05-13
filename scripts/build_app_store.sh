@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-APP_BUNDLE="적자생존"
+APP_BUNDLE="Local Minutes"
 RELEASE_APP="build/macos/Build/Products/Release/${APP_BUNDLE}.app"
 ENTITLEMENTS="macos/Runner/Release.entitlements"
 MIN_MACOS_VERSION="15.5"

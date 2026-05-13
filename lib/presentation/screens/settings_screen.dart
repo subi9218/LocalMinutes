@@ -3,6 +3,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:macos_ui/macos_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,9 +22,9 @@ import '../providers/settings_providers.dart';
 
 /// 설정 다이얼로그 열기 헬퍼
 void showSettingsDialog(BuildContext context, WidgetRef ref) {
-  showDialog(
+  showMacosSheet(
     context: context,
-    builder: (_) => _SettingsDialog(ref: ref),
+    builder: (_) => MacosSheet(child: _SettingsDialog(ref: ref)),
   );
 }
 
@@ -165,8 +166,33 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     if (mounted) setState(() {});
   }
 
+  bool get _anyModelDownloading =>
+      _sttFastDl.status == _DlStatus.downloading ||
+      _sttFastCoreMlDl.status == _DlStatus.downloading ||
+      _sttAccurateDl.status == _DlStatus.downloading ||
+      _llmGemmaDl.status == _DlStatus.downloading ||
+      _llmQwenDl.status == _DlStatus.downloading ||
+      _diarSegDl.status == _DlStatus.downloading ||
+      _diarEmbDl.status == _DlStatus.downloading;
+
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : null,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   // ── 모델 재다운로드 ───────────────────────────────────────────────
   Future<void> _downloadModel({required _DlTarget target}) async {
+    if (_anyModelDownloading) {
+      _showSnack('이미 다운로드 중인 모델이 있습니다. 완료 후 다음 모델을 다운로드하세요.');
+      return;
+    }
+
     final appSupport = await getApplicationSupportDirectory();
     final dir = Directory('${appSupport.path}/models');
     await dir.create(recursive: true);
@@ -331,78 +357,75 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   // ── BUILD ──────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SizedBox(
-        width: 580,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── 헤더 ──────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.06),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
+    final scheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      width: 580,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── 헤더 ──────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.38),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(10),
               ),
-              child: Row(
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.settings,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '설정',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+
+          // ── 스크롤 가능한 설정 목록 ────────────────────────────
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.settings,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '설정',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  _buildRecordingSection(),
+                  const SizedBox(height: 20),
+                  _buildRecordQualitySection(),
+                  const SizedBox(height: 20),
+                  _buildSummaryTemplateSection(),
+                  const SizedBox(height: 20),
+                  _buildDataSection(),
+                  const SizedBox(height: 20),
+                  _buildModelSection(),
+                  const SizedBox(height: 20),
+                  _buildDiarizationSection(),
+                  const SizedBox(height: 20),
+                  _buildDisplaySection(),
+                  const SizedBox(height: 20),
+                  _buildLegalSection(),
+                  const SizedBox(height: 20),
+                  _buildDebugSection(),
                 ],
               ),
             ),
-
-            // ── 스크롤 가능한 설정 목록 ────────────────────────────
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildRecordingSection(),
-                    const SizedBox(height: 20),
-                    _buildRecordQualitySection(),
-                    const SizedBox(height: 20),
-                    _buildSummaryTemplateSection(),
-                    const SizedBox(height: 20),
-                    _buildDataSection(),
-                    const SizedBox(height: 20),
-                    _buildModelSection(),
-                    const SizedBox(height: 20),
-                    _buildDiarizationSection(),
-                    const SizedBox(height: 20),
-                    _buildDisplaySection(),
-                    const SizedBox(height: 20),
-                    _buildLegalSection(),
-                    const SizedBox(height: 20),
-                    _buildDebugSection(),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -518,10 +541,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       children: [
         _SettingRow(
           title: '자동 음량 조절 (AGC)',
-          subtitle:
-              '조용한 화자의 볼륨을 자동 보정합니다. '
-              '조용한 환경에서 유리하지만 배경 소음도 함께 증폭될 수 있습니다.',
-          trailing: Switch(
+          subtitle: '조용한 화자를 보정합니다. 배경 소음이 큰 곳에서는 꺼두는 편이 좋습니다.',
+          trailing: Switch.adaptive(
             value: settings.recordAutoGain,
             onChanged: (v) async {
               await settings.setRecordAutoGain(v);
@@ -532,11 +553,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         const Divider(height: 20),
         _SettingRow(
           title: '에코 제거',
-          subtitle:
-              '스피커폰 통화 환경에 유리합니다. '
-              '다중 화자가 마주 앉은 회의에서는 반대편 화자 음량이 감쇄돼 '
-              '오히려 품질이 떨어질 수 있습니다. (기본: 꺼짐)',
-          trailing: Switch(
+          subtitle: '스피커폰 통화에 유리합니다. 대면 회의에서는 기본적으로 꺼둡니다.',
+          trailing: Switch.adaptive(
             value: settings.recordEchoCancel,
             onChanged: (v) async {
               await settings.setRecordEchoCancel(v);
@@ -547,11 +565,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         const Divider(height: 20),
         _SettingRow(
           title: '녹음 정규화 (피크 -1dB)',
-          subtitle:
-              '저장 시 전체 음량을 최대치 근처까지 자동으로 끌어올립니다. '
-              '음성 인식 품질 향상에 유리하며 클리핑은 발생하지 않습니다. '
-              '(권장: 켜짐)',
-          trailing: Switch(
+          subtitle: '저장 음량을 자동 정리합니다. 음성 인식 품질 안정화에 도움이 됩니다.',
+          trailing: Switch.adaptive(
             value: settings.recordNormalize,
             onChanged: (v) async {
               await settings.setRecordNormalize(v);
@@ -563,7 +578,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         _SettingRow(
           title: '마이크 가이드 다시 보기',
           subtitle: settings.micGuideShown
-              ? '다음 녹음 시작 시 마이크 위치/거리 가이드를 한 번 더 표시합니다.'
+              ? '다음 녹음 시작 시 마이크 가이드를 다시 표시합니다.'
               : '아직 표시되지 않았습니다. 첫 녹음 시작 시 자동으로 안내됩니다.',
           trailing: TextButton.icon(
             icon: const Icon(Icons.refresh, size: 16),
@@ -591,7 +606,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             subtitle:
                 '회의 제목과 시작/종료 시각으로 Calendar.app에 새 이벤트가 추가됩니다. '
                 '첫 활성화 시 macOS가 자동화 권한을 요청합니다.',
-            trailing: Switch(
+            trailing: Switch.adaptive(
               value: settings.autoAddToCalendar,
               onChanged: (v) async {
                 await settings.setAutoAddToCalendar(v);
@@ -729,7 +744,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     SummaryTemplates.byId(currentId).description,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -749,7 +764,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 '고급 설정 — 세부 정리 방식',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.grey.shade600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -766,7 +781,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     preview,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       height: 1.4,
                     ),
                   ),
@@ -777,7 +792,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   '커스텀 모드에서 직접 조정할 수 있습니다.',
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey.shade500,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -804,7 +821,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                         : '커스텀2 — 요약에서 강조할 기준을 직접 편집합니다. 비워두면 일반 회의 지침이 사용됩니다.',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -899,7 +916,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         // 자동 삭제
         _SettingRow(
           title: '오래된 녹음 파일 자동 삭제',
-          subtitle: '설정한 일수보다 오래된 WAV 파일만 삭제합니다. 회의록·전사·요약은 그대로 유지됩니다.',
+          subtitle: '오래된 WAV만 정리합니다. 회의록·전사·요약은 유지됩니다.',
           trailing: DropdownButton<int>(
             value: AppSettings.instance.autoDeleteDays,
             underline: const SizedBox(),
@@ -935,11 +952,14 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   color: Colors.red.shade600,
                 ),
                 label: Text(
-                  '지금 삭제 (${AppSettings.instance.autoDeleteDays}일 이상 지난 녹음 파일만)',
+                  '오래된 녹음 삭제',
                   style: TextStyle(fontSize: 12, color: Colors.red.shade600),
                 ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: Colors.red.shade200),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(7),
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
               ),
@@ -951,7 +971,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               padding: const EdgeInsets.only(left: 16),
               child: Text(
                 _deleteResult!,
-                style: TextStyle(fontSize: 12, color: Colors.green.shade700),
+                style: TextStyle(fontSize: 11, color: Colors.green.shade700),
               ),
             ),
           ],
@@ -962,76 +982,90 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   // ── 3. 모델 관리 ──────────────────────────────────────────────────
   Widget _buildModelSection() {
+    final downloadDisabled = _anyModelDownloading;
+
     return _SectionCard(
       title: '음성/요약 모델',
       icon: Icons.memory,
       children: [
+        const _ModelGroupHeader(
+          title: '필수',
+          subtitle: '음성 인식 1개와 요약 모델 1개가 있으면 녹음과 요약을 시작할 수 있습니다.',
+        ),
         _ModelRow(
-          name: '빠른 음성 인식 모델',
+          name: '빠른 음성 인식',
           size: '~900 MB',
-          subtitle: '짧은 회의 초안 확인에 적합합니다.',
+          subtitle: '짧은 회의 초안 확인에 적합',
           exists: _sttFastExists,
           dlState: _sttFastDl,
           onDownload: () => _downloadModel(target: _DlTarget.sttFast),
+          downloadDisabled: downloadDisabled,
           onCancel: () {
             _sttFastDlService.cancel();
             setState(() => _sttFastDl = const _DlState());
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _ModelRow(
-          name: '빠른 음성 인식 가속팩',
-          size: '~1.2 GB',
-          subtitle: 'Apple Silicon에서 Core ML로 긴 녹음 전사를 더 빠르게 처리합니다.',
-          exists: _sttFastCoreMlExists,
-          dlState: _sttFastCoreMlDl,
-          onDownload: () => _downloadModel(target: _DlTarget.sttFastCoreMl),
-          onCancel: () {
-            _sttFastCoreMlDlService.cancel();
-            setState(() => _sttFastCoreMlDl = const _DlState());
-          },
-        ),
-        const SizedBox(height: 12),
-        _ModelRow(
-          name: '정확도 높은 음성 인식 모델',
-          size: '~1.1 GB',
-          subtitle: '긴 회의와 최종 회의록 품질에 유리합니다.',
-          exists: _sttAccurateExists,
-          dlState: _sttAccurateDl,
-          onDownload: () => _downloadModel(target: _DlTarget.sttAccurate),
-          onCancel: () {
-            _sttAccurateDlService.cancel();
-            setState(() => _sttAccurateDl = const _DlState());
-          },
-        ),
-        const SizedBox(height: 12),
-        _ModelRow(
-          name: '기본 요약 모델',
+          name: '기본 요약',
           size: '~3 GB',
-          subtitle: '빠르게 요약하고 메모리 부담이 적습니다.',
+          subtitle: '빠르고 메모리 부담이 적음',
           exists: _llmGemmaExists,
           dlState: _llmGemmaDl,
           onDownload: () => _downloadModel(target: _DlTarget.llmGemma),
+          downloadDisabled: downloadDisabled,
           onCancel: () {
             _llmGemmaDlService.cancel();
             setState(() => _llmGemmaDl = const _DlState());
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 18),
+        const _ModelGroupHeader(
+          title: '선택',
+          subtitle: '정확도, 처리 속도, 구조화 품질이 더 필요할 때 추가합니다.',
+        ),
         _ModelRow(
-          name: '고품질 요약 모델',
+          name: '정확도 높은 음성 인식',
+          size: '~1.1 GB',
+          subtitle: '긴 회의와 최종 회의록 품질에 유리',
+          exists: _sttAccurateExists,
+          dlState: _sttAccurateDl,
+          onDownload: () => _downloadModel(target: _DlTarget.sttAccurate),
+          downloadDisabled: downloadDisabled,
+          onCancel: () {
+            _sttAccurateDlService.cancel();
+            setState(() => _sttAccurateDl = const _DlState());
+          },
+        ),
+        const SizedBox(height: 8),
+        _ModelRow(
+          name: '빠른 음성 인식 가속팩',
+          size: '~1.2 GB',
+          subtitle: 'Apple Silicon에서 긴 녹음 전사를 더 빠르게 처리',
+          exists: _sttFastCoreMlExists,
+          dlState: _sttFastCoreMlDl,
+          onDownload: () => _downloadModel(target: _DlTarget.sttFastCoreMl),
+          downloadDisabled: downloadDisabled,
+          onCancel: () {
+            _sttFastCoreMlDlService.cancel();
+            setState(() => _sttFastCoreMlDl = const _DlState());
+          },
+        ),
+        const SizedBox(height: 8),
+        _ModelRow(
+          name: '고품질 요약',
           size: '~4.7 GB',
-          subtitle: '논의·결정·액션아이템을 구조화하는 데 유리합니다.',
+          subtitle: '논의·결정·액션아이템 구조화에 유리',
           exists: _llmQwenExists,
           dlState: _llmQwenDl,
           onDownload: () => _downloadModel(target: _DlTarget.llmQwen),
+          downloadDisabled: downloadDisabled,
           onCancel: () {
             _llmQwenDlService.cancel();
             setState(() => _llmQwenDl = const _DlState());
           },
         ),
-        const SizedBox(height: 12),
-        const SizedBox(height: 4),
+        const SizedBox(height: 16),
         _buildDefaultLlmPicker(),
         const SizedBox(height: 12),
         _buildAdvancedModelInfo(),
@@ -1070,11 +1104,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.primaryContainer.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-        ),
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1095,8 +1127,11 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           ),
           const SizedBox(height: 4),
           Text(
-            '회의록 요약에 기본으로 사용할 방식을 고릅니다. 요약할 때마다 바꿀 수도 있습니다.',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            '기본 요약 방식을 고릅니다. 요약할 때마다 바꿀 수도 있습니다.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -1129,19 +1164,23 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   }
 
   Widget _buildAdvancedModelInfo() {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(top: 4, left: 8, right: 8),
         dense: true,
-        title: const Text(
-          '고급 정보',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-        subtitle: const Text(
+        iconColor: muted,
+        collapsedIconColor: muted,
+        title: Text('고급 정보', style: TextStyle(fontSize: 11, color: muted)),
+        subtitle: Text(
           '모델 파일명과 상세 정보를 확인합니다.',
-          style: TextStyle(fontSize: 11),
+          style: TextStyle(
+            fontSize: 10.5,
+            color: muted.withValues(alpha: 0.75),
+          ),
         ),
         children: [
           _AdvancedInfoLine('빠른 음성 인식', AppConstants.sttModelFileFast),
@@ -1177,50 +1216,53 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   void _showLicenseNotices() {
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('사용 모델 및 라이선스'),
-        content: SizedBox(
-          width: 560,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '이 앱은 회의 음성과 요약 내용을 외부 서버로 보내지 않고, 사용자가 설치한 로컬 모델로 처리합니다.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 12),
-                for (final item in LegalNotices.items) ...[
+      builder: (ctx) {
+        final muted = Theme.of(ctx).colorScheme.onSurfaceVariant;
+        return AlertDialog(
+          title: const Text('사용 모델 및 라이선스'),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    item.name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  SelectableText(
-                    '${item.role} · ${item.license}\n${item.source}\n${item.note}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.35,
-                      color: Colors.grey.shade700,
-                    ),
+                    '회의 음성과 요약 내용은 설치된 로컬 모델로 처리됩니다.',
+                    style: TextStyle(fontSize: 12, color: muted),
                   ),
                   const SizedBox(height: 12),
+                  for (final item in LegalNotices.items) ...[
+                    Text(
+                      item.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    SelectableText(
+                      '${item.role} · ${item.license}\n${item.source}\n${item.note}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        color: muted,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('닫기'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1228,6 +1270,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   Widget _buildDiarizationSection() {
     final settings = AppSettings.instance;
     final modelsReady = _diarSegExists && _diarEmbExists;
+    final downloadDisabled = _anyModelDownloading;
 
     return _SectionCard(
       title: '발화자 라벨',
@@ -1239,7 +1282,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               ? '사람 이름을 자동으로 알아내지는 않고, 각 문장에 A/B/C 라벨을 붙입니다. '
                     '회의 길이에 따라 수십 초~수 분 추가됩니다.'
               : '아래 두 모델을 먼저 다운로드하세요.',
-          trailing: Switch(
+          trailing: Switch.adaptive(
             value: settings.diarizationEnabled,
             onChanged: modelsReady
                 ? (v) async {
@@ -1274,13 +1317,18 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           ),
         ),
         const SizedBox(height: 16),
+        const _ModelGroupHeader(
+          title: '필요한 모델',
+          subtitle: '두 모델을 모두 설치하면 발화자 라벨을 켤 수 있습니다.',
+        ),
         _ModelRow(
           name: '발화 구간 찾기 모델',
           size: '~6 MB',
-          subtitle: '누가 언제 말했는지 나누기 위한 보조 모델입니다.',
+          subtitle: '누가 언제 말했는지 나누기 위한 보조 모델',
           exists: _diarSegExists,
           dlState: _diarSegDl,
           onDownload: () => _downloadModel(target: _DlTarget.diarSeg),
+          downloadDisabled: downloadDisabled,
           onCancel: () {
             _diarSegDlService.cancel();
             setState(() => _diarSegDl = const _DlState());
@@ -1290,10 +1338,11 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         _ModelRow(
           name: '목소리 구분 모델',
           size: '~26 MB',
-          subtitle: '비슷한 목소리 구간을 같은 발화자로 묶는 데 사용합니다.',
+          subtitle: '비슷한 목소리 구간을 같은 발화자로 묶는 모델',
           exists: _diarEmbExists,
           dlState: _diarEmbDl,
           onDownload: () => _downloadModel(target: _DlTarget.diarEmb),
+          downloadDisabled: downloadDisabled,
           onCancel: () {
             _diarEmbDlService.cancel();
             setState(() => _diarEmbDl = const _DlState());
@@ -1306,13 +1355,23 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.only(top: 4, left: 8, right: 8),
             dense: true,
-            title: const Text(
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            collapsedIconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            title: Text(
               '고급 정보',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-            subtitle: const Text(
+            subtitle: Text(
               '발화자 라벨 모델 파일명을 확인합니다.',
-              style: TextStyle(fontSize: 11),
+              style: TextStyle(
+                fontSize: 10.5,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+              ),
             ),
             children: [
               _AdvancedInfoLine('발화 구간 찾기', AppConstants.diarSegModelFile),
@@ -1398,12 +1457,12 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           decoration: BoxDecoration(
             color: Theme.of(
               context,
-            ).colorScheme.primaryContainer.withValues(alpha: 0.38),
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: Theme.of(
                 context,
-              ).colorScheme.primary.withValues(alpha: 0.18),
+              ).colorScheme.outlineVariant.withValues(alpha: 0.8),
             ),
           ),
           child: Row(
@@ -1412,7 +1471,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               Icon(
                 Icons.privacy_tip_outlined,
                 size: 20,
-                color: Theme.of(context).colorScheme.primary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -1428,9 +1487,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         const SizedBox(height: 10),
         _SettingRow(
           title: '문제 진단 자료 내보내기',
-          subtitle:
-              '앱 상태, 모델 설치 여부, 최근 처리 시간, 충돌 로그를 ZIP 파일로 저장합니다. '
-              '고객 문의나 오류 분석에 사용할 수 있습니다.',
+          subtitle: '앱 상태, 모델 설치 여부, 처리 시간, 충돌 로그를 ZIP으로 저장합니다.',
           child: Padding(
             padding: const EdgeInsets.only(top: 6),
             child: FilledButton.icon(
@@ -1452,7 +1509,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         const Divider(height: 18),
         _SettingRow(
           title: '충돌·예외 로그',
-          subtitle: '$logStatus 문제가 발생했을 때 진단 자료와 함께 공유하면 원인 파악에 도움이 됩니다.',
+          subtitle: '$logStatus 진단 자료와 함께 공유하면 원인 파악에 도움이 됩니다.',
           child: Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Wrap(
@@ -1688,7 +1745,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             const Spacer(),
             Text(
               sizeStr,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -1699,14 +1759,18 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               ? Center(
                   child: Text(
                     '기록된 로그가 없습니다.',
-                    style: TextStyle(color: Colors.grey.shade500),
+                    style: TextStyle(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 )
               : Container(
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(
+                      color: Theme.of(ctx).colorScheme.outlineVariant,
+                    ),
                   ),
                   padding: const EdgeInsets.all(8),
                   child: SingleChildScrollView(
@@ -1844,21 +1908,23 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 섹션 헤더
         Row(
           children: [
-            Icon(icon, size: 15, color: Theme.of(context).colorScheme.primary),
+            Icon(icon, size: 15, color: scheme.primary),
             const SizedBox(width: 6),
             Text(
               title,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.primary,
-                letterSpacing: 0.5,
+                color: scheme.primary,
+                letterSpacing: 0,
               ),
             ),
           ],
@@ -1866,13 +1932,11 @@ class _SectionCard extends StatelessWidget {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: scheme.outlineVariant),
           ),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: children,
@@ -1901,6 +1965,8 @@ class _SettingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1913,6 +1979,7 @@ class _SettingRow extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
+                  letterSpacing: 0,
                 ),
               ),
               if (subtitle.isNotEmpty) ...[
@@ -1921,7 +1988,7 @@ class _SettingRow extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade500,
+                    color: scheme.onSurfaceVariant,
                     fontFamily: subtitleIsPath ? 'monospace' : null,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -1947,6 +2014,8 @@ class _AdvancedInfoLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -1954,10 +2023,7 @@ class _AdvancedInfoLine extends StatelessWidget {
         children: [
           SizedBox(
             width: 112,
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-            ),
+            child: Text(label, style: TextStyle(fontSize: 11, color: muted)),
           ),
           Expanded(
             child: SelectableText(
@@ -1965,7 +2031,7 @@ class _AdvancedInfoLine extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontFamily: 'monospace',
-                color: Colors.grey.shade600,
+                color: muted.withValues(alpha: 0.86),
               ),
             ),
           ),
@@ -2021,6 +2087,40 @@ class _StorageBadge extends StatelessWidget {
   }
 }
 
+class _ModelGroupHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _ModelGroupHeader({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.35,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── 모델 행 ───────────────────────────────────────────────────────────────
 enum _DlTarget {
   sttFast,
@@ -2054,6 +2154,7 @@ class _ModelRow extends StatelessWidget {
   final _DlState dlState;
   final VoidCallback onDownload;
   final VoidCallback onCancel;
+  final bool downloadDisabled;
 
   const _ModelRow({
     required this.name,
@@ -2063,122 +2164,156 @@ class _ModelRow extends StatelessWidget {
     required this.dlState,
     required this.onDownload,
     required this.onCancel,
+    this.downloadDisabled = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isDownloading = dlState.status == _DlStatus.downloading;
+    final hasError = dlState.status == _DlStatus.error;
+    final installed = dlState.status == _DlStatus.done || exists;
+    final muted = scheme.onSurfaceVariant;
+    final borderColor = installed
+        ? Colors.green.shade300.withValues(alpha: 0.65)
+        : hasError
+        ? Colors.red.shade300.withValues(alpha: 0.65)
+        : scheme.outlineVariant.withValues(alpha: 0.75);
+    final backgroundColor = installed
+        ? Colors.green.withValues(alpha: 0.04)
+        : hasError
+        ? Colors.red.withValues(alpha: 0.04)
+        : scheme.surfaceContainerLowest;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            // 상태 아이콘
-            if (dlState.status == _DlStatus.done || exists)
-              const Icon(Icons.check_circle, size: 16, color: Colors.green)
-            else if (dlState.status == _DlStatus.error)
-              Icon(Icons.error_outline, size: 16, color: Colors.red.shade600)
-            else
-              Icon(
-                Icons.radio_button_unchecked,
-                size: 16,
-                color: Colors.grey.shade400,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // 상태 아이콘
+              if (installed)
+                const Icon(Icons.check_circle, size: 16, color: Colors.green)
+              else if (hasError)
+                Icon(Icons.error_outline, size: 16, color: Colors.red.shade600)
+              else if (isDownloading)
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: scheme.primary,
+                  ),
+                )
+              else
+                Icon(
+                  Icons.radio_button_unchecked,
+                  size: 16,
+                  color: muted.withValues(alpha: 0.56),
+                ),
+              const SizedBox(width: 8),
+
+              // 이름
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(size, style: TextStyle(fontSize: 11, color: muted)),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.25,
+                          color: muted,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
-            const SizedBox(width: 8),
 
-            // 이름
-            Expanded(
+              // 버튼
+              if (isDownloading)
+                TextButton.icon(
+                  onPressed: onCancel,
+                  icon: const Icon(Icons.cancel_outlined, size: 14),
+                  label: const Text('취소', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.red.shade600,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: downloadDisabled ? null : onDownload,
+                  icon: const Icon(Icons.download, size: 14),
+                  label: Text(
+                    exists ? '재다운로드' : '다운로드',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+            ],
+          ),
+
+          // 다운로드 진행 상태
+          if (isDownloading) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                  LinearProgressIndicator(
+                    value: dlState.progress,
+                    backgroundColor: scheme.outlineVariant.withValues(
+                      alpha: 0.55,
                     ),
+                    minHeight: 4,
                   ),
-                  Text(
-                    size,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  ),
-                  if (subtitle != null)
+                  if (dlState.label.isNotEmpty) ...[
+                    const SizedBox(height: 3),
                     Text(
-                      subtitle!,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontFamily: 'monospace',
-                        color: Colors.grey.shade500,
-                      ),
+                      dlState.label,
+                      style: TextStyle(fontSize: 11, color: muted),
                     ),
+                  ],
                 ],
               ),
             ),
-
-            // 버튼
-            if (isDownloading)
-              TextButton.icon(
-                onPressed: onCancel,
-                icon: const Icon(Icons.cancel_outlined, size: 14),
-                label: const Text('취소', style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.red.shade600,
-                  visualDensity: VisualDensity.compact,
-                ),
-              )
-            else
-              OutlinedButton.icon(
-                onPressed: onDownload,
-                icon: const Icon(Icons.download, size: 14),
-                label: Text(
-                  exists ? '재다운로드' : '다운로드',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
           ],
-        ),
 
-        // 다운로드 진행 상태
-        if (isDownloading) ...[
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LinearProgressIndicator(
-                  value: dlState.progress,
-                  backgroundColor: Colors.grey.shade200,
-                  minHeight: 4,
-                ),
-                if (dlState.label.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    dlState.label,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  ),
-                ],
-              ],
+          // 오류 메시지
+          if (dlState.status == _DlStatus.error &&
+              dlState.label.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: Text(
+                dlState.label,
+                style: TextStyle(fontSize: 11, color: Colors.red.shade600),
+              ),
             ),
-          ),
+          ],
         ],
-
-        // 오류 메시지
-        if (dlState.status == _DlStatus.error && dlState.label.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Text(
-              dlState.label,
-              style: TextStyle(fontSize: 11, color: Colors.red.shade600),
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }

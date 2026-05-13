@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_ui/macos_ui.dart';
@@ -79,6 +80,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: Colors.green.shade700,
       ),
     );
+  }
+
+  void _startRecordingFromToolbar() {
+    final activeTask =
+        OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
+    if (activeTask != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('현재 $activeTask 작업 중입니다. 완료 후 녹음을 시작해주세요.'),
+          backgroundColor: Colors.orange.shade700,
+        ),
+      );
+      return;
+    }
+    ref.read(isRecordingActiveProvider.notifier).state = true;
+    ref.read(selectedMeetingIdProvider.notifier).state = null;
+    ref.read(selectedGroupIdProvider.notifier).state = null;
   }
 
   void _dismissRecoveryBanner() {
@@ -190,28 +208,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (!_sidebarCollapsed)
             Container(
               width: 1,
-              color: Theme.of(
-                context,
-              ).dividerColor.withValues(alpha: 0.3),
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
           // ── 메인 영역 (MacosScaffold + ToolBar) ──────────────────
           Expanded(
             child: MacosScaffold(
               toolBar: ToolBar(
                 titleWidth: 200,
-                title: const Text('적자생존'),
+                title: const Text('Local Minutes'),
                 leading: MacosTooltip(
                   message: _sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기',
                   child: MacosIconButton(
-                    icon: Icon(
-                      _sidebarCollapsed
-                          ? Icons.view_sidebar_outlined
-                          : Icons.view_sidebar,
-                      size: 18,
-                    ),
-                    onPressed: () => setState(
-                      () => _sidebarCollapsed = !_sidebarCollapsed,
-                    ),
+                    icon: Icon(CupertinoIcons.sidebar_left, size: 19),
+                    onPressed: () =>
+                        setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                     boxConstraints: const BoxConstraints(
                       minHeight: 28,
                       minWidth: 28,
@@ -224,24 +234,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   // macOS 표준 toolbar 는 아이콘 + tooltip 만으로 표기 (라벨 표시는 separator 와 충돌해 어색).
                   ToolBarIconButton(
                     label: '새 녹음',
-                    icon: const Icon(
-                      Icons.fiber_manual_record,
-                      color: Colors.red,
-                    ),
-                    onPressed: () {
-                      ref
-                          .read(isRecordingActiveProvider.notifier)
-                          .state = true;
-                      ref
-                          .read(selectedMeetingIdProvider.notifier)
-                          .state = null;
-                    },
+                    icon: const MacosIcon(CupertinoIcons.mic_circle),
+                    onPressed: _startRecordingFromToolbar,
                     showLabel: false,
                     tooltipMessage: '새 회의 녹음 시작 (⌘⇧R)',
                   ),
                   ToolBarIconButton(
                     label: '설정',
-                    icon: const Icon(Icons.settings_outlined),
+                    icon: const MacosIcon(CupertinoIcons.gear),
                     onPressed: () => showSettingsDialog(context, ref),
                     showLabel: false,
                     tooltipMessage: '설정 (⌘,)',
@@ -331,9 +331,6 @@ class _WelcomeView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Phase 3a: macOS 친화 톤으로 다듬기 — 색은 macos_ui accent + Material primary 조합,
-    //   타이틀 weight/letterSpacing 은 macOS HIG (.title1) 기준,
-    //   버튼은 macos_ui PushButton (large + accent color).
     final accent = MacosTheme.of(context).primaryColor;
     final secondaryText = MacosTheme.of(context).typography.subheadline.color;
 
@@ -341,69 +338,35 @@ class _WelcomeView extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 앱 아이콘 (둥근 표면)
           Container(
-            width: 88,
-            height: 88,
+            width: 76,
+            height: 76,
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: accent.withValues(alpha: 0.16)),
             ),
-            child: Icon(Icons.edit_note, size: 48, color: accent),
+            child: Icon(Icons.edit_note, size: 42, color: accent),
           ),
           const SizedBox(height: 20),
 
-          // 앱 이름 (macOS Title 1 스타일)
           Text(
-            '적자생존',
+            'Local Minutes',
             style: MacosTheme.of(context).typography.title1.copyWith(
               fontWeight: FontWeight.w700,
               color: accent,
-              letterSpacing: 2,
+              letterSpacing: 0,
             ),
           ),
-          const SizedBox(height: 4),
-
-          // 영문 부제
+          const SizedBox(height: 8),
           Text(
-            'Survival of the Writer',
-            style: MacosTheme.of(context).typography.caption1.copyWith(
-              color: secondaryText,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 슬로건 — macOS pill 스타일
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: accent.withValues(alpha: 0.15)),
-            ),
-            child: Text(
-              '"적는 자만이 살아남는다!"',
-              style: TextStyle(
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-                color: accent.withValues(alpha: 0.85),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(height: 36),
-
-          // 안내 문구
-          Text(
-            '좌측에서 회의를 선택하거나 새 녹음을 시작하세요.',
+            '내 Mac에서 정리하는 로컬 회의록',
             style: MacosTheme.of(
               context,
             ).typography.subheadline.copyWith(color: secondaryText),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
 
-          // macOS PushButton (accent + large)
           PushButton(
             controlSize: ControlSize.large,
             secondary: false,

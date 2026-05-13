@@ -8,7 +8,7 @@
 #    ./scripts/build_dmg.sh --no-bump    # 현재 pubspec 버전 그대로 빌드
 #
 #  출력:
-#    dist/적자생존_v<version>_build<build>.dmg
+#    dist/LocalMinutes_v<version>_build<build>.dmg
 #
 #  필요 조건:
 #    - Flutter SDK (macOS)
@@ -19,8 +19,9 @@
 set -euo pipefail
 
 # ── 설정 ─────────────────────────────────────────────────────────────────────
-APP_NAME="적자생존"
-APP_BUNDLE="적자생존"
+APP_NAME="Local Minutes"
+APP_BUNDLE="Local Minutes"
+DMG_BASENAME="LocalMinutes"
 DIST_DIR="dist"
 STAGING_DIR=".dmg_staging"
 DIRECT_ENTITLEMENTS="macos/Runner/DirectDistribution.entitlements"
@@ -51,7 +52,7 @@ VERSION="${VERSION_RAW%%+*}"
 BUILD_NUMBER="${VERSION_RAW##*+}"
 
 RELEASE_APP="build/macos/Build/Products/Release/${APP_BUNDLE}.app"
-DMG_NAME="${APP_NAME}_v${VERSION}_build${BUILD_NUMBER}"
+DMG_NAME="${DMG_BASENAME}_v${VERSION}_build${BUILD_NUMBER}"
 DMG_OUTPUT="${DIST_DIR}/${DMG_NAME}.dmg"
 DMG_TMP="${DIST_DIR}/${DMG_NAME}_tmp.dmg"
 
@@ -158,7 +159,7 @@ HELPER_SRC="${STAGING_DIR}/설치_도우미_소스.applescript"
 HELPER_APP="${STAGING_DIR}/⚡ 처음 여기를 먼저 실행하세요.app"
 
 cat > "${HELPER_SRC}" << 'APPLESCRIPT'
-set appName to "적자생존"
+set appName to "Local Minutes"
 set appPath to "/Applications/" & appName & ".app"
 
 -- 앱이 설치되어 있는지 확인

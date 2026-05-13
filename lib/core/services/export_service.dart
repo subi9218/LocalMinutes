@@ -151,7 +151,7 @@ class ExportService {
     buf.writeln();
     buf.writeln('- 날짜: $dtStr');
     if (durStr.isNotEmpty) buf.writeln('- 소요 시간: $durStr');
-    buf.writeln('- 생성: 적자생존 온디바이스 AI 회의록');
+    buf.writeln('- 생성: Local Minutes 온디바이스 AI 회의록');
     buf.writeln();
 
     if (summary == null) {
@@ -1024,8 +1024,8 @@ class ExportService {
     return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:title>${_xmlText(meeting.title)}</dc:title>
-  <dc:creator>적자생존</dc:creator>
-  <cp:lastModifiedBy>적자생존</cp:lastModifiedBy>
+  <dc:creator>Local Minutes</dc:creator>
+  <cp:lastModifiedBy>Local Minutes</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">$created</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">$created</dcterms:modified>
 </cp:coreProperties>
@@ -1060,7 +1060,7 @@ class ExportService {
   static const _docxAppProps =
       '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>적자생존</Application>
+  <Application>Local Minutes</Application>
 </Properties>
 ''';
 

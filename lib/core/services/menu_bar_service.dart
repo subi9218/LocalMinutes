@@ -126,47 +126,47 @@ class MenuBarService with TrayListener {
         if (_recording) ...[
           MenuItem(
             key: 'recording_status',
-            label: '🔴 녹음 중 · $elapsedStr',
+            label: '녹음 중 · $elapsedStr',
             disabled: true,
           ),
           MenuItem.separator(),
-          MenuItem(key: 'bookmark', label: '📍 북마크 추가  (⌘B)'),
+          MenuItem(key: 'bookmark', label: '북마크 추가  (⌘B)'),
           MenuItem(key: 'stop', label: '■ 녹음 정지  (⌘⇧R)'),
         ] else ...[
           _startMenuItem(),
         ],
         MenuItem.separator(),
-        MenuItem(key: 'show', label: '📂 앱 창 열기'),
+        MenuItem(key: 'show', label: '앱 창 열기'),
         MenuItem.separator(),
         MenuItem(key: 'quit', label: '종료'),
       ],
     );
     await trayManager.setContextMenu(menu);
     await trayManager.setToolTip(
-      _recording ? '적자생존 — 녹음 중 ($elapsedStr)' : _idleToolTip(),
+      _recording ? 'Local Minutes — 녹음 중 ($elapsedStr)' : _idleToolTip(),
     );
   }
 
   MenuItem _startMenuItem() {
     switch (_startState) {
       case TrayStartState.ready:
-        return MenuItem(key: 'start', label: '🎙 빠른 녹음 시작  (⌘⇧R)');
+        return MenuItem(key: 'start', label: '빠른 녹음 시작  (⌘⇧R)');
       case TrayStartState.storageRequired:
         return MenuItem(
           key: 'storage_required',
-          label: '⚠ 저장 폴더 설정 필요',
+          label: '저장 폴더 설정 필요',
           disabled: true,
         );
       case TrayStartState.modelsRequired:
         return MenuItem(
           key: 'models_required',
-          label: '⚠ AI 모델 준비 필요',
+          label: 'AI 모델 준비 필요',
           disabled: true,
         );
       case TrayStartState.busy:
         return MenuItem(
           key: 'busy',
-          label: '⏳ ${_busyLabel ?? '처리 중...'}',
+          label: _busyLabel ?? '처리 중',
           disabled: true,
         );
     }
@@ -175,13 +175,13 @@ class MenuBarService with TrayListener {
   String _idleToolTip() {
     switch (_startState) {
       case TrayStartState.ready:
-        return '적자생존';
+        return 'Local Minutes';
       case TrayStartState.storageRequired:
-        return '적자생존 — 저장 폴더 설정 필요';
+        return 'Local Minutes — 저장 폴더 설정 필요';
       case TrayStartState.modelsRequired:
-        return '적자생존 — AI 모델 준비 필요';
+        return 'Local Minutes — AI 모델 준비 필요';
       case TrayStartState.busy:
-        return '적자생존 — ${_busyLabel ?? '처리 중'}';
+        return 'Local Minutes — ${_busyLabel ?? '처리 중'}';
     }
   }
 

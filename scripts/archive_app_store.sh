@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-APP_NAME="적자생존"
+APP_NAME="Local Minutes"
 WORKSPACE="macos/Runner.xcworkspace"
 SCHEME="Runner"
 CONFIGURATION="Release"

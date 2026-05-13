@@ -394,20 +394,28 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         ? Brightness.dark
         : platformBrightness;
 
+    const systemBlue = Color(0xFF007AFF);
+
     // Phase 1b: root 를 MacosApp 으로 교체. 본문은 여전히 Material 위젯이라
     // builder 안에서 Theme(ThemeData) 도 함께 제공해 호환을 유지한다.
     return MacosApp(
       navigatorKey: _navigatorKey,
-      title: '적자생존',
+      title: 'Local Minutes',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
-      theme: MacosThemeData.light(),
-      darkTheme: MacosThemeData.dark(),
+      theme: MacosThemeData(
+        brightness: Brightness.light,
+        primaryColor: systemBlue,
+      ),
+      darkTheme: MacosThemeData(
+        brightness: Brightness.dark,
+        primaryColor: systemBlue,
+      ),
       builder: (context, child) {
         return Theme(
           data: ThemeData(
             colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.indigo,
+              seedColor: systemBlue,
               brightness: effectiveBrightness,
             ),
             useMaterial3: true,

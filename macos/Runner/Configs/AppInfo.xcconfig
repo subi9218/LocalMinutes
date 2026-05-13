@@ -5,7 +5,7 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = 적자생존
+PRODUCT_NAME = Local Minutes
 EXECUTABLE_NAME = LocalMinutes
 
 // The application's bundle identifier

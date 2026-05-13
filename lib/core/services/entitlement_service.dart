@@ -149,7 +149,7 @@ class EntitlementService {
     return EntitlementDecision.blocked(PaywallTrigger.accurateSttMode);
   }
 
-  /// 내보내기에서 적자생존 워터마크 제거 가능?
+  /// 내보내기에서 Local Minutes 워터마크 제거 가능?
   /// Pro/trialing: 항상 허용. Free: 차단 → 워터마크 포함 export.
   EntitlementDecision canExportWithoutWatermark() {
     if (isUnlocked) return EntitlementDecision.allowed();

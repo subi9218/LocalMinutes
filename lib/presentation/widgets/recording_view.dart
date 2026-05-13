@@ -816,7 +816,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     setState(() {
       _cancelSummaryRequested = true;
-      _statusMsg = '요약 중지 요청 중...';
+      _statusMsg = '요약 중지 중';
     });
     LlmService.instance.requestCancelActiveGeneration();
   }
@@ -861,7 +861,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     setState(() {
       _phase = _RecordingPhase.loadingModel;
-      _statusMsg = 'Whisper 모델 로드 중... (~2 GB)';
+      _statusMsg = '음성 인식 모델 준비 중';
       _segments.clear();
       _transcriptManuallyEdited = false;
       _pendingSpeakerLabels = const [];
@@ -895,8 +895,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       if (mounted) {
         setState(() {
           _statusMsg = liveSttModelFile == AppConstants.sttModelFileFast
-              ? 'Whisper 빠른 모델 로드 중... (실시간 초안)'
-              : 'Whisper 정확 모델 로드 중...';
+              ? '빠른 음성 인식 준비 중'
+              : '정확 음성 인식 준비 중';
         });
       }
 
@@ -1041,7 +1041,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             children: [
               const Text(
                 '회의 녹음을 위해 마이크 접근 권한이 필요합니다.\n'
-                '시스템 설정에서 "적자생존" 항목을 켜주세요.',
+                '시스템 설정에서 "Local Minutes" 항목을 켜주세요.',
                 style: TextStyle(fontSize: 13, height: 1.5),
               ),
               const SizedBox(height: 12),
@@ -1113,7 +1113,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     _checkpointTimer?.cancel();
     setState(() {
       _phase = _RecordingPhase.processing;
-      _statusMsg = '녹음 중지 중...';
+      _statusMsg = '녹음 정리 중';
     });
     await MicrophoneService.instance.stopRecording();
     _recordingEndedAt = DateTime.now();
@@ -1168,11 +1168,48 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         return StatefulBuilder(
           builder: (ctx, setLocalState) {
             final viewport = MediaQuery.sizeOf(ctx);
+            final scheme = Theme.of(ctx).colorScheme;
             final messageWidth = math.min(520.0, viewport.width - 96);
             final messageHeight = math.max(
               300.0,
               math.min(460.0, viewport.height - 360),
             );
+            InputDecoration prepDecoration(
+              String label, {
+              String? hintText,
+              String? helperText,
+            }) {
+              return InputDecoration(
+                labelText: label,
+                hintText: hintText,
+                helperText: helperText,
+                hintStyle: TextStyle(
+                  fontSize: 11,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.62),
+                ),
+                helperStyle: TextStyle(
+                  fontSize: 10,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.78),
+                ),
+                filled: true,
+                fillColor: scheme.surfaceContainerHighest.withValues(
+                  alpha: 0.34,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(7),
+                  borderSide: BorderSide(color: scheme.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(7),
+                  borderSide: BorderSide(color: scheme.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(7),
+                  borderSide: BorderSide(color: scheme.primary),
+                ),
+                isDense: true,
+              );
+            }
 
             return MacosAlertDialog(
               appIcon: const Icon(Icons.tune_rounded, size: 48),
@@ -1205,11 +1242,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         key: ValueKey('prep-title-$titleFieldVersion'),
                         initialValue: titleText,
                         onChanged: (v) => titleText = v,
-                        decoration: const InputDecoration(
-                          labelText: '회의 제목',
+                        decoration: prepDecoration(
+                          '회의 제목',
                           hintText: '예: 제품 주간 회의',
-                          border: OutlineInputBorder(),
-                          isDense: true,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1219,11 +1254,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                             child: DropdownButtonFormField<int>(
                               isExpanded: true,
                               initialValue: speakerCount,
-                              decoration: const InputDecoration(
-                                labelText: '말할 사람 수',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
+                              decoration: prepDecoration('말할 사람 수'),
                               items: const [
                                 DropdownMenuItem(value: 2, child: Text('2명')),
                                 DropdownMenuItem(value: 3, child: Text('3명')),
@@ -1243,11 +1274,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                             child: DropdownButtonFormField<String?>(
                               isExpanded: true,
                               initialValue: templateId,
-                              decoration: const InputDecoration(
-                                labelText: '회의 유형',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
+                              decoration: prepDecoration('회의 유형'),
                               items: [
                                 const DropdownMenuItem<String?>(
                                   value: null,
@@ -1294,35 +1321,21 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         onChanged: (v) => agendaText = v,
                         maxLines: 4,
                         minLines: 2,
-                        decoration: InputDecoration(
-                          labelText: '어젠다 (선택)',
+                        decoration: prepDecoration(
+                          '어젠다 (선택)',
                           hintText:
                               '한 줄에 하나씩 입력하면 요약이 어젠다별로 정리됩니다.\n'
                               '예:\n'
                               '- 신규 피처 일정\n'
                               '- 결제 모듈 리뷰',
-                          hintStyle: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade400,
-                          ),
                           helperText: '비워두면 일반 요약. 입력하면 항목별 결정·액션이 정리됩니다.',
-                          helperStyle: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
-                          ),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
                         ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
                         initialValue: sttLanguage,
-                        decoration: const InputDecoration(
-                          labelText: '음성 인식 언어',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
+                        decoration: prepDecoration('음성 인식 언어'),
                         items: [
                           for (final code in AppSettings.supportedSttLanguages)
                             DropdownMenuItem(
@@ -1344,18 +1357,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         AppSettings.sttLanguageDescription(sttLanguage),
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade600,
+                          color: scheme.onSurfaceVariant,
                           height: 1.4,
                         ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String?>(
                         initialValue: selectedDeviceId,
-                        decoration: const InputDecoration(
-                          labelText: '마이크',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
+                        decoration: prepDecoration('마이크'),
                         items: [
                           const DropdownMenuItem<String?>(
                             value: null,
@@ -1381,12 +1390,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         onStopReady: (stop) => stopMicTest = stop,
                       ),
                       const SizedBox(height: 12),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('발화자 라벨 사용'),
-                        subtitle: const Text(
-                          '사람 이름을 자동으로 알아내지는 않고, 발화 흐름을 A/B/C로 구분합니다.',
-                        ),
+                      _PrepToggleRow(
+                        title: '발화자 라벨 사용',
+                        subtitle: '발화 흐름을 A/B/C로 구분합니다.',
                         value: diarizationEnabled,
                         onChanged: (v) {
                           setLocalState(() => diarizationEnabled = v);
@@ -1411,21 +1417,19 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           icon: Icons.record_voice_over_outlined,
                           text: '여러 명이 참석하면 겹쳐 말하는 시간을 줄이면 좋습니다.',
                         ),
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
+                        _PrepCheckRow(
                           value: guideChecked,
                           onChanged: (v) {
-                            setLocalState(() => guideChecked = v ?? false);
+                            setLocalState(() => guideChecked = v);
                           },
-                          title: const Text('확인했습니다'),
-                          controlAffinity: ListTileControlAffinity.leading,
+                          title: '확인했습니다',
                         ),
                       ],
                       Text(
                         '7명 이상 회의는 현재 가장 가까운 값인 6명을 선택하세요.',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -1660,11 +1664,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                   emphasis: true,
                 ),
                 const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
+                _PrepToggleRow(
                   value: useDiarization,
-                  title: const Text('발화자 라벨 사용'),
-                  subtitle: const Text('끄면 더 빠르게 요약하지만, 누가 말했는지 흐름 정보는 줄어듭니다.'),
+                  title: '발화자 라벨 사용',
+                  subtitle: '끄면 더 빠르게 요약하지만, 발화 흐름 정보는 줄어듭니다.',
                   onChanged: (v) {
                     setLocalState(() => useDiarization = v);
                   },
@@ -1750,7 +1753,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     setState(() {
       _phase = _RecordingPhase.summarizing;
       _cancelSummaryRequested = false;
-      _statusMsg = '전사 저장 중...';
+      _statusMsg = '전사 저장 중';
       _summaryProgress = 0.0;
       _summaryStartTime = DateTime.now();
       _lastFinalSttElapsedMs = 0;
@@ -1838,7 +1841,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     // ── 2단계: LLM 요약 ─────────────────────────────────────
     try {
-      setState(() => _statusMsg = '요약 모델 준비 중...');
+      setState(() => _statusMsg = '요약 모델 준비 중');
       final appSupport = await getApplicationSupportDirectory();
       final llmPath =
           '${appSupport.path}/models/${AppSettings.llmModelFileFor(llmId)}';
@@ -1850,7 +1853,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         nBatch: 512,
       );
       if (_cancelSummaryRequested) throw const SummaryCancelledException();
-      if (mounted) setState(() => _statusMsg = '회의 요약 생성 중...');
+      if (mounted) setState(() => _statusMsg = '회의 요약 생성 중');
 
       final dateStr =
           '${recStart.year}-'
@@ -1936,7 +1939,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       if (AppSettings.instance.summarySpeedMode !=
           AppSettings.summaryModeFast) {
         try {
-          if (mounted) setState(() => _statusMsg = '태그 자동 추출 중...');
+          if (mounted) setState(() => _statusMsg = '태그 정리 중');
           final tags = await TagExtractor.extractFromSummary(
             summary,
             notes: notesText,
@@ -2033,7 +2036,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     try {
       if (mounted) {
         setState(() {
-          _statusMsg = '정확 모델로 최종 전사 준비 중...';
+          _statusMsg = '정확 전사 준비 중';
           _summaryProgress = 0.0;
         });
       }
@@ -2049,8 +2052,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           if (!mounted || totalMs <= 0 || _cancelSummaryRequested) return;
           final progress = (processedMs / totalMs).clamp(0.0, 1.0);
           setState(() {
-            _statusMsg =
-                '정확 모델로 최종 전사 중... ${(progress * 100).toStringAsFixed(0)}%';
+            _statusMsg = '정확 전사 중 ${(progress * 100).toStringAsFixed(0)}%';
             _summaryProgress = progress * 0.25;
           });
         },
@@ -2073,7 +2075,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           _segments
             ..clear()
             ..addAll(finalSegments);
-          _statusMsg = '정확 전사 완료. 전사 저장 중...';
+          _statusMsg = '정확 전사 완료. 전사 저장 중';
           _summaryProgress = 0.25;
         });
       }
@@ -2123,7 +2125,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       final diarSw = Stopwatch()..start();
       if (mounted) {
         setState(() {
-          _statusMsg = '발화자 라벨 생성 중... 긴 녹음은 몇 분 걸릴 수 있습니다.';
+          _statusMsg = '발화자 라벨 분석 중';
           _summaryProgress = _summaryProgress < 0.27 ? 0.27 : _summaryProgress;
         });
       }
@@ -2139,7 +2141,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           setState(() {
             _statusMsg = completed
                 ? '발화자 라벨 분석 완료. 요약을 준비하고 있습니다.'
-                : '발화자 라벨 생성 중... 오디오를 분석하고 있습니다.';
+                : '발화자 라벨 분석 중';
             _summaryProgress = completed
                 ? 0.3
                 : (_summaryProgress < 0.27 ? 0.27 : _summaryProgress);
@@ -2325,7 +2327,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     final descLines = <String>[];
     if (agenda.trim().isNotEmpty) descLines.add('어젠다:\n$agenda');
     if (notes.trim().isNotEmpty) descLines.add('메모:\n$notes');
-    descLines.add('— 적자생존에서 자동 등록');
+    descLines.add('— Local Minutes에서 자동 등록');
     final description = descLines.join('\n\n');
 
     final err = await CalendarService.instance.addEventToCalendar(
@@ -2412,6 +2414,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   /// • processing          → [처리 중... (비활성)]
   /// • stopped / done      → [녹음 시작] [✨ 요약]
   Widget _buildControlButtons(bool isRecording, bool isPaused, bool isBusy) {
+    final scheme = Theme.of(context).colorScheme;
+
     // ── 녹음 중 ────────────────────────────────────────────────
     if (isRecording) {
       return Row(
@@ -2546,9 +2550,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         _phase == _RecordingPhase.processing) {
       final label = switch (_phase) {
         _RecordingPhase.checkingModels => '모델 확인 중...',
-        _RecordingPhase.loadingModel => '모델 로드 중...',
-        _RecordingPhase.processing => '처리 중...',
-        _ => '처리 중...',
+        _RecordingPhase.loadingModel => '모델 로드 중',
+        _RecordingPhase.processing => '처리 중',
+        _ => '처리 중',
       };
       return Container(
         height: 34,
@@ -2671,7 +2675,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       summaryBlock,
                       PushButton(
                         controlSize: ControlSize.large,
-                        color: Colors.deepPurple,
+                        color: scheme.primary,
                         onPressed: summaryBlock == null ? _runSummary : null,
                         child: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
@@ -2750,11 +2754,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                             const SizedBox(width: 6),
                             Text(
                               isSummarizing
-                                  ? '요약 중...'
+                                  ? '요약 중'
                                   : _phase == _RecordingPhase.loadingModel
-                                  ? '모델 로드 중...'
+                                  ? '모델 로드 중'
                                   : _phase == _RecordingPhase.processing
-                                  ? '처리 중...'
+                                  ? '처리 중'
                                   : (showSummaryBtn ? '새 녹음 시작' : '녹음 시작'),
                               style: const TextStyle(color: MacosColors.white),
                             ),
@@ -2771,9 +2775,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       _segments.isEmpty ? null : summaryBlock,
                       PushButton(
                         controlSize: ControlSize.large,
-                        color: _segments.isEmpty
-                            ? Colors.grey
-                            : Colors.deepPurple,
+                        color: _segments.isEmpty ? Colors.grey : scheme.primary,
                         onPressed: canSummaryNow ? _runSummary : null,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -2798,7 +2800,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                               const SizedBox(width: 6),
                               Text(
                                 _phase == _RecordingPhase.summarizing
-                                    ? '요약 중...'
+                                    ? '요약 중'
                                     : '${_llmDisplayName(AppSettings.instance.selectedLlmModel)} 요약',
                                 style: const TextStyle(
                                   color: MacosColors.white,
@@ -2835,19 +2837,25 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   String _summaryProcessingDescription() {
     if (_statusMsg.contains('발화자 라벨')) {
-      return '오디오에서 말한 구간을 찾는 중입니다.\n긴 녹음은 몇 분 걸릴 수 있습니다.';
+      return '말한 구간을 분석 중입니다.\n긴 녹음은 시간이 더 걸릴 수 있습니다.';
     }
     if (_statusMsg.contains('전사')) {
-      return '녹음 내용을 한 번 더 확인해 요약 품질을 높이는 중입니다.\n잠시만 기다려 주세요.';
+      return '전사본을 정리하고 있습니다.\n잠시만 기다려 주세요.';
     }
-    return '요약, 참석자, 결정사항, 액션아이템을 정리 중...\n잠시만 기다려 주세요.';
+    return '요약과 액션아이템을 정리하고 있습니다.\n잠시만 기다려 주세요.';
   }
 
   Widget _buildSummarizingCard() {
     final elapsedStr = _formatDurationClock(_currentSummaryElapsed());
+    final scheme = Theme.of(context).colorScheme;
+    final accent = scheme.primary;
 
     return Card(
-      color: Colors.deepPurple.shade50,
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
@@ -2862,14 +2870,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     height: 56,
                     child: CircularProgressIndicator(
                       strokeWidth: 3,
-                      color: Colors.deepPurple.shade300,
+                      color: accent.withValues(alpha: 0.74),
                     ),
                   ),
-                  Icon(
-                    Icons.auto_awesome,
-                    size: 26,
-                    color: Colors.deepPurple.shade400,
-                  ),
+                  Icon(Icons.auto_awesome, size: 26, color: accent),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2878,7 +2882,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.deepPurple.shade700,
+                  color: scheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -2887,7 +2891,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 _summaryProcessingDescription(),
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.deepPurple.shade400,
+                  color: scheme.onSurfaceVariant,
                   height: 1.6,
                 ),
                 textAlign: TextAlign.center,
@@ -2896,10 +2900,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               _SummaryStepIndicator(statusMsg: _statusMsg),
               const SizedBox(height: 8),
               Text(
-                _statusMsg.isEmpty ? '처리 준비 중...' : _statusMsg,
+                _statusMsg.isEmpty ? '처리 준비 중' : _statusMsg,
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.deepPurple.shade500,
+                  color: scheme.onSurfaceVariant,
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
@@ -2915,16 +2919,16 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 child: LinearProgressIndicator(
                   value: _summaryProgress > 0 ? _summaryProgress : null,
                   minHeight: 4,
-                  backgroundColor: Colors.deepPurple.shade50,
+                  color: accent,
+                  backgroundColor: scheme.outlineVariant.withValues(
+                    alpha: 0.55,
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 '${(_summaryProgress * 100).toStringAsFixed(0)}% · 경과 $elapsedStr',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.deepPurple.shade300,
-                ),
+                style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -3437,13 +3441,16 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   // ── 모델 미설치 안내 화면 ──────────────────────────────────────
   Widget _buildModelMissingBanner() {
+    final scheme = Theme.of(context).colorScheme;
+    final warning = Colors.orange.shade700;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.orange.shade300),
+        color: warning.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: warning.withValues(alpha: 0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3452,7 +3459,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             children: [
               Icon(
                 Icons.download_for_offline_outlined,
-                color: Colors.orange.shade700,
+                color: warning,
                 size: 18,
               ),
               const SizedBox(width: 8),
@@ -3460,7 +3467,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 'AI 모델 설치 필요',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.orange.shade800,
+                  color: warning,
                   fontSize: 14,
                 ),
               ),
@@ -3471,7 +3478,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             '아래 모델 파일을 다운로드하여\n$_modelDir\n폴더에 넣어주세요.',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.orange.shade900,
+              color: scheme.onSurfaceVariant,
               height: 1.6,
             ),
           ),
@@ -3506,8 +3513,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               icon: const Icon(Icons.refresh, size: 16),
               label: const Text('다운로드 완료 후 여기를 눌러 확인'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.orange.shade800,
-                side: BorderSide(color: Colors.orange.shade400),
+                foregroundColor: warning,
+                side: BorderSide(color: warning.withValues(alpha: 0.35)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(7),
+                ),
               ),
             ),
           ),
@@ -3712,12 +3722,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               Row(
                 children: [
                   if (_isProcessingWindow)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
                       child: SizedBox(
                         width: 12,
                         height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                     ),
                   Expanded(
@@ -3731,8 +3744,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                             ? Colors.green.shade700
                             : _phase == _RecordingPhase.paused
                             ? Colors.orange.shade700
-                            : Colors.grey.shade600,
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -3784,7 +3799,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                       '${_segments.length}개',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.grey.shade600,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -3796,11 +3813,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                     ? Center(
                                         child: Text(
                                           isRecording
-                                              ? '말씀해 주세요... (30초 후 텍스트로 변환)'
+                                              ? '말씀해 주세요. 곧 텍스트로 변환됩니다.'
                                               : '녹음을 시작하면 내용이 여기에 표시됩니다',
                                           style: TextStyle(
                                             fontSize: 13,
-                                            color: Colors.grey.shade500,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
@@ -3924,6 +3943,7 @@ class _SummaryStepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final steps = [
       ('전사 확인', '전사'),
       ('발화자 라벨', '발화자 라벨'),
@@ -3946,11 +3966,7 @@ class _SummaryStepIndicator extends StatelessWidget {
         return Row(
           children: [
             if (idx > 0) ...[
-              Container(
-                width: 16,
-                height: 1,
-                color: Colors.deepPurple.shade100,
-              ),
+              Container(width: 16, height: 1, color: scheme.outlineVariant),
             ],
             Column(
               children: [
@@ -3960,8 +3976,11 @@ class _SummaryStepIndicator extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isActive
-                        ? Colors.deepPurple.shade400
-                        : Colors.deepPurple.shade100,
+                        ? scheme.primary
+                        : scheme.surfaceContainerHighest,
+                    border: Border.all(
+                      color: isActive ? scheme.primary : scheme.outlineVariant,
+                    ),
                   ),
                   child: Center(
                     child: isActive
@@ -3977,7 +3996,7 @@ class _SummaryStepIndicator extends StatelessWidget {
                             '${idx + 1}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.deepPurple.shade300,
+                              color: scheme.onSurfaceVariant,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -3989,8 +4008,8 @@ class _SummaryStepIndicator extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 9,
                     color: isActive
-                        ? Colors.deepPurple.shade600
-                        : Colors.deepPurple.shade200,
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant.withValues(alpha: 0.58),
                   ),
                 ),
               ],
@@ -4023,24 +4042,19 @@ class _NativeTaskNotice extends StatelessWidget {
                 ? '대기 중: $queued 외 ${state.queuedCount - 1}개'
                 : '다음 작업 대기: $queued',
         ].join(' · ');
+        final scheme = Theme.of(context).colorScheme;
 
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.deepPurple.withValues(alpha: 0.08),
+            color: scheme.primary.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: Colors.deepPurple.withValues(alpha: 0.14),
-            ),
+            border: Border.all(color: scheme.primary.withValues(alpha: 0.14)),
           ),
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.deepPurple.shade500,
-              height: 1.35,
-            ),
+            style: TextStyle(fontSize: 11, color: scheme.primary, height: 1.35),
             textAlign: TextAlign.center,
           ),
         );
@@ -4261,13 +4275,13 @@ class _VoicePulseCardState extends State<_VoicePulseCard>
     if (l < 0.15) {
       return (
         label: '말씀하시면 마이크가 따라갑니다',
-        color: Colors.amber.shade700,
+        color: Colors.orange.shade700,
         icon: Icons.mic_rounded,
       );
     }
     return (
       label: '잘 들리고 있어요',
-      color: Colors.indigo.shade600,
+      color: const Color(0xFF007AFF),
       icon: Icons.mic_rounded,
     );
   }
@@ -4276,13 +4290,13 @@ class _VoicePulseCardState extends State<_VoicePulseCard>
   Widget build(BuildContext context) {
     final status = _statusOf(widget.level);
     final scheme = Theme.of(context).colorScheme;
-    final cardBg = scheme.surfaceContainerHighest.withValues(alpha: 0.4);
+    final cardBg = scheme.surfaceContainerHighest.withValues(alpha: 0.30);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
@@ -4318,7 +4332,7 @@ class _VoicePulseCardState extends State<_VoicePulseCard>
                       _hint(widget.level, widget.isReceiving),
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.grey.shade600,
+                        color: scheme.onSurfaceVariant,
                         height: 1.3,
                       ),
                     ),
@@ -4389,18 +4403,18 @@ class _MicHalo extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: color.withValues(alpha: 0.6),
-                    width: 1.5,
+                    color: color.withValues(alpha: 0.44),
+                    width: 1,
                   ),
                   boxShadow: amp > 0.1
                       ? [
                           BoxShadow(
-                            color: color.withValues(alpha: 0.35 * amp),
-                            blurRadius: 12 * amp,
-                            spreadRadius: 1 * amp,
+                            color: color.withValues(alpha: 0.18 * amp),
+                            blurRadius: 10 * amp,
+                            spreadRadius: 0.5 * amp,
                           ),
                         ]
                       : null,
@@ -4417,15 +4431,15 @@ class _MicHalo extends StatelessWidget {
   /// 동심원 ripple — t는 0..1, 0에서 시작해 1로 퍼지며 페이드아웃
   Widget _ripple(double amp, double t) {
     if (amp <= 0.05) return const SizedBox.shrink();
-    final size = 38 + 18 * t * amp.clamp(0.2, 1.0); // 38 ~ 56
-    final opacity = (1 - t) * 0.45 * amp;
+    final size = 38 + 14 * t * amp.clamp(0.2, 1.0); // 38 ~ 52
+    final opacity = (1 - t) * 0.28 * amp;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: opacity), width: 1.2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: opacity)),
       ),
     );
   }
@@ -4463,7 +4477,7 @@ class _MiniWaveform extends StatelessWidget {
         final alpha = isReceiving
             ? (0.25 + 0.7 * freshness) * (0.5 + 0.5 * norm)
             : 0.15;
-        final h = isReceiving ? (3 + 18 * norm) : 3.0;
+        final h = isReceiving ? (3 + 16 * norm) : 3.0;
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 0.6),
@@ -4915,20 +4929,22 @@ class _LowInputWarningBanner extends StatelessWidget {
     final body = noSignal
         ? '입력 장치가 올바른지, 시스템 설정에서 마이크 권한이 켜져 있는지 확인하세요.'
         : '마이크를 말하는 사람 가까이에 두거나 입력 음량을 올려주세요.';
+    final scheme = Theme.of(context).colorScheme;
+    final warning = Colors.orange.shade700;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.orange.shade200),
+        color: warning.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: warning.withValues(alpha: 0.22)),
       ),
       child: Row(
         children: [
           Icon(
             noSignal ? Icons.mic_off_rounded : Icons.hearing_disabled_outlined,
             size: 20,
-            color: Colors.orange.shade800,
+            color: warning,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -4940,7 +4956,7 @@ class _LowInputWarningBanner extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: Colors.orange.shade900,
+                    color: warning,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -4949,7 +4965,7 @@ class _LowInputWarningBanner extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     height: 1.35,
-                    color: Colors.orange.shade900,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -4958,7 +4974,7 @@ class _LowInputWarningBanner extends StatelessWidget {
           MacosTooltip(
             message: '닫기',
             child: MacosIconButton(
-              icon: Icon(Icons.close, size: 16, color: Colors.orange.shade800),
+              icon: Icon(Icons.close, size: 16, color: warning),
               backgroundColor: Colors.transparent,
               padding: EdgeInsets.zero,
               boxConstraints: const BoxConstraints(
@@ -5039,6 +5055,117 @@ class _PrepGuideRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PrepToggleRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _PrepToggleRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.30),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: scheme.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Switch.adaptive(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrepCheckRow extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final String title;
+
+  const _PrepCheckRow({
+    required this.value,
+    required this.onChanged,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(7),
+      onTap: () => onChanged(!value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: value
+              ? scheme.primary.withValues(alpha: 0.08)
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(
+            color: value
+                ? scheme.primary.withValues(alpha: 0.35)
+                : scheme.outlineVariant,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              value ? Icons.check_circle : Icons.radio_button_unchecked,
+              size: 17,
+              color: value ? scheme.primary : scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: value ? scheme.primary : scheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

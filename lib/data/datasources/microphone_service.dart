@@ -138,7 +138,7 @@ class MicrophoneService {
       await OnDeviceModelManager.instance.unloadStt();
       throw const MicrophonePermissionDeniedException(
         '마이크 접근 권한이 거부되었습니다.\n'
-        '시스템 설정 → 개인정보 보호 및 보안 → 마이크에서 "적자생존"을 켜주세요.',
+        '시스템 설정 → 개인정보 보호 및 보안 → 마이크에서 "Local Minutes"를 켜주세요.',
       );
     }
 

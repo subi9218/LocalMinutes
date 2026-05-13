@@ -26,7 +26,7 @@ class CalendarEvent {
 /// macOS Calendar.app 이벤트 조회 서비스 — AppleScript(`osascript`) 활용.
 ///
 /// 첫 호출 시 macOS가 자동화 권한 다이얼로그를 띄움
-/// ("적자생존이 Calendar 앱을 제어하려고 합니다"). 수락 후부터 정상 동작.
+/// ("Local Minutes가 Calendar 앱을 제어하려고 합니다"). 수락 후부터 정상 동작.
 ///
 /// 권한 거부 시 [getUpcomingEvents]는 빈 리스트를 반환 (silent fail).
 class CalendarService {
@@ -121,15 +121,18 @@ return output
 ''';
 
     try {
-      final result = await Process.run('osascript', ['-e', script])
-          .timeout(const Duration(seconds: 6));
+      final result = await Process.run('osascript', [
+        '-e',
+        script,
+      ]).timeout(const Duration(seconds: 6));
       if (result.exitCode != 0) {
         final stderr = (result.stderr ?? '').toString();
-        debugPrint('[CalendarService] osascript exit=${result.exitCode} '
-            'stderr=$stderr');
+        debugPrint(
+          '[CalendarService] osascript exit=${result.exitCode} '
+          'stderr=$stderr',
+        );
         // 권한 거부의 일반 패턴: "Not authorized" / "AppleEvent" / "1743"
-        if (stderr.contains('Not authorized') ||
-            stderr.contains('-1743')) {
+        if (stderr.contains('Not authorized') || stderr.contains('-1743')) {
           _disabled = true;
         }
         return const [];
@@ -242,14 +245,17 @@ return "OK"
 ''';
 
     try {
-      final result = await Process.run('osascript', ['-e', script])
-          .timeout(const Duration(seconds: 8));
+      final result = await Process.run('osascript', [
+        '-e',
+        script,
+      ]).timeout(const Duration(seconds: 8));
       if (result.exitCode != 0) {
         final stderr = (result.stderr ?? '').toString();
-        debugPrint('[CalendarService] addEvent fail exit=${result.exitCode} '
-            'stderr=$stderr');
-        if (stderr.contains('Not authorized') ||
-            stderr.contains('-1743')) {
+        debugPrint(
+          '[CalendarService] addEvent fail exit=${result.exitCode} '
+          'stderr=$stderr',
+        );
+        if (stderr.contains('Not authorized') || stderr.contains('-1743')) {
           _disabled = true;
           return '캘린더 접근 권한이 거부되었습니다 (시스템 설정 > 개인정보 보호 > 자동화)';
         }

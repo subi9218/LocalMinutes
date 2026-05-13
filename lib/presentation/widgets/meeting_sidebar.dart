@@ -485,10 +485,8 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       }
     }).toList();
 
-    // ThemeData 가 themeMode + platform 직접 계산으로 정확히 잡히면 surfaceContainerLow 가
-    // 라이트에서는 light 톤, 다크에서는 dark 톤을 반환한다. Sidebar.decoration 과 같은 색감으로 통일됨.
     return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      color: Colors.transparent,
       child: Column(
         children: [
           // ── 헤더 ────────────────────────────────────────────────
@@ -509,19 +507,18 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '적자생존',
+                        'Local Minutes',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        '적는 자만이 살아남는다!',
+                        '내 Mac의 로컬 회의록',
                         style: TextStyle(
                           fontSize: 9,
                           color: Theme.of(
                             context,
-                          ).colorScheme.primary.withValues(alpha: 0.7),
-                          fontStyle: FontStyle.italic,
+                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -644,6 +641,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                     label: const Text('새 녹음'),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red.shade600,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
@@ -967,11 +967,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     String query,
   ) {
     if (hits.isEmpty) {
-      return Center(
-        child: Text(
-          '검색 결과 없음',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-        ),
+      return const _SidebarEmptyState(
+        icon: Icons.search_off,
+        title: '검색 결과 없음',
       );
     }
     final meetingById = {for (final m in meetings) m.id: m};
@@ -1025,11 +1023,11 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: Colors.deepPurple.shade400),
-            const SizedBox(height: 12),
+            ProgressCircle(borderColor: Colors.deepPurple.shade300),
+            const SizedBox(height: 10),
             Text(
               status,
-              style: TextStyle(fontSize: 12, color: Colors.deepPurple.shade600),
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
             ),
           ],
         ),
@@ -1038,43 +1036,17 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
 
     // 아직 검색 안 함
     if (aiResults == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.auto_awesome,
-                size: 32,
-                color: Colors.deepPurple.shade200,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '"AI로 검색" 버튼을\n눌러 AI 검색을 실행하세요.',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
+      return const _SidebarEmptyState(
+        icon: Icons.auto_awesome,
+        title: 'AI 검색 대기 중',
       );
     }
 
     // 결과 없음
     if (aiResults.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off, size: 32, color: Colors.grey.shade300),
-            const SizedBox(height: 8),
-            Text(
-              '관련 회의를 찾지 못했습니다.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
-          ],
-        ),
+      return const _SidebarEmptyState(
+        icon: Icons.search_off,
+        title: '관련 회의 없음',
       );
     }
 
@@ -1168,12 +1140,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     bool isRecording,
   ) {
     if (meetings.isEmpty) {
-      return Center(
-        child: Text(
-          '저장된 회의가 없습니다.',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-          textAlign: TextAlign.center,
-        ),
+      return const _SidebarEmptyState(
+        icon: Icons.event_note_outlined,
+        title: '회의 없음',
       );
     }
 
@@ -1232,6 +1201,43 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
             onRenameMeeting: _onRenameMeeting,
           ),
       ],
+    );
+  }
+}
+
+class _SidebarEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const _SidebarEmptyState({required this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 24,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.42),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.72),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1467,10 +1473,12 @@ class _DateChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: selected ? c.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: selected ? c.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
           border: Border.all(
-            color: selected ? c.withValues(alpha: 0.5) : Colors.grey.shade300,
+            color: selected
+                ? c.withValues(alpha: 0.42)
+                : Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
         child: Text(
@@ -1511,10 +1519,12 @@ class _ModeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(
-          color: selected ? c.withValues(alpha: 0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          color: selected ? c.withValues(alpha: 0.11) : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
           border: Border.all(
-            color: selected ? c.withValues(alpha: 0.5) : Colors.grey.shade300,
+            color: selected
+                ? c.withValues(alpha: 0.42)
+                : Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
         child: Row(
@@ -1578,105 +1588,131 @@ class _GroupSectionState extends State<_GroupSection> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final groupSelected = widget.selectedGroupId == widget.group.id;
+
     return Column(
       children: [
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            color: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            child: Row(
-              children: [
-                Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  size: 16,
-                  color: Colors.grey.shade600,
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.folder, size: 14, color: Colors.amber.shade700),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    widget.group.name,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(7),
+            hoverColor: scheme.onSurface.withValues(alpha: 0.04),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: groupSelected
+                    ? scheme.primary.withValues(alpha: 0.12)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_down
+                        : Icons.keyboard_arrow_right,
+                    size: 16,
+                    color: groupSelected
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.folder,
+                    size: 14,
+                    color: groupSelected
+                        ? scheme.primary
+                        : Colors.amber.shade700,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      widget.group.name,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: groupSelected
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    '${widget.meetings.length}',
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
+                      fontSize: 10,
+                      color: groupSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : scheme.onSurfaceVariant.withValues(alpha: 0.75),
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  '${widget.meetings.length}',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                ),
-                const SizedBox(width: 2),
-                IconButton(
-                  tooltip: '시리즈 진행',
-                  icon: Icon(
-                    Icons.timeline,
-                    size: 14,
-                    color: widget.selectedGroupId == widget.group.id
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade500,
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: '시리즈 진행',
+                    icon: Icon(
+                      Icons.timeline,
+                      size: 14,
+                      color: groupSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                    ),
+                    iconSize: 14,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 22,
+                      minHeight: 22,
+                    ),
+                    splashRadius: 14,
+                    onPressed: () => widget.onShowSeriesDashboard(widget.group),
                   ),
-                  iconSize: 14,
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 22,
-                    minHeight: 22,
-                  ),
-                  splashRadius: 14,
-                  onPressed: () => widget.onShowSeriesDashboard(widget.group),
-                ),
-                PopupMenuButton<String>(
-                  icon: Icon(
-                    Icons.more_vert,
-                    size: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                  iconSize: 14,
-                  tooltip: '그룹 관리',
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'rename',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 16),
-                          SizedBox(width: 8),
-                          Text('그룹명 수정', style: TextStyle(fontSize: 13)),
-                        ],
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert,
+                      size: 14,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                    ),
+                    iconSize: 14,
+                    tooltip: '그룹 관리',
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'rename',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 16),
+                            SizedBox(width: 8),
+                            Text('그룹명 수정', style: TextStyle(fontSize: 13)),
+                          ],
+                        ),
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete_outline,
-                            size: 16,
-                            color: Colors.red,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '그룹 삭제',
-                            style: TextStyle(fontSize: 13, color: Colors.red),
-                          ),
-                        ],
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_outline,
+                              size: 16,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '그룹 삭제',
+                              style: TextStyle(fontSize: 13, color: Colors.red),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                  onSelected: (action) {
-                    if (action == 'rename') _showRenameDialog(context);
-                    if (action == 'delete') _showDeleteDialog(context);
-                  },
-                ),
-              ],
+                    ],
+                    onSelected: (action) {
+                      if (action == 'rename') _showRenameDialog(context);
+                      if (action == 'delete') _showDeleteDialog(context);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1794,46 +1830,57 @@ class _UngroupedSectionState extends State<_UngroupedSection> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       children: [
         if (widget.groups.isNotEmpty)
-          InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              child: Row(
-                children: [
-                  Icon(
-                    _expanded
-                        ? Icons.keyboard_arrow_down
-                        : Icons.keyboard_arrow_right,
-                    size: 16,
-                    color: Colors.grey.shade500,
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.folder_open,
-                    size: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '미분류',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(7),
+              hoverColor: scheme.onSurface.withValues(alpha: 0.04),
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_down
+                          : Icons.keyboard_arrow_right,
+                      size: 16,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.folder_open,
+                      size: 14,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '미분류',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    '${widget.meetings.length}',
-                    style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
-                  ),
-                ],
+                    Text(
+                      '${widget.meetings.length}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1888,6 +1935,12 @@ class _MeetingTile extends StatelessWidget {
     final qualityColor = report.inputQualityStatus == 'empty'
         ? Colors.red.shade700
         : Colors.orange.shade700;
+    final selectedTextColor = scheme.onPrimary;
+    final secondaryTextColor = isSelected
+        ? scheme.onPrimary.withValues(alpha: 0.74)
+        : scheme.onSurfaceVariant;
+    final tileBackground = isSelected ? scheme.primary : Colors.transparent;
+
     return Dismissible(
       key: ValueKey(meeting.id),
       direction: DismissDirection.endToStart,
@@ -1924,15 +1977,21 @@ class _MeetingTile extends StatelessWidget {
       child: GestureDetector(
         onSecondaryTapUp: (d) => _showContextMenu(context, d.globalPosition),
         child: InkWell(
+          borderRadius: BorderRadius.circular(7),
+          hoverColor: scheme.onSurface.withValues(alpha: 0.045),
           onTap: onTap,
-          child: Container(
-            color: isSelected
-                ? scheme.primaryContainer.withValues(alpha: 0.4)
-                : null,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            decoration: BoxDecoration(
+              color: tileBackground,
+              borderRadius: BorderRadius.circular(7),
+            ),
             child: Row(
               children: [
-                _StatusIcon(status: meeting.status),
+                _StatusIcon(status: meeting.status, selected: isSelected),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -1951,6 +2010,9 @@ class _MeetingTile extends StatelessWidget {
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.normal,
+                            color: isSelected
+                                ? selectedTextColor
+                                : scheme.onSurface,
                           ),
                         ),
                       ),
@@ -1959,7 +2021,7 @@ class _MeetingTile extends StatelessWidget {
                         _formatDate(meeting.createdAt),
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade500,
+                          color: secondaryTextColor,
                         ),
                       ),
                       if (qualityLabel.isNotEmpty) ...[
@@ -1974,7 +2036,9 @@ class _MeetingTile extends StatelessWidget {
                               Icon(
                                 Icons.warning_amber_rounded,
                                 size: 12,
-                                color: qualityColor,
+                                color: isSelected
+                                    ? selectedTextColor.withValues(alpha: 0.86)
+                                    : qualityColor,
                               ),
                               const SizedBox(width: 3),
                               Flexible(
@@ -1984,7 +2048,11 @@ class _MeetingTile extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 10.5,
-                                    color: qualityColor,
+                                    color: isSelected
+                                        ? selectedTextColor.withValues(
+                                            alpha: 0.86,
+                                          )
+                                        : qualityColor,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -2340,26 +2408,40 @@ class _AddGroupButton extends StatelessWidget {
 // ── 상태 아이콘 ───────────────────────────────────────────────────────
 class _StatusIcon extends StatelessWidget {
   final MeetingStatus status;
-  const _StatusIcon({required this.status});
+  final bool selected;
+
+  const _StatusIcon({required this.status, this.selected = false});
 
   @override
   Widget build(BuildContext context) {
+    final selectedColor = Theme.of(context).colorScheme.onPrimary;
     switch (status) {
       case MeetingStatus.done:
-        return const Icon(Icons.check_circle, size: 16, color: Colors.green);
+        return Icon(
+          Icons.check_circle,
+          size: 16,
+          color: selected ? selectedColor : Colors.green,
+        );
       case MeetingStatus.error:
-        return Icon(Icons.error, size: 16, color: Colors.red.shade600);
+        return Icon(
+          Icons.error,
+          size: 16,
+          color: selected ? selectedColor : Colors.red.shade600,
+        );
       case MeetingStatus.recording:
-        return const Icon(
+        return Icon(
           Icons.fiber_manual_record,
           size: 16,
-          color: Colors.red,
+          color: selected ? selectedColor : Colors.red,
         );
       case MeetingStatus.transcribing:
-        return const SizedBox(
+        return SizedBox(
           width: 16,
           height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: selected ? selectedColor : null,
+          ),
         );
       case MeetingStatus.summarizing:
         return SizedBox(
@@ -2367,7 +2449,7 @@ class _StatusIcon extends StatelessWidget {
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: Colors.deepPurple.shade400,
+            color: selected ? selectedColor : Colors.deepPurple.shade400,
           ),
         );
     }
@@ -2441,6 +2523,8 @@ class _SidebarSearchTopState extends ConsumerState<SidebarSearchTop> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     // ⌘F → 검색 포커스
     ref.listen<int>(shortcutFocusSearchSignalProvider, (_, _) {
       _focus.requestFocus();
@@ -2487,20 +2571,18 @@ class _SidebarSearchTopState extends ConsumerState<SidebarSearchTop> {
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: BorderSide(color: scheme.outlineVariant),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: BorderSide(color: scheme.outlineVariant),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            borderSide: BorderSide(color: scheme.primary),
           ),
           filled: true,
-          fillColor: Theme.of(context).colorScheme.surface,
+          fillColor: scheme.surface.withValues(alpha: 0.82),
         ),
         style: const TextStyle(fontSize: 12),
         onChanged: (v) {
