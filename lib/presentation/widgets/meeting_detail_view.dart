@@ -4962,6 +4962,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     _searchCtrl.addListener(_onSearchChanged);
     // 텍스트 입력 중에는 J/K/Space 단축키가 한글 모음 입력을 가로채지 않게 한다.
     FocusManager.instance.addListener(_onFocusChanged);
+    HardwareKeyboard.instance.addHandler(_handleShortcutKey);
     // 전사 점프 함수는 오디오 유무와 관계없이 즉시 등록
     // (오디오가 없어도 우측 패널 스크롤+하이라이트는 가능해야 함)
     widget.onSeekRegister?.call(jumpToSegmentDetailed);
@@ -5107,6 +5108,22 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
         context.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
+  bool _handleShortcutKey(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    if (_isTextEditingFocused()) return false;
+    if (_player == null || !_playerReady) return false;
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _seekRelativeSeconds(-10);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      _seekRelativeSeconds(10);
+      return true;
+    }
+    return false;
+  }
+
   @override
   void dispose() {
     widget.onSeekRegister?.call(null);
@@ -5117,6 +5134,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     _playingSub?.cancel();
     _player?.dispose();
     FocusManager.instance.removeListener(_onFocusChanged);
+    HardwareKeyboard.instance.removeHandler(_handleShortcutKey);
     _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
     _editingCtrl.dispose();
