@@ -1253,214 +1253,301 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         (useDiarization ? diarizationEstimate : Duration.zero);
 
     if (!mounted) return;
-    final options = await showMacosAlertDialog<_RerunSttOptions>(
+    final options = await showDialog<_RerunSttOptions>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) => MacosAlertDialog(
-          appIcon: const Icon(Icons.timer_outlined, size: 48),
-          title: const Text('음성 인식 다시 돌리기'),
-          message: SizedBox(
-            width: 680,
-            height: 560,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    '기존 전사본을 삭제하고 오디오 파일에서 다시 받아쓰기를 실행합니다. 기존 요약은 유지되며, 필요하면 다시 요약할 수 있습니다.',
-                    style: TextStyle(fontSize: 13, height: 1.5),
+        builder: (ctx, setDialog) {
+          final scheme = Theme.of(ctx).colorScheme;
+          final screenSize = MediaQuery.sizeOf(ctx);
+          final dialogWidth = (screenSize.width - 96)
+              .clamp(520.0, 620.0)
+              .toDouble();
+          final dialogMaxHeight = (screenSize.height - 96)
+              .clamp(560.0, 760.0)
+              .toDouble();
+
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 48,
+              vertical: 40,
+            ),
+            backgroundColor: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: dialogWidth,
+                maxHeight: dialogMaxHeight,
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: scheme.outlineVariant.withValues(alpha: 0.8),
                   ),
-                  const SizedBox(height: 14),
-                  _EstimateRow(
-                    label: '오디오 길이',
-                    value: audioDuration > Duration.zero
-                        ? _durationKr(audioDuration)
-                        : '확인 불가',
-                  ),
-                  _EstimateRow(
-                    label:
-                        '${AppSettings.sttProcessingModeLabel(sttMode)} 음성 인식',
-                    value: audioDuration > Duration.zero
-                        ? '약 ${_durationKr(currentSttEstimate())}'
-                        : '실행 후 표시',
-                  ),
-                  if (previousEstimateRatioFor(sttMode) != null)
-                    Text(
-                      '이 회의의 이전 음성 인식 시간을 반영했습니다.',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                        height: 1.4,
-                      ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.24),
+                      blurRadius: 28,
+                      offset: const Offset(0, 14),
                     ),
-                  if (useDiarization)
-                    _EstimateRow(
-                      label: '발화자 라벨',
-                      value: audioDuration > Duration.zero
-                          ? '약 ${_durationKr(diarizationEstimate)}'
-                          : '실행 후 표시',
-                    ),
-                  const Divider(height: 22),
-                  _EstimateRow(
-                    label: '총 예상',
-                    value: audioDuration > Duration.zero
-                        ? '약 ${_durationKr(totalEstimate())}'
-                        : '실행 후 진행률 표시',
-                    emphasis: true,
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    '음성 인식 방식',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  SegmentedButton<String>(
-                    segments: [
-                      ButtonSegment(
-                        value: AppSettings.sttModeUltraFast,
-                        icon: MacosTooltip(
-                          message:
-                              'Whisper large-v3-turbo Q8 (~900MB)\n'
-                              '대기 시간을 조금 더 줄이는 방식입니다.\n'
-                              '파일: ${AppConstants.sttModelFileFast}',
-                          child: const Icon(Icons.flash_on, size: 14),
-                        ),
-                        label: MacosTooltip(
-                          message:
-                              'Whisper large-v3-turbo Q8 (~900MB)\n'
-                              '대기 시간을 조금 더 줄이는 방식입니다.\n'
-                              '파일: ${AppConstants.sttModelFileFast}',
-                          child: Text(
-                            fastInstalled ? '빠름' : '빠름 (미설치)',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                        enabled: fastInstalled,
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(26, 24, 26, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 42,
+                        color: scheme.onSurface,
                       ),
-                      ButtonSegment(
-                        value: AppSettings.sttModeBalanced,
-                        icon: MacosTooltip(
-                          message:
-                              'Whisper large-v3-turbo Q8 (~900MB)\n'
-                              '속도와 전사 품질을 함께 고려합니다.\n'
-                              '파일: ${AppConstants.sttModelFileFast}',
-                          child: const Icon(Icons.speed, size: 14),
+                      const SizedBox(height: 14),
+                      Text(
+                        '음성 인식 다시 돌리기',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0,
                         ),
-                        label: MacosTooltip(
-                          message:
-                              'Whisper large-v3-turbo Q8 (~900MB)\n'
-                              '속도와 전사 품질을 함께 고려합니다.\n'
-                              '파일: ${AppConstants.sttModelFileFast}',
-                          child: Text(
-                            fastInstalled ? '표준' : '표준 (미설치)',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                        enabled: fastInstalled,
                       ),
-                      ButtonSegment(
-                        value: AppSettings.sttModeAccurate,
-                        icon: MacosTooltip(
-                          message:
-                              'Whisper large-v3 Q5_0 (~1.1GB)\n'
-                              '품질 우선, 표준보다 오래 걸립니다.\n'
-                              '파일: ${AppConstants.sttModelFileAccurate}',
-                          child: const Icon(Icons.verified, size: 14),
-                        ),
-                        label: MacosTooltip(
-                          message:
-                              'Whisper large-v3 Q5_0 (~1.1GB)\n'
-                              '품질 우선, 표준보다 오래 걸립니다.\n'
-                              '파일: ${AppConstants.sttModelFileAccurate}',
-                          child: Text(
-                            accurateInstalled ? '정밀' : '정밀 (미설치)',
-                            style: const TextStyle(fontSize: 12),
+                      const SizedBox(height: 16),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                '기존 전사본을 삭제하고 오디오 파일에서 다시 받아쓰기를 실행합니다. 기존 요약은 유지되며, 필요하면 다시 요약할 수 있습니다.',
+                                style: TextStyle(fontSize: 13, height: 1.5),
+                              ),
+                              const SizedBox(height: 14),
+                              _EstimateRow(
+                                label: '오디오 길이',
+                                value: audioDuration > Duration.zero
+                                    ? _durationKr(audioDuration)
+                                    : '확인 불가',
+                              ),
+                              _EstimateRow(
+                                label:
+                                    '${AppSettings.sttProcessingModeLabel(sttMode)} 음성 인식',
+                                value: audioDuration > Duration.zero
+                                    ? '약 ${_durationKr(currentSttEstimate())}'
+                                    : '실행 후 표시',
+                              ),
+                              if (previousEstimateRatioFor(sttMode) != null)
+                                Text(
+                                  '이 회의의 이전 음성 인식 시간을 반영했습니다.',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: scheme.onSurfaceVariant,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              if (useDiarization)
+                                _EstimateRow(
+                                  label: '발화자 라벨',
+                                  value: audioDuration > Duration.zero
+                                      ? '약 ${_durationKr(diarizationEstimate)}'
+                                      : '실행 후 표시',
+                                ),
+                              const Divider(height: 22),
+                              _EstimateRow(
+                                label: '총 예상',
+                                value: audioDuration > Duration.zero
+                                    ? '약 ${_durationKr(totalEstimate())}'
+                                    : '실행 후 진행률 표시',
+                                emphasis: true,
+                              ),
+                              const SizedBox(height: 14),
+                              const Text(
+                                '음성 인식 방식',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              SegmentedButton<String>(
+                                segments: [
+                                  ButtonSegment(
+                                    value: AppSettings.sttModeUltraFast,
+                                    icon: MacosTooltip(
+                                      message:
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          '대기 시간을 조금 더 줄이는 방식입니다.\n'
+                                          '파일: ${AppConstants.sttModelFileFast}',
+                                      child: const Icon(
+                                        Icons.flash_on,
+                                        size: 14,
+                                      ),
+                                    ),
+                                    label: MacosTooltip(
+                                      message:
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          '대기 시간을 조금 더 줄이는 방식입니다.\n'
+                                          '파일: ${AppConstants.sttModelFileFast}',
+                                      child: Text(
+                                        fastInstalled ? '빠름' : '빠름 (미설치)',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    enabled: fastInstalled,
+                                  ),
+                                  ButtonSegment(
+                                    value: AppSettings.sttModeBalanced,
+                                    icon: MacosTooltip(
+                                      message:
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          '속도와 전사 품질을 함께 고려합니다.\n'
+                                          '파일: ${AppConstants.sttModelFileFast}',
+                                      child: const Icon(Icons.speed, size: 14),
+                                    ),
+                                    label: MacosTooltip(
+                                      message:
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          '속도와 전사 품질을 함께 고려합니다.\n'
+                                          '파일: ${AppConstants.sttModelFileFast}',
+                                      child: Text(
+                                        fastInstalled ? '표준' : '표준 (미설치)',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    enabled: fastInstalled,
+                                  ),
+                                  ButtonSegment(
+                                    value: AppSettings.sttModeAccurate,
+                                    icon: MacosTooltip(
+                                      message:
+                                          'Whisper large-v3 Q5_0 (~1.1GB)\n'
+                                          '품질 우선, 표준보다 오래 걸립니다.\n'
+                                          '파일: ${AppConstants.sttModelFileAccurate}',
+                                      child: const Icon(
+                                        Icons.verified,
+                                        size: 14,
+                                      ),
+                                    ),
+                                    label: MacosTooltip(
+                                      message:
+                                          'Whisper large-v3 Q5_0 (~1.1GB)\n'
+                                          '품질 우선, 표준보다 오래 걸립니다.\n'
+                                          '파일: ${AppConstants.sttModelFileAccurate}',
+                                      child: Text(
+                                        accurateInstalled ? '정밀' : '정밀 (미설치)',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    enabled: accurateInstalled,
+                                  ),
+                                ],
+                                selected: {sttMode},
+                                onSelectionChanged: (sel) =>
+                                    setDialog(() => sttMode = sel.first),
+                                style: ButtonStyle(
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                AppSettings.sttProcessingModeDescription(
+                                  sttMode,
+                                ),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: sttLanguage,
+                                decoration: const InputDecoration(
+                                  labelText: '음성 인식 언어',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                items: [
+                                  for (final code
+                                      in AppSettings.supportedSttLanguages)
+                                    DropdownMenuItem(
+                                      value: code,
+                                      child: Text(
+                                        AppSettings.sttLanguageLabel(code),
+                                      ),
+                                    ),
+                                ],
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    setDialog(() => sttLanguage = v);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                AppSettings.sttLanguageDescription(sttLanguage),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                value: useDiarization,
+                                title: const Text('발화자 라벨 사용'),
+                                subtitle: Text(
+                                  diarizationModelsReady
+                                      ? '끄면 더 빠르게 끝나지만, A/B/C 발화 흐름 정보는 제거됩니다.'
+                                      : '발화자 라벨 모델이 설치되어 있지 않습니다.',
+                                ),
+                                onChanged: diarizationModelsReady
+                                    ? (v) => setDialog(() => useDiarization = v)
+                                    : null,
+                              ),
+                            ],
                           ),
                         ),
-                        enabled: accurateInstalled,
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: PushButton(
+                              controlSize: ControlSize.large,
+                              secondary: true,
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('취소'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: PushButton(
+                              controlSize: ControlSize.large,
+                              onPressed: () => Navigator.pop(
+                                ctx,
+                                _RerunSttOptions(
+                                  sttMode: sttMode,
+                                  useDiarization: useDiarization,
+                                  sttLanguage: sttLanguage,
+                                ),
+                              ),
+                              child: const Text('실행'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                    selected: {sttMode},
-                    onSelectionChanged: (sel) =>
-                        setDialog(() => sttMode = sel.first),
-                    style: ButtonStyle(visualDensity: VisualDensity.compact),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppSettings.sttProcessingModeDescription(sttMode),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: sttLanguage,
-                    decoration: const InputDecoration(
-                      labelText: '음성 인식 언어',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    items: [
-                      for (final code in AppSettings.supportedSttLanguages)
-                        DropdownMenuItem(
-                          value: code,
-                          child: Text(AppSettings.sttLanguageLabel(code)),
-                        ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setDialog(() => sttLanguage = v);
-                    },
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    AppSettings.sttLanguageDescription(sttLanguage),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: useDiarization,
-                    title: const Text('발화자 라벨 사용'),
-                    subtitle: Text(
-                      diarizationModelsReady
-                          ? '끄면 더 빠르게 끝나지만, A/B/C 발화 흐름 정보는 제거됩니다.'
-                          : '발화자 라벨 모델이 설치되어 있지 않습니다.',
-                    ),
-                    onChanged: diarizationModelsReady
-                        ? (v) => setDialog(() => useDiarization = v)
-                        : null,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-          primaryButton: PushButton(
-            controlSize: ControlSize.large,
-            onPressed: () => Navigator.pop(
-              ctx,
-              _RerunSttOptions(
-                sttMode: sttMode,
-                useDiarization: useDiarization,
-                sttLanguage: sttLanguage,
-              ),
-            ),
-            child: const Text('실행'),
-          ),
-          secondaryButton: PushButton(
-            controlSize: ControlSize.large,
-            secondary: true,
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-        ),
+          );
+        },
       ),
     );
     if (options == null) return;
@@ -2300,94 +2387,113 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         '${created.hour.toString().padLeft(2, '0')}:'
         '${created.minute.toString().padLeft(2, '0')}';
     final durStr = meeting.durationSeconds > 0
-        ? '  ·  ${meeting.durationSeconds ~/ 60}분 ${meeting.durationSeconds % 60}초'
-        : '';
+        ? '${meeting.durationSeconds ~/ 60}분 ${meeting.durationSeconds % 60}초'
+        : null;
+    final scheme = Theme.of(context).colorScheme;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 제목 + 날짜 + 그룹 선택
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Text(
-                      meeting.title,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  // 제목 수정 버튼
-                  MacosTooltip(
-                    message: '제목 수정',
-                    child: MacosIconButton(
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        size: 16,
-                        color: Colors.grey.shade500,
-                      ),
-                      backgroundColor: Colors.transparent,
-                      padding: EdgeInsets.zero,
-                      boxConstraints: const BoxConstraints(
-                        minWidth: 22,
-                        minHeight: 22,
-                        maxWidth: 22,
-                        maxHeight: 22,
-                      ),
-                      onPressed: () =>
-                          _showTitleEditDialog(context, ref, meeting),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    '$dateStr$durStr',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(width: 12),
-                  // 그룹 선택 드롭다운
-                  _GroupSelector(
-                    meeting: meeting,
-                    groups: groups,
-                    onChanged: (groupId) async {
-                      meeting.groupId = groupId;
-                      await MeetingRepositoryImpl(
-                        IsarService.instance.db,
-                      ).updateMeeting(meeting);
-                      ref.invalidate(meetingsProvider);
-                    },
-                  ),
-                ],
-              ),
-
-              // ── 태그 ────────────────────────────────────────────
-              const SizedBox(height: 6),
-              _MeetingTagsRow(meeting: meeting),
-
-              // ── 녹음 파일명 (클릭 → Finder에서 선택) ───────────
-              if (meeting.audioFilePath != null) ...[
-                const SizedBox(height: 3),
-                _AudioFileReveal(path: meeting.audioFilePath!),
-              ],
-            ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.7),
           ),
         ),
-        // 내보내기 버튼
-        _ExportMenu(
-          meeting: meeting,
-          summary: summary,
-          transcripts: transcripts,
-          enabled: isDataReady,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          meeting.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                height: 1.16,
+                                letterSpacing: 0,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      MacosTooltip(
+                        message: '제목 수정',
+                        child: MacosIconButton(
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                          backgroundColor: Colors.transparent,
+                          padding: EdgeInsets.zero,
+                          boxConstraints: const BoxConstraints(
+                            minWidth: 24,
+                            minHeight: 24,
+                            maxWidth: 24,
+                            maxHeight: 24,
+                          ),
+                          onPressed: () =>
+                              _showTitleEditDialog(context, ref, meeting),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _HeaderMetaChip(
+                        icon: Icons.calendar_today_outlined,
+                        label: dateStr,
+                      ),
+                      if (durStr != null)
+                        _HeaderMetaChip(
+                          icon: Icons.schedule_outlined,
+                          label: durStr,
+                        ),
+                      _GroupSelector(
+                        meeting: meeting,
+                        groups: groups,
+                        onChanged: (groupId) async {
+                          meeting.groupId = groupId;
+                          await MeetingRepositoryImpl(
+                            IsarService.instance.db,
+                          ).updateMeeting(meeting);
+                          ref.invalidate(meetingsProvider);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _MeetingTagsRow(meeting: meeting),
+                  if (meeting.audioFilePath != null) ...[
+                    const SizedBox(height: 6),
+                    _AudioFileReveal(path: meeting.audioFilePath!),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            _ExportMenu(
+              meeting: meeting,
+              summary: summary,
+              transcripts: transcripts,
+              enabled: isDataReady,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -2500,94 +2606,26 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             spacing: 8,
             runSpacing: 6,
             children: [
-              PushButton(
-                controlSize: ControlSize.small,
-                secondary: true,
+              _SummaryToolbarButton(
+                icon: Icons.book_outlined,
+                label: '용어 추출',
+                loading: _isExtractingTerms,
                 onPressed:
                     (_isExtractingTerms ||
                         _isSummarizing ||
                         transcripts.isEmpty)
                     ? null
                     : () => _extractTerms(transcripts),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _isExtractingTerms
-                          ? const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              Icons.book_outlined,
-                              size: 14,
-                              color: Colors.teal.shade700,
-                            ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '용어 추출',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.teal.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-              PushButton(
-                controlSize: ControlSize.small,
-                secondary: true,
+              _SummaryToolbarButton(
+                icon: Icons.edit_outlined,
+                label: '편집',
                 onPressed: _isSummarizing ? null : () => _showEditSummary(s),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.edit_outlined,
-                        size: 14,
-                        color: Colors.deepPurple.shade700,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '편집',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.deepPurple.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-              PushButton(
-                controlSize: ControlSize.small,
-                secondary: true,
+              _SummaryToolbarButton(
+                icon: Icons.history,
+                label: '이력',
                 onPressed: () => _showHistory(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.history,
-                        size: 14,
-                        color: Colors.indigo.shade700,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '이력',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.indigo.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
               StreamBuilder<NativeModelTaskSnapshot>(
                 stream: OnDeviceModelManager.instance.nativeTaskStream,
@@ -2604,9 +2642,10 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       reason != null;
                   return _withDisabledReason(
                     reason,
-                    PushButton(
-                      controlSize: ControlSize.small,
-                      color: Colors.indigo.shade600,
+                    _SummaryToolbarButton(
+                      icon: Icons.auto_awesome,
+                      label: '다시 요약',
+                      primary: true,
                       onPressed: disabled
                           ? null
                           : () => _runResummarize(
@@ -2615,27 +2654,6 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                               notes: meeting?.notes ?? '',
                               meeting: meeting,
                             ),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome,
-                              size: 14,
-                              color: MacosColors.white,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '다시 요약',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: MacosColors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                   );
                 },
@@ -3149,6 +3167,124 @@ class _DetailPaneResizeHandle extends StatelessWidget {
   }
 }
 
+class _SummaryToolbarButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool primary;
+  final bool loading;
+
+  const _SummaryToolbarButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.primary = false,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+    final foreground = enabled
+        ? primary
+              ? scheme.primary
+              : scheme.onSurfaceVariant
+        : scheme.onSurfaceVariant.withValues(alpha: 0.48);
+
+    return PushButton(
+      controlSize: ControlSize.small,
+      secondary: true,
+      onPressed: onPressed,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading)
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: foreground,
+                ),
+              )
+            else
+              Icon(icon, size: 14, color: foreground),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: foreground,
+                fontWeight: primary ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TranscriptToolbarButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+
+  const _TranscriptToolbarButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+    final foreground = enabled
+        ? scheme.onSurfaceVariant
+        : scheme.onSurfaceVariant.withValues(alpha: 0.48);
+
+    return PushButton(
+      controlSize: ControlSize.small,
+      secondary: true,
+      onPressed: onPressed,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading)
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: foreground,
+                ),
+              )
+            else
+              Icon(icon, size: 14, color: foreground),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: foreground,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── 내보내기 팝업 메뉴 ─────────────────────────────────────────────
 class _ExportMenu extends StatefulWidget {
   final Meeting meeting;
@@ -3410,7 +3546,6 @@ class _ExportMenuState extends State<_ExportMenu> {
               ),
               const PopupMenuDivider(),
               _menuItem('email', Icons.email_outlined, '이메일로 보내기'),
-              _menuItem('share', Icons.share_outlined, '공유하기'),
             ],
           );
   }
@@ -4332,6 +4467,8 @@ class _EvidenceBulletList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4341,18 +4478,25 @@ class _EvidenceBulletList extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 2),
-                  child: Text('•', style: TextStyle(fontSize: 13, height: 1.5)),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    '•',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: scheme.onSurface,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: SelectableText(
                     items[i],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       height: 1.5,
-                      color: Colors.black87,
+                      color: scheme.onSurface,
                     ),
                   ),
                 ),
@@ -4418,6 +4562,41 @@ class _EvidenceButton extends StatelessWidget {
   }
 }
 
+class _HeaderMetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _HeaderMetaChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.56),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.onSurfaceVariant,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── 그룹 선택 드롭다운 ─────────────────────────────────────────────
 class _GroupSelector extends StatelessWidget {
   final Meeting meeting;
@@ -4432,9 +4611,21 @@ class _GroupSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final currentGroup = groups
         .where((g) => g.id == meeting.groupId)
         .firstOrNull;
+    final hasGroup = currentGroup != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fillColor = hasGroup
+        ? Colors.amber.withValues(alpha: isDark ? 0.18 : 0.14)
+        : scheme.surfaceContainerHighest.withValues(alpha: 0.56);
+    final borderColor = hasGroup
+        ? Colors.amber.withValues(alpha: isDark ? 0.42 : 0.34)
+        : scheme.outlineVariant.withValues(alpha: 0.72);
+    final foregroundColor = hasGroup
+        ? (isDark ? Colors.amber.shade300 : Colors.amber.shade700)
+        : scheme.onSurfaceVariant;
 
     return PopupMenuButton<int?>(
       tooltip: '그룹 변경',
@@ -4442,44 +4633,25 @@ class _GroupSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: currentGroup != null
-              ? Colors.amber.shade50
-              : Colors.grey.shade100,
+          color: fillColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: currentGroup != null
-                ? Colors.amber.shade300
-                : Colors.grey.shade300,
-          ),
+          border: Border.all(color: borderColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              currentGroup != null ? Icons.folder : Icons.folder_open,
+              hasGroup ? Icons.folder : Icons.folder_open,
               size: 13,
-              color: currentGroup != null
-                  ? Colors.amber.shade700
-                  : Colors.grey.shade500,
+              color: foregroundColor,
             ),
             const SizedBox(width: 4),
             Text(
               currentGroup?.name ?? '미분류',
-              style: TextStyle(
-                fontSize: 12,
-                color: currentGroup != null
-                    ? Colors.amber.shade800
-                    : Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 12, color: foregroundColor),
             ),
             const SizedBox(width: 2),
-            Icon(
-              Icons.arrow_drop_down,
-              size: 14,
-              color: currentGroup != null
-                  ? Colors.amber.shade700
-                  : Colors.grey.shade500,
-            ),
+            Icon(Icons.arrow_drop_down, size: 14, color: foregroundColor),
           ],
         ),
       ),
@@ -4819,35 +4991,46 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
   @override
   Widget build(BuildContext context) {
     final tags = widget.meeting.tags;
+    final scheme = Theme.of(context).colorScheme;
+    final neutralFill = scheme.surfaceContainerHighest.withValues(alpha: 0.54);
+    final neutralBorder = scheme.outlineVariant.withValues(alpha: 0.78);
+    final neutralText = scheme.onSurfaceVariant;
+    final tagFill = scheme.primaryContainer.withValues(alpha: 0.55);
+    final tagBorder = scheme.primary.withValues(alpha: 0.22);
+    final tagText = scheme.onPrimaryContainer;
+    final suggestFill = scheme.tertiaryContainer.withValues(alpha: 0.58);
+    final suggestBorder = scheme.tertiary.withValues(alpha: 0.24);
+    final suggestText = scheme.onTertiaryContainer;
+
     return Wrap(
       spacing: 6,
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Icon(Icons.sell_outlined, size: 13, color: Colors.grey.shade500),
+        Icon(Icons.sell_outlined, size: 13, color: neutralText),
         for (final t in tags)
           InputChip(
             label: Text('#$t', style: const TextStyle(fontSize: 11)),
             onPressed: () => _searchByTag(t),
             onDeleted: () => _removeTag(t),
-            deleteIconColor: Colors.grey.shade600,
-            backgroundColor: Colors.indigo.shade50,
-            side: BorderSide(color: Colors.indigo.shade200),
-            labelStyle: TextStyle(color: Colors.indigo.shade700),
+            deleteIconColor: tagText.withValues(alpha: 0.74),
+            backgroundColor: tagFill,
+            side: BorderSide(color: tagBorder),
+            labelStyle: TextStyle(color: tagText),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
             tooltip: '#$t 태그로 검색',
           ),
         ActionChip(
-          avatar: Icon(Icons.add, size: 13, color: Colors.grey.shade600),
+          avatar: Icon(Icons.add, size: 13, color: neutralText),
           label: Text(
             tags.isEmpty ? '태그 추가' : '추가',
-            style: const TextStyle(fontSize: 11),
+            style: TextStyle(fontSize: 11, color: neutralText),
           ),
           onPressed: _addTag,
-          backgroundColor: Colors.grey.shade50,
-          side: BorderSide(color: Colors.grey.shade300),
+          backgroundColor: neutralFill,
+          side: BorderSide(color: neutralBorder),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
@@ -4859,17 +5042,17 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
                   height: 12,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.teal.shade700,
+                    color: suggestText,
                   ),
                 )
-              : Icon(Icons.auto_awesome, size: 13, color: Colors.teal.shade700),
+              : Icon(Icons.auto_awesome, size: 13, color: suggestText),
           label: Text(
             _isSuggestingTags ? '추천 중' : '추천',
-            style: const TextStyle(fontSize: 11),
+            style: TextStyle(fontSize: 11, color: suggestText),
           ),
           onPressed: _isSuggestingTags ? null : _suggestTags,
-          backgroundColor: Colors.teal.shade50,
-          side: BorderSide(color: Colors.teal.shade200),
+          backgroundColor: suggestFill,
+          side: BorderSide(color: suggestBorder),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
@@ -4936,6 +5119,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
 
   // 인라인 편집
   int? _editingIndex;
+  int? _editingSegmentId;
   final TextEditingController _editingCtrl = TextEditingController();
 
   // 전사 리스트 스크롤 + 점프 하이라이트
@@ -5126,6 +5310,9 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
 
   @override
   void dispose() {
+    if (_editingIndex != null) {
+      unawaited(_commitEditing(fromDispose: true, notify: false));
+    }
     widget.onSeekRegister?.call(null);
     _flashTimer?.cancel();
     _navHintTimer?.cancel();
@@ -5142,23 +5329,64 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
   }
 
   void _startEditing(int originalIndex) {
+    if (_editingIndex != null && _editingIndex != originalIndex) {
+      unawaited(_commitEditing());
+    }
     setState(() {
       _editingIndex = originalIndex;
+      _editingSegmentId = widget.segments[originalIndex].id;
       _editingCtrl.text = widget.segments[originalIndex].text;
+      _editingCtrl.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _editingCtrl.text.length,
+      );
     });
   }
 
-  Future<void> _commitEditing() async {
+  Future<void> _commitEditing({
+    bool fromDispose = false,
+    bool notify = true,
+  }) async {
     if (_editingIndex == null) return;
+    final editingIndex = _editingIndex!;
+    final editingSegmentId = _editingSegmentId;
     final newText = _editingCtrl.text.trim();
-    final seg = widget.segments[_editingIndex!];
-    setState(() => _editingIndex = null);
-    if (newText.isNotEmpty && newText != seg.text) {
-      seg.text = newText;
-      await TranscriptRepositoryImpl(
-        IsarService.instance.db,
-      ).updateSegment(seg);
+    final seg = widget.segments[editingIndex];
+
+    if (!fromDispose && mounted) {
+      setState(() {
+        _editingIndex = null;
+        _editingSegmentId = null;
+      });
+    } else {
+      _editingIndex = null;
+      _editingSegmentId = null;
     }
+
+    if (newText.isEmpty || newText == seg.text) return;
+
+    // 화면에 들고 있는 객체와 DB에서 다시 읽은 객체를 모두 갱신한다.
+    // 목록 rebuild/화면 이동 타이밍이 겹쳐도 수정값이 원문으로 되돌아가지 않게 한다.
+    seg.text = newText;
+    final db = IsarService.instance.db;
+    final latest = editingSegmentId == null
+        ? null
+        : await db.transcripts.get(editingSegmentId);
+    final target = latest ?? seg;
+    target.text = newText;
+    await TranscriptRepositoryImpl(db).updateSegment(target);
+    await _refreshTranscriptPreview();
+    if (notify) widget.onTranscriptChanged?.call();
+  }
+
+  Future<void> _refreshTranscriptPreview() async {
+    final meeting = widget.meeting;
+    if (meeting == null) return;
+    final fullText = widget.segments.map((s) => s.text).join(' ');
+    meeting.transcriptPreview = fullText.length > 200
+        ? '${fullText.substring(0, 200)}...'
+        : fullText;
+    await MeetingRepositoryImpl(IsarService.instance.db).updateMeeting(meeting);
   }
 
   // ── 전사 보정 액션 ──────────────────────────────────────────────
@@ -5700,18 +5928,37 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     final curMs = _position.inMilliseconds
         .clamp(0, maxMs > 0 ? maxMs.toInt() : 0)
         .toDouble();
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.indigo.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.indigo.shade100),
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
       ),
       child: Row(
         children: [
-          // 재생/정지 버튼
+          MacosTooltip(
+            message: '10초 뒤로',
+            child: MacosIconButton(
+              padding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              boxConstraints: const BoxConstraints(
+                minWidth: 28,
+                minHeight: 28,
+                maxWidth: 28,
+                maxHeight: 28,
+              ),
+              icon: Icon(
+                Icons.replay_10,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+              onPressed: () => _seekRelativeSeconds(-10),
+            ),
+          ),
           SizedBox(
             width: 32,
             height: 32,
@@ -5727,12 +5974,30 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               icon: Icon(
                 _isPlaying ? Icons.pause_circle : Icons.play_circle,
                 size: 22,
-                color: Colors.indigo.shade600,
+                color: scheme.primary,
               ),
               onPressed: () => _isPlaying ? _player!.pause() : _player!.play(),
             ),
           ),
-          // 현재 시간
+          MacosTooltip(
+            message: '10초 앞으로',
+            child: MacosIconButton(
+              padding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              boxConstraints: const BoxConstraints(
+                minWidth: 28,
+                minHeight: 28,
+                maxWidth: 28,
+                maxHeight: 28,
+              ),
+              icon: Icon(
+                Icons.forward_10,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+              onPressed: () => _seekRelativeSeconds(10),
+            ),
+          ),
           SizedBox(
             width: 36,
             child: Text(
@@ -5740,7 +6005,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               style: TextStyle(
                 fontSize: 10,
                 fontFamily: 'monospace',
-                color: Colors.indigo.shade700,
+                color: scheme.onSurface,
               ),
               textAlign: TextAlign.right,
             ),
@@ -5751,9 +6016,11 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               data: SliderTheme.of(context).copyWith(
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
                 trackHeight: 2,
-                activeTrackColor: Colors.indigo.shade400,
-                inactiveTrackColor: Colors.indigo.shade100,
-                thumbColor: Colors.indigo.shade600,
+                activeTrackColor: scheme.primary.withValues(alpha: 0.72),
+                inactiveTrackColor: scheme.outlineVariant.withValues(
+                  alpha: 0.72,
+                ),
+                thumbColor: scheme.primary,
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
               ),
               child: Slider(
@@ -5774,7 +6041,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               style: TextStyle(
                 fontSize: 10,
                 fontFamily: 'monospace',
-                color: Colors.grey.shade500,
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -5940,6 +6207,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               )
               .toList();
     final textEditingFocused = _isTextEditingFocused();
+    final scheme = Theme.of(context).colorScheme;
 
     return CallbackShortcuts(
       bindings: textEditingFocused
@@ -5975,55 +6243,88 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── 헤더 (좁은 창에서 자동 줄바꿈) ──────────────────────
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              // 좌측 타이틀 그룹
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.transcribe, size: 16),
-                  const SizedBox(width: 6),
-                  Text(
-                    '녹취록',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  if (widget.segments.isNotEmpty)
-                    Text(
-                      '(${widget.segments.length}개)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.24),
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.56),
               ),
-              // 우측 액션 그룹 (오디오 정보 + 음성 인식 다시 + 전사 보정 메뉴)
-              if (hasAudio)
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
+              children: [
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.headphones_outlined,
-                      size: 13,
-                      color: Colors.indigo.shade300,
+                      Icons.transcribe,
+                      size: 16,
+                      color: scheme.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
-                      '오디오 있음',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.indigo.shade300,
+                      '녹취록',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0,
                       ),
                     ),
-                    if (widget.onRerunStt != null) ...[
+                    const SizedBox(width: 6),
+                    if (widget.segments.isNotEmpty)
+                      Text(
+                        '${widget.segments.length}개',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    if (hasAudio) ...[
                       const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: scheme.primary.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.headphones_outlined,
+                              size: 12,
+                              color: scheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '오디오',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (hasAudio && widget.onRerunStt != null)
                       StreamBuilder<NativeModelTaskSnapshot>(
                         stream: OnDeviceModelManager.instance.nativeTaskStream,
                         initialData:
@@ -6035,55 +6336,23 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                               : '현재 $active 작업 중입니다. 완료 후 음성 인식을 다시 시도해주세요.';
                           final disabled = widget.isRerunning || reason != null;
                           return MacosTooltip(
-                            message: reason ?? '',
-                            child: PushButton(
-                              controlSize: ControlSize.small,
-                              secondary: true,
+                            message: reason ?? '음성 인식 다시',
+                            child: _TranscriptToolbarButton(
+                              icon: Icons.replay,
+                              label: widget.isRerunning ? '실행 중' : '다시 전사',
+                              loading: widget.isRerunning,
                               onPressed: disabled ? null : widget.onRerunStt,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    widget.isRerunning
-                                        ? const SizedBox(
-                                            width: 12,
-                                            height: 12,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : Icon(
-                                            Icons.replay,
-                                            size: 14,
-                                            color: Colors.indigo.shade600,
-                                          ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      widget.isRerunning ? '실행 중…' : '음성 인식 다시',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.indigo.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ),
                           );
                         },
                       ),
-                    ],
                     const SizedBox(width: 4),
-                    // 전사 보정 메뉴 — 단어집 추가/전체 치환/alias 재교정
                     PopupMenuButton<String>(
                       tooltip: '전사 보정',
                       icon: Icon(
                         Icons.spellcheck,
                         size: 16,
-                        color: Colors.indigo.shade600,
+                        color: scheme.onSurfaceVariant,
                       ),
                       padding: EdgeInsets.zero,
                       splashRadius: 18,
@@ -6156,7 +6425,8 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                     ),
                   ],
                 ),
-            ],
+              ],
+            ),
           ),
 
           // ── 검색 바 ─────────────────────────────────────────────
@@ -7554,6 +7824,11 @@ class _ActionItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final done = item.completed;
+    final scheme = Theme.of(context).colorScheme;
+    final textColor = done
+        ? scheme.onSurfaceVariant.withValues(alpha: 0.68)
+        : scheme.onSurface;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -7578,7 +7853,7 @@ class _ActionItemRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.5,
-                    color: done ? Colors.grey.shade500 : null,
+                    color: textColor,
                     decoration: done ? TextDecoration.lineThrough : null,
                   ),
                   children: [
@@ -7586,10 +7861,7 @@ class _ActionItemRow extends StatelessWidget {
                     if (!item.ownerNeedsConfirmation && item.owner.isNotEmpty)
                       TextSpan(
                         text: '  [${item.owner}]',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.indigo.shade400,
-                        ),
+                        style: TextStyle(fontSize: 12, color: scheme.primary),
                       ),
                     if (!item.deadlineNeedsConfirmation &&
                         item.deadline.isNotEmpty)
@@ -7918,7 +8190,8 @@ class _AudioFileRevealState extends State<_AudioFileReveal> {
   @override
   Widget build(BuildContext context) {
     final fileName = widget.path.split('/').last;
-    final color = _hover ? Colors.blue.shade300 : Colors.grey.shade400;
+    final scheme = Theme.of(context).colorScheme;
+    final color = _hover ? scheme.primary : scheme.onSurfaceVariant;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -7928,17 +8201,20 @@ class _AudioFileRevealState extends State<_AudioFileReveal> {
         child: MacosTooltip(
           message: 'Finder에서 보기\n${widget.path}',
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.audio_file_outlined, size: 12, color: color),
               const SizedBox(width: 4),
-              Text(
-                fileName,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: color,
-                  fontFamily: 'monospace',
-                  decoration: _hover ? TextDecoration.underline : null,
+              Flexible(
+                child: Text(
+                  fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontFamily: 'monospace',
+                    decoration: _hover ? TextDecoration.underline : null,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),

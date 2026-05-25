@@ -1,13 +1,23 @@
-import 'dart:io';
+import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 
+import '../../core/services/app_settings.dart';
+import '../../core/services/isar_service.dart';
 import '../../core/services/security_scoped_bookmark_service.dart';
+import 'home_screen.dart';
+import 'setup_screen.dart';
+
+PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
+  pageBuilder: (_, _, _) => child,
+  transitionDuration: Duration.zero,
+  reverseTransitionDuration: Duration.zero,
+);
 
 class StorageSetupScreen extends StatefulWidget {
-  final VoidCallback onComplete;
+  final ValueChanged<String> onComplete;
 
   const StorageSetupScreen({super.key, required this.onComplete});
 
@@ -18,6 +28,7 @@ class StorageSetupScreen extends StatefulWidget {
 class _StorageSetupScreenState extends State<StorageSetupScreen> {
   int _step = 0;
   bool _picking = false;
+  String _pickingMessage = '선택 중...';
   String? _error;
 
   void _nextStep() {
@@ -33,6 +44,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
   Future<void> _pickFolder() async {
     setState(() {
       _picking = true;
+      _pickingMessage = '폴더 선택 중...';
       _error = null;
     });
 
@@ -40,25 +52,53 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
       final path = await getDirectoryPath(confirmButtonText: '저장 폴더 선택');
       if (!mounted) return;
       if (path == null || path.trim().isEmpty) {
-        setState(() => _picking = false);
+        setState(() {
+          _picking = false;
+          _pickingMessage = '선택 중...';
+        });
         return;
       }
 
-      final dir = Directory(path);
-      if (!await dir.exists()) {
-        throw Exception('선택한 폴더를 찾을 수 없습니다.');
+      final selectedPath = path.trim();
+      setState(() => _pickingMessage = '저장 위치 적용 중...');
+      await SecurityScopedBookmarkService.saveRecordingsFolderSelection(
+        selectedPath,
+      );
+      // 새 사용자 폴더에 Isar DB 열기 (구버전 컨테이너 잔재가 있으면 이전)
+      if (IsarService.instance.isOpen) {
+        await IsarService.instance.relocateToUserSelectedDirectory();
+      } else {
+        await IsarService.instance.init();
       }
 
-      await SecurityScopedBookmarkService.saveRecordingsFolderSelection(path);
       if (!mounted) return;
-      widget.onComplete();
+      setState(() => _pickingMessage = '다음 화면으로 이동 중...');
+      if (!mounted) return;
+      _openNextScreen();
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 250),
+          () => widget.onComplete(selectedPath),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _picking = false;
+        _pickingMessage = '선택 중...';
         _error = '저장 폴더를 설정하지 못했습니다: $e';
       });
     }
+  }
+
+  void _openNextScreen() {
+    final next = AppSettings.instance.modelsSetupComplete
+        ? const HomeScreen()
+        : SetupScreen(onComplete: () {});
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).pushReplacement(_instantRoute(next));
   }
 
   @override
@@ -67,9 +107,9 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
     final steps = [
       _OnboardingStep(
         icon: Icons.lock_outline_rounded,
-        title: '회의 내용은 내 Mac 밖으로 나가지 않습니다',
+        title: '회의 내용은 기기 밖으로 나가지 않습니다',
         description:
-            '녹음, 음성 인식, 발화자 라벨, 요약은 모두 이 Mac 안에서 실행됩니다. 회의 음성이나 전사본을 외부 서버로 전송하지 않습니다.',
+            '녹음, 음성 인식, 발화자 라벨, 요약은 모두 이 기기에서 실행됩니다. 회의 음성이나 전사본을 외부 서버로 전송하지 않습니다.',
         points: const [
           _OnboardingPoint(
             icon: Icons.cloud_off_outlined,
@@ -77,7 +117,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
           ),
           _OnboardingPoint(
             icon: Icons.computer_rounded,
-            text: 'AI 처리는 로컬 모델로 이 Mac에서 실행됩니다.',
+            text: 'AI 처리는 로컬 모델로 이 기기에서 실행됩니다.',
           ),
           _OnboardingPoint(
             icon: Icons.security_rounded,
@@ -268,7 +308,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
                                       ),
                                 label: Text(
                                   _picking
-                                      ? '선택 중...'
+                                      ? _pickingMessage
                                       : isLastStep
                                       ? '저장 폴더 선택'
                                       : '다음',

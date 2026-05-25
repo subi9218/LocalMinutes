@@ -80,16 +80,22 @@ class MainFlutterWindow: NSWindow {
           return
         }
 
-        do {
-          let url = URL(fileURLWithPath: path, isDirectory: true)
-          let data = try url.bookmarkData(
-            options: [.withSecurityScope],
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-          )
-          result(data.base64EncodedString())
-        } catch {
-          result(FlutterError(code: "bookmark_create_failed", message: error.localizedDescription, details: nil))
+        DispatchQueue.global(qos: .userInitiated).async {
+          do {
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            let data = try url.bookmarkData(
+              options: [.withSecurityScope],
+              includingResourceValuesForKeys: nil,
+              relativeTo: nil
+            )
+            DispatchQueue.main.async {
+              result(data.base64EncodedString())
+            }
+          } catch {
+            DispatchQueue.main.async {
+              result(FlutterError(code: "bookmark_create_failed", message: error.localizedDescription, details: nil))
+            }
+          }
         }
 
       case "startAccessingBookmark":
@@ -102,25 +108,31 @@ class MainFlutterWindow: NSWindow {
           return
         }
 
-        do {
-          var stale = false
-          let url = try URL(
-            resolvingBookmarkData: data,
-            options: [.withSecurityScope],
-            relativeTo: nil,
-            bookmarkDataIsStale: &stale
-          )
-          let accessing = url.startAccessingSecurityScopedResource()
-          if accessing {
-            self.activeSecurityScopedURLs[bookmark] = url
+        DispatchQueue.global(qos: .userInitiated).async {
+          do {
+            var stale = false
+            let url = try URL(
+              resolvingBookmarkData: data,
+              options: [.withSecurityScope],
+              relativeTo: nil,
+              bookmarkDataIsStale: &stale
+            )
+            let accessing = url.startAccessingSecurityScopedResource()
+            DispatchQueue.main.async {
+              if accessing {
+                self.activeSecurityScopedURLs[bookmark] = url
+              }
+              result([
+                "path": url.path,
+                "stale": stale,
+                "accessing": accessing
+              ])
+            }
+          } catch {
+            DispatchQueue.main.async {
+              result(FlutterError(code: "bookmark_resolve_failed", message: error.localizedDescription, details: nil))
+            }
           }
-          result([
-            "path": url.path,
-            "stale": stale,
-            "accessing": accessing
-          ])
-        } catch {
-          result(FlutterError(code: "bookmark_resolve_failed", message: error.localizedDescription, details: nil))
         }
 
       case "stopAccessingBookmark":

@@ -1154,14 +1154,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     var templateId = _summaryTemplateId;
     var diarizationEnabled = AppSettings.instance.diarizationEnabled;
     var sttLanguage = AppSettings.instance.sttLanguage;
-    var guideChecked = AppSettings.instance.micGuideShown;
-
     var titleText = _titleSuffixController.text.trim();
     var agendaText = '';
     var titleFieldVersion = 0;
     var agendaFieldVersion = 0;
     Future<void> Function()? stopMicTest;
-    final result = await showMacosAlertDialog<_RecordingPrepResult>(
+    final result = await showDialog<_RecordingPrepResult>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
@@ -1169,11 +1167,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           builder: (ctx, setLocalState) {
             final viewport = MediaQuery.sizeOf(ctx);
             final scheme = Theme.of(ctx).colorScheme;
-            final messageWidth = math.min(520.0, viewport.width - 96);
-            final messageHeight = math.max(
-              300.0,
-              math.min(460.0, viewport.height - 360),
-            );
+            final dialogWidth = (viewport.width - 96)
+                .clamp(560.0, 680.0)
+                .toDouble();
+            final dialogMaxHeight = (viewport.height - 96)
+                .clamp(600.0, 780.0)
+                .toDouble();
             InputDecoration prepDecoration(
               String label, {
               String? hintText,
@@ -1211,270 +1210,348 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               );
             }
 
-            return MacosAlertDialog(
-              appIcon: const Icon(Icons.tune_rounded, size: 48),
-              title: const Text('녹음 준비'),
-              message: SizedBox(
-                width: messageWidth,
-                height: messageHeight,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (AppBuildConfig.enableCalendarIntegration)
-                        _CalendarSuggestionPanel(
-                          onPick: (event) {
-                            setLocalState(() {
-                              if (titleText.trim().isEmpty) {
-                                titleText = event.title;
-                                titleFieldVersion++;
-                              }
-                              if (agendaText.trim().isEmpty) {
-                                final t = event.title;
-                                agendaText = '- $t';
-                                agendaFieldVersion++;
-                              }
-                            });
-                          },
-                        ),
-                      TextFormField(
-                        key: ValueKey('prep-title-$titleFieldVersion'),
-                        initialValue: titleText,
-                        onChanged: (v) => titleText = v,
-                        decoration: prepDecoration(
-                          '회의 제목',
-                          hintText: '예: 제품 주간 회의',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              isExpanded: true,
-                              initialValue: speakerCount,
-                              decoration: prepDecoration('말할 사람 수'),
-                              items: const [
-                                DropdownMenuItem(value: 2, child: Text('2명')),
-                                DropdownMenuItem(value: 3, child: Text('3명')),
-                                DropdownMenuItem(value: 4, child: Text('4명')),
-                                DropdownMenuItem(value: 5, child: Text('5명')),
-                                DropdownMenuItem(value: 6, child: Text('6명')),
-                              ],
-                              onChanged: (v) {
-                                if (v != null) {
-                                  setLocalState(() => speakerCount = v);
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: DropdownButtonFormField<String?>(
-                              isExpanded: true,
-                              initialValue: templateId,
-                              decoration: prepDecoration('회의 유형'),
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text(
-                                    '설정값 사용',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                for (final t in SummaryTemplates.presets)
-                                  DropdownMenuItem<String?>(
-                                    value: t.id,
-                                    child: Text(
-                                      t.name,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                const DropdownMenuItem<String?>(
-                                  value: SummaryTemplates.customId1,
-                                  child: Text(
-                                    '커스텀1',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const DropdownMenuItem<String?>(
-                                  value: SummaryTemplates.customId2,
-                                  child: Text(
-                                    '커스텀2',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                              onChanged: (v) {
-                                setLocalState(() => templateId = v);
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // ── 어젠다 (선택) ──────────────────────────────
-                      TextFormField(
-                        key: ValueKey('prep-agenda-$agendaFieldVersion'),
-                        initialValue: agendaText,
-                        onChanged: (v) => agendaText = v,
-                        maxLines: 4,
-                        minLines: 2,
-                        decoration: prepDecoration(
-                          '어젠다 (선택)',
-                          hintText:
-                              '한 줄에 하나씩 입력하면 요약이 어젠다별로 정리됩니다.\n'
-                              '예:\n'
-                              '- 신규 피처 일정\n'
-                              '- 결제 모듈 리뷰',
-                          helperText: '비워두면 일반 요약. 입력하면 항목별 결정·액션이 정리됩니다.',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        initialValue: sttLanguage,
-                        decoration: prepDecoration('음성 인식 언어'),
-                        items: [
-                          for (final code in AppSettings.supportedSttLanguages)
-                            DropdownMenuItem(
-                              value: code,
-                              child: Text(
-                                AppSettings.sttLanguageLabel(code),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) {
-                            setLocalState(() => sttLanguage = v);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        AppSettings.sttLanguageDescription(sttLanguage),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String?>(
-                        initialValue: selectedDeviceId,
-                        decoration: prepDecoration('마이크'),
-                        items: [
-                          const DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text('시스템 기본 마이크'),
-                          ),
-                          for (final device in _inputDevices)
-                            DropdownMenuItem<String?>(
-                              value: device.id,
-                              child: Text(
-                                device.label,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        onChanged: (v) {
-                          setLocalState(() => selectedDeviceId = v);
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      _MicTestPanel(
-                        selectedDeviceId: selectedDeviceId,
-                        devices: _inputDevices,
-                        onStopReady: (stop) => stopMicTest = stop,
-                      ),
-                      const SizedBox(height: 12),
-                      _PrepToggleRow(
-                        title: '발화자 라벨 사용',
-                        subtitle: '발화 흐름을 A/B/C로 구분합니다.',
-                        value: diarizationEnabled,
-                        onChanged: (v) {
-                          setLocalState(() => diarizationEnabled = v);
-                        },
-                      ),
-                      if (!AppSettings.instance.micGuideShown) ...[
-                        const Divider(height: 24),
-                        const Text(
-                          '녹음 품질 체크',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 8),
-                        const _PrepGuideRow(
-                          icon: Icons.center_focus_strong_rounded,
-                          text: 'Mac 또는 마이크를 말하는 사람들의 중앙에 두세요.',
-                        ),
-                        const _PrepGuideRow(
-                          icon: Icons.volume_down_rounded,
-                          text: '에어컨, 선풍기, 키보드 소음은 가능한 한 멀리 두세요.',
-                        ),
-                        const _PrepGuideRow(
-                          icon: Icons.record_voice_over_outlined,
-                          text: '여러 명이 참석하면 겹쳐 말하는 시간을 줄이면 좋습니다.',
-                        ),
-                        _PrepCheckRow(
-                          value: guideChecked,
-                          onChanged: (v) {
-                            setLocalState(() => guideChecked = v);
-                          },
-                          title: '확인했습니다',
-                        ),
-                      ],
-                      Text(
-                        '7명 이상 회의는 현재 가장 가까운 값인 6명을 선택하세요.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant,
-                        ),
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 48,
+                vertical: 40,
+              ),
+              backgroundColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: dialogWidth,
+                  maxHeight: dialogMaxHeight,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: scheme.outlineVariant.withValues(alpha: 0.8),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.22),
+                        blurRadius: 28,
+                        offset: const Offset(0, 14),
                       ),
                     ],
                   ),
-                ),
-              ),
-              primaryButton: PushButton(
-                controlSize: ControlSize.large,
-                onPressed: !AppSettings.instance.micGuideShown && !guideChecked
-                    ? null
-                    : () async {
-                        await stopMicTest?.call();
-                        if (!ctx.mounted) return;
-                        InputDevice? selectedDevice;
-                        if (selectedDeviceId != null) {
-                          for (final device in _inputDevices) {
-                            if (device.id == selectedDeviceId) {
-                              selectedDevice = device;
-                              break;
-                            }
-                          }
-                        }
-                        Navigator.of(ctx).pop(
-                          _RecordingPrepResult(
-                            titleSuffix: titleText.trim(),
-                            speakerCount: speakerCount,
-                            device: selectedDevice,
-                            summaryTemplateId: templateId,
-                            diarizationEnabled: diarizationEnabled,
-                            sttLanguage: sttLanguage,
-                            markMicGuideShown: guideChecked,
-                            agenda: agendaText.trim(),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Icon(
+                          Icons.tune_rounded,
+                          size: 42,
+                          color: scheme.onSurface,
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          '녹음 준비',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0,
                           ),
-                        );
-                      },
-                child: const Text('녹음 시작'),
-              ),
-              secondaryButton: PushButton(
-                controlSize: ControlSize.large,
-                secondary: true,
-                onPressed: () async {
-                  await stopMicTest?.call();
-                  if (ctx.mounted) Navigator.of(ctx).pop(null);
-                },
-                child: const Text('취소'),
+                        ),
+                        const SizedBox(height: 16),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (AppBuildConfig.enableCalendarIntegration)
+                                  _CalendarSuggestionPanel(
+                                    onPick: (event) {
+                                      setLocalState(() {
+                                        if (titleText.trim().isEmpty) {
+                                          titleText = event.title;
+                                          titleFieldVersion++;
+                                        }
+                                        if (agendaText.trim().isEmpty) {
+                                          final t = event.title;
+                                          agendaText = '- $t';
+                                          agendaFieldVersion++;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                TextFormField(
+                                  key: ValueKey(
+                                    'prep-title-$titleFieldVersion',
+                                  ),
+                                  initialValue: titleText,
+                                  onChanged: (v) => titleText = v,
+                                  decoration: prepDecoration(
+                                    '회의 제목',
+                                    hintText: '예: 제품 주간 회의',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<int>(
+                                        isExpanded: true,
+                                        initialValue: speakerCount,
+                                        decoration: prepDecoration('말할 사람 수'),
+                                        items: const [
+                                          DropdownMenuItem(
+                                            value: 2,
+                                            child: Text('2명'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 3,
+                                            child: Text('3명'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 4,
+                                            child: Text('4명'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 5,
+                                            child: Text('5명'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 6,
+                                            child: Text('6명'),
+                                          ),
+                                        ],
+                                        onChanged: (v) {
+                                          if (v != null) {
+                                            setLocalState(
+                                              () => speakerCount = v,
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: DropdownButtonFormField<String?>(
+                                        isExpanded: true,
+                                        initialValue: templateId,
+                                        decoration: prepDecoration('회의 유형'),
+                                        items: [
+                                          const DropdownMenuItem<String?>(
+                                            value: null,
+                                            child: Text(
+                                              '설정값 사용',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          for (final t
+                                              in SummaryTemplates.presets)
+                                            DropdownMenuItem<String?>(
+                                              value: t.id,
+                                              child: Text(
+                                                t.name,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          const DropdownMenuItem<String?>(
+                                            value: SummaryTemplates.customId1,
+                                            child: Text(
+                                              '커스텀1',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const DropdownMenuItem<String?>(
+                                            value: SummaryTemplates.customId2,
+                                            child: Text(
+                                              '커스텀2',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                        onChanged: (v) {
+                                          setLocalState(() => templateId = v);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // ── 어젠다 (선택) ──────────────────────────────
+                                TextFormField(
+                                  key: ValueKey(
+                                    'prep-agenda-$agendaFieldVersion',
+                                  ),
+                                  initialValue: agendaText,
+                                  onChanged: (v) => agendaText = v,
+                                  maxLines: 4,
+                                  minLines: 2,
+                                  decoration: prepDecoration(
+                                    '어젠다 (선택)',
+                                    hintText:
+                                        '한 줄에 하나씩 입력하면 요약이 어젠다별로 정리됩니다.\n'
+                                        '예:\n'
+                                        '- 신규 피처 일정\n'
+                                        '- 결제 모듈 리뷰',
+                                    helperText:
+                                        '비워두면 일반 요약. 입력하면 항목별 결정·액션이 정리됩니다.',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  initialValue: sttLanguage,
+                                  decoration: prepDecoration('음성 인식 언어'),
+                                  items: [
+                                    for (final code
+                                        in AppSettings.supportedSttLanguages)
+                                      DropdownMenuItem(
+                                        value: code,
+                                        child: Text(
+                                          AppSettings.sttLanguageLabel(code),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) {
+                                      setLocalState(() => sttLanguage = v);
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  AppSettings.sttLanguageDescription(
+                                    sttLanguage,
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: scheme.onSurfaceVariant,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String?>(
+                                  initialValue: selectedDeviceId,
+                                  decoration: prepDecoration('마이크'),
+                                  items: [
+                                    const DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: Text('시스템 기본 마이크'),
+                                    ),
+                                    for (final device in _inputDevices)
+                                      DropdownMenuItem<String?>(
+                                        value: device.id,
+                                        child: Text(
+                                          device.label,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                  ],
+                                  onChanged: (v) {
+                                    setLocalState(() => selectedDeviceId = v);
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                                _MicTestPanel(
+                                  selectedDeviceId: selectedDeviceId,
+                                  devices: _inputDevices,
+                                  onStopReady: (stop) => stopMicTest = stop,
+                                ),
+                                const SizedBox(height: 12),
+                                _PrepToggleRow(
+                                  title: '발화자 라벨 사용',
+                                  subtitle: '발화 흐름을 A/B/C로 구분합니다.',
+                                  value: diarizationEnabled,
+                                  onChanged: (v) {
+                                    setLocalState(() => diarizationEnabled = v);
+                                  },
+                                ),
+                                if (!AppSettings.instance.micGuideShown) ...[
+                                  const Divider(height: 24),
+                                  const Text(
+                                    '녹음 품질 체크',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const _PrepGuideRow(
+                                    icon: Icons.center_focus_strong_rounded,
+                                    text: '기기 또는 마이크를 말하는 사람들의 중앙에 두세요.',
+                                  ),
+                                  const _PrepGuideRow(
+                                    icon: Icons.volume_down_rounded,
+                                    text: '에어컨, 선풍기, 키보드 소음은 가능한 한 멀리 두세요.',
+                                  ),
+                                  const _PrepGuideRow(
+                                    icon: Icons.record_voice_over_outlined,
+                                    text: '여러 명이 참석하면 겹쳐 말하는 시간을 줄이면 좋습니다.',
+                                  ),
+                                ],
+                                const SizedBox(height: 6),
+                                Text(
+                                  '7명 이상 회의는 현재 가장 가까운 값인 6명을 선택하세요.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: PushButton(
+                                controlSize: ControlSize.large,
+                                secondary: true,
+                                onPressed: () async {
+                                  await stopMicTest?.call();
+                                  if (ctx.mounted) Navigator.of(ctx).pop(null);
+                                },
+                                child: const Text('취소'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: PushButton(
+                                controlSize: ControlSize.large,
+                                onPressed: () async {
+                                  await stopMicTest?.call();
+                                  if (!ctx.mounted) return;
+                                  InputDevice? selectedDevice;
+                                  if (selectedDeviceId != null) {
+                                    for (final device in _inputDevices) {
+                                      if (device.id == selectedDeviceId) {
+                                        selectedDevice = device;
+                                        break;
+                                      }
+                                    }
+                                  }
+                                  Navigator.of(ctx).pop(
+                                    _RecordingPrepResult(
+                                      titleSuffix: titleText.trim(),
+                                      speakerCount: speakerCount,
+                                      device: selectedDevice,
+                                      summaryTemplateId: templateId,
+                                      diarizationEnabled: diarizationEnabled,
+                                      sttLanguage: sttLanguage,
+                                      markMicGuideShown:
+                                          !AppSettings.instance.micGuideShown,
+                                      agenda: agendaText.trim(),
+                                    ),
+                                  );
+                                },
+                                child: const Text('녹음 시작'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             );
           },
@@ -1639,7 +1716,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '회의 길이 ${_formatDurationKr(audio)} 기준의 대략적인 예상입니다. Mac 성능과 모델에 따라 달라질 수 있습니다.',
+                  '회의 길이 ${_formatDurationKr(audio)} 기준의 대략적인 예상입니다. 기기 성능과 모델에 따라 달라질 수 있습니다.',
                   style: const TextStyle(fontSize: 13, height: 1.5),
                 ),
                 const SizedBox(height: 14),
@@ -5112,60 +5189,6 @@ class _PrepToggleRow extends StatelessWidget {
           const SizedBox(width: 12),
           Switch.adaptive(value: value, onChanged: onChanged),
         ],
-      ),
-    );
-  }
-}
-
-class _PrepCheckRow extends StatelessWidget {
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  final String title;
-
-  const _PrepCheckRow({
-    required this.value,
-    required this.onChanged,
-    required this.title,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(7),
-      onTap: () => onChanged(!value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: value
-              ? scheme.primary.withValues(alpha: 0.08)
-              : scheme.surfaceContainerHighest.withValues(alpha: 0.28),
-          borderRadius: BorderRadius.circular(7),
-          border: Border.all(
-            color: value
-                ? scheme.primary.withValues(alpha: 0.35)
-                : scheme.outlineVariant,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              value ? Icons.check_circle : Icons.radio_button_unchecked,
-              size: 17,
-              color: value ? scheme.primary : scheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: value ? scheme.primary : scheme.onSurface,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -30,7 +30,7 @@ class LegalNotices {
       role: '음성 인식 모델',
       license: 'MIT License',
       source: 'https://huggingface.co/ggerganov/whisper.cpp',
-      note: '사용자가 내려받아 로컬 Mac에서만 실행하는 음성 인식 모델입니다.',
+      note: '사용자가 내려받아 로컬 기기에서만 실행하는 음성 인식 모델입니다.',
     ),
     LegalNotice(
       name: 'llama.cpp',

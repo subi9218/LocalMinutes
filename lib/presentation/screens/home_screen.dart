@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../core/ffi/on_device_model_manager.dart';
+import '../../core/services/app_settings.dart';
 import '../../core/services/recovery_service.dart';
 import '../../data/datasources/microphone_service.dart';
 import '../../domain/entities/meeting.dart';
@@ -24,14 +25,22 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const double _minSidebarWidth = 260;
+  static const double _defaultSidebarWidth = 320;
+  static const double _maxSidebarWidth = 480;
+
   // Phase 2c: ToolBar 의 사이드바 토글 액션이 이 상태를 변경.
   bool _sidebarCollapsed = false;
+  late double _sidebarWidth;
   bool _recoveryChecked = false;
   List<Meeting> _recoverable = const [];
 
   @override
   void initState() {
     super.initState();
+    _sidebarWidth = AppSettings.instance.sidebarWidth
+        .clamp(_minSidebarWidth, _maxSidebarWidth)
+        .toDouble();
     // 첫 빌드 후 비정상 종료된 녹음 검사 — 모달 다이얼로그 대신
     // 비차단 배너로 표시 (앱 클릭이 막히지 않도록)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -103,6 +112,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _recoverable = const []);
   }
 
+  void _resizeSidebar(double delta) {
+    if (_sidebarCollapsed) return;
+    setState(() {
+      _sidebarWidth = (_sidebarWidth + delta)
+          .clamp(_minSidebarWidth, _maxSidebarWidth)
+          .toDouble();
+    });
+  }
+
+  void _persistSidebarWidth() {
+    AppSettings.instance.setSidebarWidth(_sidebarWidth);
+  }
+
+  void _resetSidebarWidth() {
+    setState(() => _sidebarWidth = _defaultSidebarWidth);
+    AppSettings.instance.setSidebarWidth(_sidebarWidth);
+  }
+
   void _showShortcutSnack(String message, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -163,6 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 사이드바는 직접 Container 로 그리고, 메인 영역은 MacosScaffold(toolBar) 로 감싸
     // Phase 2c 의 macOS 표준 ToolBar(사이드바 토글/새 녹음/설정) 패턴을 적용.
     final sidebarColor = _resolveSidebarColor(context, themeMode);
+    final visibleSidebarWidth = _sidebarCollapsed ? 0.0 : _sidebarWidth;
 
     return MacosWindow(
       disableWallpaperTinting: true,
@@ -172,13 +200,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
-            width: _sidebarCollapsed ? 0 : 280,
+            width: visibleSidebarWidth,
             child: ClipRect(
               child: OverflowBox(
-                maxWidth: 280,
+                maxWidth: _maxSidebarWidth,
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
-                  width: 280,
+                  width: _sidebarWidth,
                   child: Container(
                     color: sidebarColor,
                     child: SafeArea(
@@ -206,9 +234,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           // 사이드바와 메인 영역 사이 1px separator (사이드바 펼쳐진 경우만)
           if (!_sidebarCollapsed)
-            Container(
-              width: 1,
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+            _SidebarResizeHandle(
+              onDrag: _resizeSidebar,
+              onDragEnd: _persistSidebarWidth,
+              onReset: _resetSidebarWidth,
             ),
           // ── 메인 영역 (MacosScaffold + ToolBar) ──────────────────
           Expanded(
@@ -301,8 +330,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-// Phase 2b 에서 _CollapsedSidebarRail / _SidebarResizeHandle 제거됨.
-// macos_ui Sidebar 가 폭 조절을 자체 처리. 사이드바 토글은 Phase 2c 에서 ToolBar 액션으로 도입 예정.
+class _SidebarResizeHandle extends StatefulWidget {
+  final ValueChanged<double> onDrag;
+  final VoidCallback onDragEnd;
+  final VoidCallback onReset;
+
+  const _SidebarResizeHandle({
+    required this.onDrag,
+    required this.onDragEnd,
+    required this.onReset,
+  });
+
+  @override
+  State<_SidebarResizeHandle> createState() => _SidebarResizeHandleState();
+}
+
+class _SidebarResizeHandleState extends State<_SidebarResizeHandle> {
+  bool _hovered = false;
+  bool _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dividerColor = Theme.of(context).dividerColor.withValues(alpha: 0.3);
+    final activeColor = scheme.primary.withValues(alpha: 0.48);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onDoubleTap: widget.onReset,
+        onHorizontalDragStart: (_) => setState(() => _dragging = true),
+        onHorizontalDragUpdate: (details) => widget.onDrag(details.delta.dx),
+        onHorizontalDragEnd: (_) {
+          setState(() => _dragging = false);
+          widget.onDragEnd();
+        },
+        onHorizontalDragCancel: () {
+          setState(() => _dragging = false);
+          widget.onDragEnd();
+        },
+        child: SizedBox(
+          width: 7,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              width: _hovered || _dragging ? 2 : 1,
+              color: _hovered || _dragging ? activeColor : dividerColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _MainArea extends ConsumerWidget {
   const _MainArea();
@@ -329,87 +412,114 @@ class _MainArea extends ConsumerWidget {
 class _WelcomeView extends ConsumerWidget {
   const _WelcomeView();
 
+  void _startRecording(BuildContext context, WidgetRef ref) {
+    final activeTask =
+        OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
+    if (activeTask != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('현재 $activeTask 작업 중입니다. 완료 후 녹음을 시작해주세요.'),
+          backgroundColor: Colors.orange.shade700,
+        ),
+      );
+      return;
+    }
+    ref.read(isRecordingActiveProvider.notifier).state = true;
+    ref.read(selectedMeetingIdProvider.notifier).state = null;
+    ref.read(selectedGroupIdProvider.notifier).state = null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final accent = MacosTheme.of(context).primaryColor;
-    final secondaryText = MacosTheme.of(context).typography.subheadline.color;
+    final macosTheme = MacosTheme.of(context);
+    final color = Theme.of(context).colorScheme;
+    final accent = macosTheme.primaryColor;
+    final secondaryText = macosTheme.typography.subheadline.color;
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return SafeArea(
+      top: false,
+      child: Stack(
         children: [
-          Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: accent.withValues(alpha: 0.16)),
-            ),
-            child: Icon(Icons.edit_note, size: 42, color: accent),
-          ),
-          const SizedBox(height: 20),
-
-          Text(
-            'Local Minutes',
-            style: MacosTheme.of(context).typography.title1.copyWith(
-              fontWeight: FontWeight.w700,
-              color: accent,
-              letterSpacing: 0,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '내 Mac에서 정리하는 로컬 회의록',
-            style: MacosTheme.of(
-              context,
-            ).typography.subheadline.copyWith(color: secondaryText),
-          ),
-          const SizedBox(height: 28),
-
-          PushButton(
-            controlSize: ControlSize.large,
-            secondary: false,
-            onPressed: () {
-              final activeTask =
-                  OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
-              if (activeTask != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('현재 $activeTask 작업 중입니다. 완료 후 녹음을 시작해주세요.'),
-                    backgroundColor: Colors.orange.shade700,
-                  ),
-                );
-                return;
-              }
-              ref.read(isRecordingActiveProvider.notifier).state = true;
-              ref.read(selectedMeetingIdProvider.notifier).state = null;
-              ref.read(selectedGroupIdProvider.notifier).state = null;
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.fiber_manual_record,
-                    size: 14,
-                    color: Colors.white,
-                  ),
-                  SizedBox(width: 8),
-                  Text('새 녹음 시작'),
-                ],
+          Align(
+            alignment: const Alignment(0, -0.08),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 92,
+                      height: 92,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: Icon(Icons.edit_note, size: 48, color: accent),
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      '새 회의 녹음',
+                      textAlign: TextAlign.center,
+                      style: macosTheme.typography.largeTitle.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: color.onSurface,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '회의록이 아직 없습니다',
+                      textAlign: TextAlign.center,
+                      style: macosTheme.typography.subheadline.copyWith(
+                        color: secondaryText,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    PushButton(
+                      controlSize: ControlSize.large,
+                      secondary: false,
+                      onPressed: () => _startRecording(context, ref),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.fiber_manual_record,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 8),
+                            Text('새 녹음 시작'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-
-          const SizedBox(height: 48),
-
-          AppVersionCredit(
-            badgeBackgroundColor: Colors.grey.shade100,
-            badgeBorderColor: Colors.grey.shade300,
-            versionColor: Colors.grey.shade500,
-            creditColor: Colors.grey.shade400,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 30,
+            child: Center(
+              child: AppVersionCredit(
+                badgeBackgroundColor: color.surfaceContainerHighest.withValues(
+                  alpha: 0.75,
+                ),
+                badgeBorderColor: color.outlineVariant.withValues(alpha: 0.7),
+                versionColor: color.onSurfaceVariant.withValues(alpha: 0.78),
+                creditColor: color.onSurfaceVariant.withValues(alpha: 0.55),
+              ),
+            ),
           ),
         ],
       ),

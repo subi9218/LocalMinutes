@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,13 @@ import '../../core/services/app_settings.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/model_download_service.dart';
 import '../../core/services/user_error_message.dart';
+import 'home_screen.dart';
+
+PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
+  pageBuilder: (_, _, _) => child,
+  transitionDuration: Duration.zero,
+  reverseTransitionDuration: Duration.zero,
+);
 
 /// 모델 파일 설치 안내 + 자동 다운로드 화면
 class SetupScreen extends StatefulWidget {
@@ -34,6 +42,9 @@ class _SetupScreenState extends State<SetupScreen> {
   bool _diarSegOk = false;
   bool _diarEmbOk = false;
   bool _checking = false;
+  bool _starting = false;
+  bool _startButtonPressed = false;
+  String? _startError;
   String _modelsDir = '';
 
   // ── 다운로드 상태 ───────────────────────────────────────────────
@@ -97,7 +108,7 @@ class _SetupScreenState extends State<SetupScreen> {
     _diarEmbUrlCtrl = TextEditingController(
       text: AppConstants.diarEmbDownloadUrl,
     );
-    _check();
+    _check(autoComplete: true);
   }
 
   @override
@@ -121,7 +132,7 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   // ── 파일 존재 확인 ───────────────────────────────────────────────
-  Future<void> _check() async {
+  Future<void> _check({bool autoComplete = false}) async {
     setState(() => _checking = true);
     try {
       final dir = await _modelsDirectory();
@@ -148,7 +159,11 @@ class _SetupScreenState extends State<SetupScreen> {
         '${dir.path}/${AppConstants.diarEmbModelFile}',
       ).exists();
     } catch (_) {}
-    if (mounted) setState(() => _checking = false);
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (autoComplete && !_anyDownloading && _hasRequiredModels) {
+      await _completeSetup();
+    }
   }
 
   Future<Directory> _modelsDirectory() async {
@@ -164,6 +179,55 @@ class _SetupScreenState extends State<SetupScreen> {
       _llmQwenDl.status == _Status.downloading ||
       _diarSegDl.status == _Status.downloading ||
       _diarEmbDl.status == _Status.downloading;
+
+  bool get _hasRequiredModels =>
+      (_sttFastOk || _sttAccurateOk) && (_llmGemmaOk || _llmQwenOk);
+
+  Future<void> _completeSetup() async {
+    try {
+      final installed = {
+        if (_llmGemmaOk) 'gemma4_e2b',
+        if (_llmQwenOk) 'qwen25_7b',
+      };
+      if (installed.isNotEmpty &&
+          !installed.contains(AppSettings.instance.selectedLlmModel)) {
+        await AppSettings.instance.setSelectedLlmModel(installed.first);
+      }
+      await AppSettings.instance.setModelsSetupComplete(true);
+      if (!mounted) return;
+      _openHomeScreen();
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 250),
+          widget.onComplete,
+        ),
+      );
+    } catch (e, st) {
+      CrashLogService.instance.recordCaught(
+        e,
+        st,
+        context: 'setupCompleteSetup',
+      );
+      if (!mounted) return;
+      final message = friendlyErrorText(
+        e,
+        fallbackTitle: '시작 준비 중 문제가 발생했습니다',
+        fallbackMessage: '설정 저장 또는 화면 전환에 실패했습니다.',
+        nextStep: '잠시 후 다시 \'앱 시작\' 버튼을 눌러주세요.',
+      );
+      setState(() => _startError = message);
+    }
+  }
+
+  void _openHomeScreen() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushReplacement(_instantRoute(const HomeScreen()));
+    });
+  }
 
   // ── 다운로드 ─────────────────────────────────────────────────────
   Future<void> _startDownload({required _Target target}) async {
@@ -257,7 +321,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
       if (mounted) {
         _setDl(target, const _DlState(status: _Status.done));
-        await _check();
+        await _check(autoComplete: true);
       }
     } on ModelDownloadException catch (e) {
       if (!mounted) return;
@@ -340,26 +404,55 @@ class _SetupScreenState extends State<SetupScreen> {
 
   // ── 확인 완료 ────────────────────────────────────────────────────
   Future<void> _confirmCheck() async {
-    await _check();
-    // STT/LLM 각각 최소 하나 이상 설치 필요
-    final anyStt = _sttFastOk || _sttAccurateOk;
-    final anyLlm = _llmGemmaOk || _llmQwenOk;
-    if (anyStt && anyLlm) {
-      // 설치된 LLM 중 하나를 기본으로 설정 (아직 미설정 시)
-      final current = AppSettings.instance.selectedLlmModel;
-      final installed = {
-        if (_llmGemmaOk) 'gemma4_e2b',
-        if (_llmQwenOk) 'qwen25_7b',
-      };
-      if (!installed.contains(current)) {
-        await AppSettings.instance.setSelectedLlmModel(installed.first);
-      }
-      widget.onComplete();
-    } else {
-      _showSnack(
-        '${[if (!anyStt) '음성 인식 모델 없음 (빠른 또는 정확도 높음 중 하나 이상 필요)', if (!anyLlm) '요약 모델 없음 (최소 하나 이상 필요)'].join(', ')} — 설치 후 다시 시도하세요.',
-        isError: true,
+    if (_starting) return;
+    setState(() {
+      _starting = true;
+      _startButtonPressed = false;
+      _startError = null;
+    });
+
+    try {
+      await _check().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => throw TimeoutException('모델 파일 확인 시간이 초과되었습니다.'),
       );
+
+      // STT/LLM 각각 최소 하나 이상 설치 필요
+      final anyStt = _sttFastOk || _sttAccurateOk;
+      final anyLlm = _llmGemmaOk || _llmQwenOk;
+      if (anyStt && anyLlm) {
+        await _completeSetup();
+        return;
+      }
+
+      // 버튼이 활성화될 땐 이 경로에 도달하지 않지만, 안전장치로 남겨둠.
+      // 친화적인 안내 메시지로 노출.
+      final missing = <String>[
+        if (!anyStt) '음성 인식 모델',
+        if (!anyLlm) '요약 모델',
+      ].join('과 ');
+      final message = '$missing을(를) 받아야 시작할 수 있습니다. 위 카드의 \'설치\' 버튼을 눌러주세요.';
+      if (!mounted) return;
+      setState(() => _startError = message);
+    } catch (e, st) {
+      CrashLogService.instance.recordCaught(
+        e,
+        st,
+        context: 'setupConfirmCheck',
+      );
+      final message = friendlyErrorText(
+        e,
+        fallbackTitle: '앱을 시작하지 못했습니다',
+        fallbackMessage: '모델 확인 중 문제가 발생했습니다.',
+        nextStep: '다시 확인을 누르거나 앱을 재실행한 뒤 한 번 더 시도해주세요.',
+      );
+      if (!mounted) return;
+      setState(() => _startError = message);
+      _showSnack(message, isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _starting = false);
+      }
     }
   }
 
@@ -394,6 +487,7 @@ class _SetupScreenState extends State<SetupScreen> {
     final anyLlm = _llmGemmaOk || _llmQwenOk;
     final allOk = anyStt && anyLlm;
     final anyDownloading = _anyDownloading;
+    final requiredCount = (anyStt ? 1 : 0) + (anyLlm ? 1 : 0);
 
     return MacosWindow(
       disableWallpaperTinting: true,
@@ -462,7 +556,73 @@ class _SetupScreenState extends State<SetupScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 18),
+
+                        // ── 진척도 배너 ───────────────────────────────────
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: allOk
+                                ? Colors.green.withValues(alpha: 0.08)
+                                : scheme.primary.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: allOk
+                                  ? Colors.green.shade300.withValues(alpha: 0.6)
+                                  : scheme.primary.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                allOk
+                                    ? Icons.check_circle
+                                    : Icons.info_outline_rounded,
+                                size: 18,
+                                color: allOk
+                                    ? Colors.green.shade700
+                                    : scheme.primary,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      allOk
+                                          ? '필수 모델 준비 완료 (2/2)'
+                                          : '필수 모델 $requiredCount/2 설치됨',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: allOk
+                                            ? Colors.green.shade800
+                                            : scheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      allOk
+                                          ? '아래 \'앱 시작\' 버튼으로 진입할 수 있습니다.'
+                                          : '음성 인식 모델 1개와 요약 모델 1개를 모두 받아야 앱을 시작할 수 있습니다.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.4,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 22),
 
                         _SetupSection(
                           title: '필수 모델',
@@ -686,6 +846,32 @@ class _SetupScreenState extends State<SetupScreen> {
                         ),
                         const SizedBox(height: 20),
 
+                        if (_startError != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.errorContainer,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: scheme.error.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Text(
+                              _startError!,
+                              style: TextStyle(
+                                color: scheme.onErrorContainer,
+                                fontSize: 12,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
                         // ── 액션 버튼 ─────────────────────────────────────
                         Row(
                           children: [
@@ -700,7 +886,7 @@ class _SetupScreenState extends State<SetupScreen> {
                             OutlinedButton.icon(
                               onPressed: _checking || anyDownloading
                                   ? null
-                                  : _check,
+                                  : () => unawaited(_check(autoComplete: true)),
                               icon: _checking
                                   ? const SizedBox(
                                       width: 14,
@@ -713,25 +899,43 @@ class _SetupScreenState extends State<SetupScreen> {
                               label: const Text('다시 확인'),
                             ),
                             const Spacer(),
-                            FilledButton.icon(
-                              onPressed: _checking || anyDownloading
-                                  ? null
-                                  : _confirmCheck,
-                              icon: allOk
-                                  ? const Icon(
-                                      Icons.check_circle_outline,
-                                      size: 18,
-                                    )
-                                  : const Icon(Icons.arrow_forward, size: 18),
-                              label: const Text('확인 완료 → 앱 시작'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: allOk
-                                    ? Colors.green.shade600
-                                    : null,
-                              ),
+                            _MacPrimaryActionButton(
+                              label: _starting ? '시작 중...' : '앱 시작',
+                              enabled:
+                                  !_checking &&
+                                  !_starting &&
+                                  !anyDownloading &&
+                                  allOk,
+                              pressed: _startButtonPressed,
+                              onPressedChanged: (value) {
+                                if (!mounted) return;
+                                setState(() => _startButtonPressed = value);
+                              },
+                              onTap: () {
+                                unawaited(_confirmCheck());
+                              },
                             ),
                           ],
                         ),
+                        if (allOk) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed:
+                                  _checking || _starting || anyDownloading
+                                  ? null
+                                  : () => unawaited(_confirmCheck()),
+                              child: Text(
+                                '버튼이 반응하지 않으면 여기를 눌러 시작',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -805,6 +1009,80 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MacPrimaryActionButton extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final bool pressed;
+  final ValueChanged<bool> onPressedChanged;
+  final VoidCallback onTap;
+
+  const _MacPrimaryActionButton({
+    required this.label,
+    required this.enabled,
+    required this.pressed,
+    required this.onPressedChanged,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = enabled
+        ? scheme.primary.withValues(alpha: pressed ? 0.82 : 1)
+        : scheme.onSurface.withValues(alpha: 0.12);
+    final foreground = enabled
+        ? scheme.onPrimary
+        : scheme.onSurface.withValues(alpha: 0.38);
+    final border = enabled
+        ? scheme.primary.withValues(alpha: 0.55)
+        : scheme.outlineVariant;
+
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: enabled ? (_) => onPressedChanged(true) : null,
+        onTapCancel: enabled ? () => onPressedChanged(false) : null,
+        onTapUp: enabled
+            ? (_) {
+                onPressedChanged(false);
+                onTap();
+              }
+            : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 90),
+          width: 132,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: border),
+            boxShadow: enabled && !pressed
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      offset: const Offset(0, 1),
+                      blurRadius: 2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: foreground,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0,
+            ),
+          ),
+        ),
       ),
     );
   }

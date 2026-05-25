@@ -142,7 +142,7 @@ Core privacy position:
 
 - Meeting audio, transcripts, summaries, notes, tags, and logs are not uploaded
   to the developer's server.
-- AI processing runs on the user's Mac.
+- AI processing runs on the user's device.
 - Network is used for user-requested model downloads and external links.
 - User-initiated export/share/email actions may pass selected content to the
   destination app or service.

@@ -1,6 +1,6 @@
 # UI Polish Tasks — Local Minutes
 
-기준일: 2026-05-14
+기준일: 2026-05-16
 
 목표: Local Minutes의 주요 화면을 macOS 네이티브 앱처럼 차분하고 전문적으로 다듬는다. 한 번에 큰 리디자인을 하지 않고, 작은 단위로 수정하고 매 단계마다 `flutter analyze`와 실제 빌드로 회귀를 확인한다.
 
@@ -19,8 +19,8 @@
 ## 완료 기준
 
 - `flutter analyze` 통과.
-- `./scripts/build_dmg.sh --no-bump` 통과.
-- `hdiutil verify dist/LocalMinutes_v2.1.1_build28.dmg` 통과.
+- `./scripts/build_dmg.sh` 또는 `./scripts/build_dmg.sh --no-bump` 통과.
+- `hdiutil verify dist/LocalMinutes_v2.1.1_build47.dmg` 통과.
 - 앱 표시명은 `Local Minutes`, 제출/문서명은 `Local Minutes - 로컬 회의록`, DMG명은 `LocalMinutes_v...dmg` 규칙을 유지한다.
 - 설정/모델 관리 화면에서 필수/선택/상태가 한눈에 보인다.
 - 초기 설정에서 여러 모델을 동시에 다운로드하려는 흐름이 계속 막힌다.
@@ -35,7 +35,7 @@
 - [x] 현재 DMG 빌드가 통과하는지 확인한다.
   - 명령: `./scripts/build_dmg.sh --no-bump`
 - [x] DMG 검증을 확인한다.
-  - 명령: `hdiutil verify dist/LocalMinutes_v2.1.1_build28.dmg`
+  - 명령: `hdiutil verify dist/LocalMinutes_v2.1.1_build47.dmg`
 - [x] UI 관련 변경 전후 비교를 위해 주요 파일만 추적한다.
   - 예상 파일:
     - `lib/presentation/screens/home_screen.dart`
@@ -170,6 +170,28 @@ rg -n "적자생존|LocalMinutes_v1|LocalMinutes 허용" README.md INSTALL.md US
 - 사용자-facing 경로에서 예전 이름이 검출되지 않는다.
 - 히스토리성 작업 로그에 남은 예전 이름은 의도적으로 유지한 것으로 구분한다.
 
+## P7 — 회귀 이슈 추가 정리
+
+- [x] 온보딩 저장 폴더 선택 후 `선택 중`, `권한 확인 중`, `저장 위치 적용 중`, `다음 화면으로 이동 중` 상태에서 멈추지 않도록 정리한다.
+- [x] 필수 모델 설치 후 `앱 시작` 버튼이 반응하지 않는 흐름을 정리한다.
+- [x] 사이드바 폭을 사용자가 드래그로 조절할 수 있게 하고, 긴 녹음 제목은 폭이 충분할 때 2줄까지 보이도록 정리한다.
+- [x] 녹취록 오디오 재생 중 좌우 방향키로 10초 뒤로/앞으로 이동할 수 있게 한다.
+- [x] 다크 테마에서 회의 상세 상단의 태그 추가, 추천, 그룹, 파일명 링크가 흐리게 보이지 않도록 색상을 테마 기반으로 정리한다.
+- [x] `다시 전사` 팝업이 macOS alert 기본 폭에 눌리지 않도록 커스텀 다이얼로그 폭으로 정리한다.
+- [x] 녹음 시작 준비창이 macOS alert 기본 폭에 눌리지 않도록 커스텀 다이얼로그 폭으로 정리하고, `확인했습니다` 체크 없이 바로 녹음을 시작할 수 있게 한다.
+- [x] 온라인 회의 앱 내부 시스템 오디오 캡처는 첫 출시에서 제외하고, 현재 버전은 마이크 입력 기반 녹음으로 문서화한다.
+- [x] 내보내기 메뉴 하단의 `공유하기` 항목을 제거하고, 저장/복사/이메일 흐름만 유지한다.
+- [x] 최신 배포 DMG를 생성하고 검증한다.
+  - 출력: `dist/LocalMinutes_v2.1.1_build47.dmg`
+  - 검증: `hdiutil verify dist/LocalMinutes_v2.1.1_build47.dmg`
+
+완료 조건:
+
+- 초기 설정, 모델 준비, 회의 상세, 녹취록 재전사 흐름에서 사용자가 막히지 않는다.
+- 다크/라이트 테마에서 주요 액션 버튼과 보조 텍스트가 읽힌다.
+- `flutter analyze` 통과.
+- 최신 DMG 검증이 `VALID`로 끝난다.
+
 ## 최종 검증
 
 - [x] `dart format` 실행이 필요한 파일만 포맷한다.
@@ -177,9 +199,10 @@ rg -n "적자생존|LocalMinutes_v1|LocalMinutes 허용" README.md INSTALL.md US
 - [x] 가능하면 주요 테스트를 실행한다.
   - 명령: `flutter test`
 - [x] DMG 빌드.
-  - 명령: `./scripts/build_dmg.sh --no-bump`
+  - 명령: `./scripts/build_dmg.sh`
+  - 결과: `dist/LocalMinutes_v2.1.1_build47.dmg`
 - [x] DMG 검증.
-  - 명령: `hdiutil verify dist/LocalMinutes_v2.1.1_build28.dmg`
+  - 명령: `hdiutil verify dist/LocalMinutes_v2.1.1_build47.dmg`
 - [x] 변경 요약 확인.
   - 명령: `git diff --stat`
 - [x] 변경 범위와 검증 결과를 사용자에게 공유한다.

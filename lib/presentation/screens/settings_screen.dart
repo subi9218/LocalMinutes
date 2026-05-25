@@ -14,6 +14,7 @@ import '../../core/services/app_settings.dart';
 import '../../core/services/auto_delete_service.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/diagnostic_export_service.dart';
+import '../../core/services/isar_service.dart';
 import '../../core/services/model_download_service.dart';
 import '../../core/services/security_scoped_bookmark_service.dart';
 import '../../core/services/summary_templates.dart';
@@ -331,6 +332,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     final path = await getDirectoryPath(confirmButtonText: '선택');
     if (path != null) {
       await SecurityScopedBookmarkService.saveRecordingsFolderSelection(path);
+      await IsarService.instance.relocateToUserSelectedDirectory();
       if (mounted) setState(() {});
       await _loadStorageInfo();
     }
@@ -1199,7 +1201,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       children: [
         _SettingRow(
           title: '사용 모델 및 라이선스',
-          subtitle: '음성 인식과 요약은 사용자가 설치한 로컬 모델로 Mac에서 실행됩니다.',
+          subtitle: '음성 인식과 요약은 사용자가 설치한 로컬 모델로 이 기기에서 실행됩니다.',
           trailing: OutlinedButton.icon(
             icon: const Icon(Icons.article_outlined, size: 16),
             label: const Text('보기'),

@@ -1,17 +1,18 @@
 # Codex TODO — Local Minutes App Store 제출 마무리
 
-기준일: 2026-05-14
+기준일: 2026-05-16
 
 ## 현재 확인된 상태
 
 - 프로젝트는 Git 저장소이며 원격 `origin/main`과 연결되어 있다.
 - UI/브랜딩 반영 기준 커밋은 `d85d175 Align Local Minutes branding docs`.
-- 현재 워킹트리는 clean 상태.
-- 현재 앱 버전은 `2.1.1+28`.
+- 현재 워킹트리는 App Store 제출 마무리/QA 수정 작업으로 변경사항이 있는 상태.
+- 현재 앱 버전은 `2.1.1+47`, App Store Connect 업로드 빌드는 Xcode Organizer 기준 `49`.
 - `flutter analyze` 통과: 0 issues.
 - `flutter test` 통과: 89/89.
 - `./scripts/build_dmg.sh --no-bump` 통과.
-- 최근 QA 산출물은 `dist/LocalMinutes_v2.1.1_build28.dmg`.
+- 최근 QA 산출물은 `dist/LocalMinutes_v2.1.1_build47.dmg`.
+- App Store Connect 업로드 완료: build `49`.
 - 핵심 제품 기능은 대부분 완료 상태.
 - 현재 1차 제출 권장 수익 모델은 `유료 앱 19,000원 / IAP 없음`.
 - `무료 앱 + Pro Unlock` 전환은 출시 후 또는 별도 작업으로 보류.
@@ -33,12 +34,12 @@
 
 ### -0. Apple Developer 계정 준비
 
-- [ ] Apple Developer Program 가입/승인 완료.
-- [ ] Team ID 확인.
+- [x] Apple Developer Program 가입/승인 완료.
+- [x] Team ID 확인: `6WP598G44V`.
 - [ ] Paid Apps Agreement 수락.
 - [ ] 세금/은행 정보 입력.
-- [ ] Xcode > Settings > Accounts에서 Apple Distribution 인증서 설치.
-- [ ] App Store Connect 앱 record 생성.
+- [x] Xcode > Settings > Accounts에서 Apple Distribution 인증서 설치.
+- [x] App Store Connect 앱 record 생성.
 
 완료 조건:
 
@@ -107,39 +108,41 @@
 
 ### 3. Apple Distribution 서명 준비
 
-- [ ] Apple Developer Program 가입/승인 완료.
-- [ ] Apple Developer Team ID 확인.
-- [ ] Xcode > Settings > Accounts에서 Apple Distribution 인증서 설치.
-- [ ] App Store Connect에서 Bundle ID / App record 생성.
-- [ ] Provisioning profile이 Xcode 자동 서명으로 잡히는지 확인.
-- [ ] `security find-identity -v -p codesigning`에서 유효한 Apple Distribution identity 확인.
+- [x] Apple Developer Program 가입/승인 완료.
+- [x] Apple Developer Team ID 확인: `6WP598G44V`.
+- [x] Xcode > Settings > Accounts에서 Apple Distribution 인증서 설치.
+- [x] App Store Connect에서 Bundle ID / App record 생성.
+- [x] App Store archive에서 Apple Distribution 서명 통과.
+- [x] `security find-identity -v -p codesigning`에서 유효한 Apple Distribution identity 확인.
 
 현재 메모:
 
-- 2026-05-10 기준 Apple Developer Certificates/Identifiers/Profiles 접근 시 `Access Unavailable` 표시.
-- 원인: 현재 Apple ID가 유료 Apple Developer Program에 등록되어 있지 않음.
-- 가입/승인 전에는 Bundle ID 등록, App Store Connect 앱 생성, Apple Distribution 인증서 생성, Archive 업로드가 불가.
+- 2026-05-16 기준 유효한 Apple Distribution identity 3개 확인됨.
+- `scripts/archive_app_store.sh`에 개인키 접근 smoke test를 추가함.
+- Keychain에 남아 있는 `B67A...`, `F6E...` identity는 `CSSMERR_TP_CERT_REVOKED` 상태로 Xcode가 무효로 판단함.
+- `91EE1282113719FFE1E68A442A1AB5C9DA20FFA4` identity로 App Store archive와 strict 검증 통과.
 
 완료 조건:
 
 - `security find-identity -v -p codesigning` 결과에 유효한 배포 인증서가 표시됨.
-- `scripts/archive_app_store.sh`의 인증서 검사 통과 가능.
+- `scripts/archive_app_store.sh`의 개인키 서명 smoke test 통과.
 
 ### 4. App Store Archive 생성 및 strict 검증
 
-- [ ] 아래 환경변수로 archive 스크립트 실행.
+- [x] Apple Distribution 개인키 접근 권한을 허용한 뒤 아래 환경변수로 archive 스크립트 실행.
 
 ```bash
-APPLE_TEAM_ID=<팀ID> \
-APP_STORE_BUNDLE_ID=<실제.bundle.id> \
+APPLE_TEAM_ID=6WP598G44V \
+APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 ./scripts/archive_app_store.sh
 ```
 
-- [ ] Archive Bundle ID 검사 통과.
-- [ ] `codesign --verify --strict --deep` 통과.
-- [ ] `get-task-allow=false` 확인.
-- [ ] Calendar/AppleEvent entitlement 미포함 확인.
-- [ ] `LSMinimumSystemVersion=15.5` 확인.
+- [x] 개인키 서명 smoke test 통과.
+- [x] Archive Bundle ID 검사 통과.
+- [x] `codesign --verify --strict --deep` 통과.
+- [x] `get-task-allow=false` 확인.
+- [x] Calendar/AppleEvent entitlement 미포함 확인.
+- [x] `LSMinimumSystemVersion=15.5` 확인.
 
 완료 조건:
 
@@ -191,7 +194,7 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 ### 7. App Store Connect 메타데이터 최종화
 
 - [x] 앱 이름: `Local Minutes`.
-- [x] 부제: `내 Mac에서 처리하는 AI 회의록`.
+- [x] 부제: `온디바이스 AI 회의록 정리`.
 - [x] 키워드 100바이트 이하 재확인.
 - [x] 앱 설명 최종 교정.
 - [x] App Store Connect 복사용 문서 `APP_STORE_CONNECT_COPY.md` 작성.
@@ -261,13 +264,13 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 
 ### 12. 실제 사용자 흐름 최종 QA
 
-- [ ] 새 설치 상태에서 저장 폴더 선택.
+- [x] 새 설치 상태에서 저장 폴더 선택.
 - [ ] 앱 재실행 후 저장 폴더 bookmark 권한 복원 확인.
-- [ ] 모델 준비 화면 진입.
-- [ ] 마이크 권한 요청 및 녹음 시작.
-- [ ] 녹음 종료 후 자동 요약이 실행되지 않는지 확인.
-- [ ] 사용자가 직접 요약 실행.
-- [ ] 회의 상세에서 전사, 요약, 근거, 액션아이템 확인.
+- [x] 모델 준비 화면 진입.
+- [x] 마이크 권한 요청 및 녹음 시작.
+- [x] 녹음 종료 후 자동 요약이 실행되지 않는지 확인.
+- [x] 사용자가 직접 요약 실행.
+- [x] 회의 상세에서 전사, 요약, 근거, 액션아이템 확인.
 - [ ] Markdown/PDF/DOCX 내보내기 확인.
 - [ ] 앱 재실행 후 기존 회의 접근 확인.
 
@@ -351,6 +354,20 @@ APP_STORE_BUNDLE_ID=<실제.bundle.id> \
 주의:
 
 - 녹음 중 STT/LLM 동시 실행으로 안정성을 깨지 않는다.
+
+### 18. 온라인 회의 녹음 모드
+
+- [ ] Zoom/Google Meet/Microsoft Teams 등 온라인 회의 사용 시 필요한 시스템 오디오 캡처 방식을 조사한다.
+- [ ] macOS ScreenCaptureKit 또는 가상 오디오 장치 기반 접근의 App Store 심사 리스크를 비교한다.
+- [ ] 마이크 입력과 시스템 오디오를 하나의 WAV로 믹싱하는 MVP 범위를 정한다.
+- [ ] 권한 안내, 이어폰/AirPods, 외장 마이크, 스피커 출력 케이스별 QA 시나리오를 만든다.
+- [ ] 첫 출시 버전의 App Store 문구에는 이 기능을 약속하지 않는다.
+
+주의:
+
+- 첫 출시 전에는 추가하지 않는다.
+- 시스템 오디오 직접 캡처를 제공하기 전까지는 마이크 입력 기반 녹음으로만 설명한다.
+- 상표명은 사용자 문서/개발 TODO의 설명 용도로만 쓰고 App Store 키워드에는 넣지 않는다.
 
 ## 유지해야 할 원칙
 

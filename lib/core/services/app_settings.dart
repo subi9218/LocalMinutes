@@ -126,9 +126,25 @@ class AppSettings {
   Future<void> setRecordingsSaveBookmark(String v) =>
       _prefs.setString('recordingsSaveBookmark', v);
 
+  // ── 모델 준비 완료 ───────────────────────────────────────────────
+  /// 필수 모델 준비 화면을 통과했는지 여부.
+  bool get modelsSetupComplete =>
+      _prefs.getBool('modelsSetupComplete') ?? false;
+  Future<void> setModelsSetupComplete(bool v) =>
+      _prefs.setBool('modelsSetupComplete', v);
+
+  // ── 사이드바 레이아웃 ─────────────────────────────────────────────
+  /// 회의 목록 사이드바 폭. macOS 사이드바처럼 사용자가 드래그로 조절 가능.
+  double get sidebarWidth => _prefs.getDouble('sidebarWidth') ?? 320;
+  Future<void> setSidebarWidth(double v) =>
+      _prefs.setDouble('sidebarWidth', v.clamp(260, 480).toDouble());
+
   // ── 테마 모드 ─────────────────────────────────────────────────────
-  /// 'system' | 'light' | 'dark'
-  String get themeMode => _prefs.getString('themeMode') ?? 'system';
+  /// 'light' | 'dark' | 'system'
+  ///
+  /// 신규 설치 기본값은 App Store 스크린샷과 첫인상을 위해 밝은 테마로 둔다.
+  /// 사용자가 설정에서 시스템/다크로 바꾸면 그 선택은 그대로 보존된다.
+  String get themeMode => _prefs.getString('themeMode') ?? 'light';
   Future<void> setThemeMode(String v) => _prefs.setString('themeMode', v);
 
   // ── 요약 템플릿 ───────────────────────────────────────────────────

@@ -24,6 +24,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
@@ -32,5 +34,9 @@
 	<string>NSApplication</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>회의 녹음을 위해 마이크 접근 권한이 필요합니다.</string>
+	<!-- 수출 규정: HTTPS 외 비표준 암호화를 사용하지 않으므로 false 명시 -->
+	<!-- (모델 다운로드는 HTTPS, App Privacy Manifest는 별도 PrivacyInfo.xcprivacy) -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

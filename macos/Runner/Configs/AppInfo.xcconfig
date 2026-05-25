@@ -10,6 +10,7 @@ EXECUTABLE_NAME = LocalMinutes
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.subi9218.localminutes
+DEVELOPMENT_TEAM = 6WP598G44V
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 subi9218. All rights reserved.

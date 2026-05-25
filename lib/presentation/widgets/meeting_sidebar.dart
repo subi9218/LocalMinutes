@@ -513,7 +513,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                         ),
                       ),
                       Text(
-                        '내 Mac의 로컬 회의록',
+                        '내 기기의 로컬 회의록',
                         style: TextStyle(
                           fontSize: 9,
                           color: Theme.of(
@@ -2001,19 +2001,25 @@ class _MeetingTile extends StatelessWidget {
                         message: meeting.title,
                         preferBelow: false,
                         waitDuration: const Duration(milliseconds: 500),
-                        child: Text(
-                          meeting.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                            color: isSelected
-                                ? selectedTextColor
-                                : scheme.onSurface,
-                          ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final useTwoLineTitle = constraints.maxWidth >= 300;
+                            return Text(
+                              meeting.title,
+                              maxLines: useTwoLineTitle ? 2 : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.22,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: isSelected
+                                    ? selectedTextColor
+                                    : scheme.onSurface,
+                              ),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 2),

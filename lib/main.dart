@@ -36,13 +36,31 @@ void main() async {
       if (Platform.isMacOS) {
         await windowManager.ensureInitialized();
       }
-      await IsarService.instance.init();
       await AppSettings.init(); // 설정 로드
-      await SecurityScopedBookmarkService.restoreRecordingsFolderAccess();
+      final storageRestored =
+          await SecurityScopedBookmarkService.restoreRecordingsFolderAccess();
+      final hasStoragePath =
+          AppSettings.instance.recordingsSavePath.trim().isNotEmpty;
+      final storageReady = hasStoragePath && storageRestored;
+      // 사용자 폴더 준비 전엔 Isar를 열지 않음 (컨테이너 폴백 금지).
+      // Apple App Sandbox 2.4.5(i): user data must live in a user-accessible
+      // location, not the hidden app container.
+      if (storageReady) {
+        await IsarService.instance.init();
+      }
       await EntitlementService.init(); // 무료/유료 게이트 (현재 hardcode pro)
       final modelsOk = await _checkModels();
-      await _runAutoDelete(); // 자동 삭제 (설정된 경우)
-      runApp(ProviderScope(child: MeetingAssistantApp(modelsOk: modelsOk)));
+      if (storageReady) {
+        await _runAutoDelete(); // 자동 삭제 (설정된 경우)
+      }
+      runApp(
+        ProviderScope(
+          child: MeetingAssistantApp(
+            modelsOk: modelsOk,
+            storageReady: storageReady,
+          ),
+        ),
+      );
     },
     (error, stack) {
       CrashLogService.instance.recordCaught(
@@ -73,7 +91,7 @@ Future<bool> _checkModels() async {
     ).exists();
     return (sttFast || sttAccurate) && (llmGemma || llmQwen);
   } catch (_) {
-    return false;
+    return AppSettings.instance.modelsSetupComplete;
   }
 }
 
@@ -85,7 +103,12 @@ Future<void> _runAutoDelete() async {
 
 class MeetingAssistantApp extends ConsumerStatefulWidget {
   final bool modelsOk;
-  const MeetingAssistantApp({super.key, required this.modelsOk});
+  final bool storageReady;
+  const MeetingAssistantApp({
+    super.key,
+    required this.modelsOk,
+    required this.storageReady,
+  });
 
   @override
   ConsumerState<MeetingAssistantApp> createState() =>
@@ -105,8 +128,8 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
   @override
   void initState() {
     super.initState();
-    _showHome = widget.modelsOk;
-    _storageReady = AppSettings.instance.recordingsSavePath.isNotEmpty;
+    _showHome = widget.modelsOk || AppSettings.instance.modelsSetupComplete;
+    _storageReady = widget.storageReady;
 
     // 앱 종료 직전 모델 정리 — ggml/Metal destructor abort 방지
     // (백그라운드 Metal init 중에 process exit하면 ggml_abort 발생)
@@ -443,7 +466,7 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         ref: ref,
         child: !_storageReady
             ? StorageSetupScreen(
-                onComplete: () {
+                onComplete: (path) {
                   setState(() => _storageReady = true);
                   unawaited(_syncTrayStartState());
                 },
@@ -451,7 +474,9 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
             : _showHome
             ? const HomeScreen()
             : SetupScreen(
-                onComplete: () {
+                onComplete: () async {
+                  await AppSettings.instance.setModelsSetupComplete(true);
+                  if (!mounted) return;
                   setState(() => _showHome = true);
                   unawaited(_syncTrayStartState());
                 },

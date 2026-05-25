@@ -9,7 +9,7 @@
 `APP_STORE_METADATA_KO.md`를 기준으로 입력합니다.
 
 - 앱 이름: `Local Minutes - 로컬 회의록`
-- 부제: `내 Mac에서 처리하는 AI 회의록`
+- 부제: `온디바이스 AI 회의록 정리`
 - 기본 언어: Korean
 - 기본 카테고리: Productivity
 - 보조 카테고리: Business
@@ -55,6 +55,7 @@
 복사 전 확인:
 
 - [ ] “로그인이나 계정 생성은 필요하지 않습니다” 문구와 실제 App Store 빌드 UI가 일치
+- [x] 현재 버전이 마이크 입력 기반 녹음이며 온라인 회의 앱 내부 시스템 오디오 직접 캡처를 제공하지 않는다는 설명 유지
 - [ ] Hugging Face 토큰 입력 UI가 App Store 제출 빌드에서 기본 노출되지 않음
 - [ ] Calendar/AppleEvent 기능이 App Store 제출 빌드에서 노출되지 않음
 - [ ] 지원 모델 목록이 Gemma/Qwen 기준으로 표시됨
@@ -93,7 +94,7 @@
 권장 5장:
 
 1. 첫 실행 온보딩
-   - 화면: `회의 내용은 내 Mac 밖으로 나가지 않습니다`
+   - 화면: `회의 내용은 기기 밖으로 나가지 않습니다`
    - 보여줄 포인트: 로컬 처리, 외부 서버 미전송
 
 2. 모델 준비 화면
@@ -103,7 +104,7 @@
 
 3. 녹음 준비/녹음 중 화면
    - 화면: 회의 제목, 말할 사람 수, 마이크, 회의 유형
-   - 보여줄 포인트: 사용자가 직접 녹음 시작, 실시간 상태
+   - 보여줄 포인트: 사용자가 직접 마이크 입력 기반 녹음 시작, 실시간 상태
 
 4. 회의 상세 화면
    - 화면: 요약, 주요 논의, 결정사항, 액션아이템, 근거 버튼
@@ -139,49 +140,66 @@ App Store archive:
 ```bash
 cd /Users/channy/LocalMinutes
 
-APPLE_TEAM_ID=<TEAM_ID> \
+APPLE_TEAM_ID=6WP598G44V \
 APP_STORE_BUNDLE_ID=com.subi9218.localminutes \
 ./scripts/archive_app_store.sh
 ```
 
+현재 상태:
+
+- [x] 유효한 Apple Distribution identity 확인
+- [x] Archive 스크립트에 개인키 서명 smoke test 추가
+- [x] Keychain Access에서 Apple Distribution 개인키 접근 권한 허용
+- [x] `91EE1282113719FFE1E68A442A1AB5C9DA20FFA4` identity로 App Store archive 성공
+- [x] Xcode Organizer에서 App Store Connect 업로드 완료: build `49`
+- [x] dSYM 경고는 외부 native dylib 심볼 경고로 확인. 앱 업로드 자체는 완료됨.
+
 성공 시 확인:
 
-- [ ] `flutter analyze` 통과
-- [ ] `flutter test` 통과
-- [ ] Archive Bundle ID가 `com.subi9218.localminutes`
-- [ ] `codesign --verify --strict --deep` 통과
-- [ ] `get-task-allow=false`
-- [ ] Calendar/AppleEvent entitlement 없음
-- [ ] `LSMinimumSystemVersion=15.5`
-- [ ] Xcode Organizer 또는 Transporter 업로드 가능
+- [x] `flutter analyze` 통과
+- [x] `flutter test` 통과
+- [x] 개인키 서명 smoke test 통과
+- [x] Archive Bundle ID가 `com.subi9218.localminutes`
+- [x] `codesign --verify --strict --deep` 통과
+- [x] `get-task-allow=false`
+- [x] Calendar/AppleEvent entitlement 없음
+- [x] `LSMinimumSystemVersion=15.5`
+- [x] Xcode Organizer 또는 Transporter 업로드 가능
 
 ## 6. App Store-Signed QA
 
 인증서 준비 후 archive 또는 TestFlight/설치 빌드에서 확인합니다.
 
+build43 직접 배포 DMG 기준 빠른 QA:
+
+- [x] 첫 실행, 저장 폴더 선택, 모델 준비, 필수 모델 다운로드/재확인, 앱 시작 확인
+- [x] 새 녹음, 녹음 준비창 폭, `확인했습니다` 제거, 샘플 녹음, 녹음 종료 후 전사/요약 흐름 확인
+- [x] 회의 상세의 다시 전사 팝업 폭, 오디오 방향키 10초 이동, 다크/라이트 주요 UI, 내보내기 진입 확인
+
 첫 실행:
 
-- [ ] 새 사용자 상태로 앱 실행
-- [ ] 저장 폴더 선택
+- [x] 새 사용자 상태로 앱 실행
+- [x] 저장 폴더 선택
 - [ ] 앱 종료 후 재실행
 - [ ] 같은 저장 폴더로 녹음 시작 가능
 - [ ] 저장 폴더 권한 실패 시 재선택 안내가 뜸
 
 모델:
 
-- [ ] STT 모델 다운로드 가능
-- [ ] 요약 모델 다운로드 가능
-- [ ] 계정/토큰 없이 기본 모델 다운로드 가능
+- [x] STT 모델 다운로드 가능
+- [x] 요약 모델 다운로드 가능
+- [x] 계정/토큰 없이 기본 모델 다운로드 가능
 - [ ] App Store 제출 빌드에서 지원 모델 목록이 Gemma/Qwen 기준으로 표시됨
 - [ ] App Store 제출 빌드에서 Hugging Face 토큰 입력/URL 편집 기본 노출 없음
 
 회의 흐름:
 
-- [ ] 마이크 권한 요청 문구 정상
-- [ ] 녹음 시작/일시정지/중지 정상
-- [ ] 녹음 종료 후 자동 요약이 실행되지 않음
-- [ ] 사용자가 직접 요약 실행
-- [ ] 회의 상세에서 요약/결정사항/액션아이템/근거 확인
+- [x] 마이크 권한 요청 문구 정상
+- [ ] 녹음 일시정지/재개 정상
+- [x] 녹음 시작/중지 정상
+- [x] 녹음 종료 후 자동 요약이 실행되지 않음
+- [x] 사용자가 직접 요약 실행
+- [x] 회의 상세에서 요약/결정사항/액션아이템/근거 확인
 - [ ] Markdown 내보내기 정상
 - [ ] PDF 내보내기 정상
 - [ ] DOCX 내보내기 정상
