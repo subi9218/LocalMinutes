@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../core/ffi/on_device_model_manager.dart';
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/recovery_service.dart';
 import '../../data/datasources/microphone_service.dart';
@@ -262,14 +263,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 actions: [
                   // macOS 표준 toolbar 는 아이콘 + tooltip 만으로 표기 (라벨 표시는 separator 와 충돌해 어색).
                   ToolBarIconButton(
-                    label: '새 녹음',
+                    label: tr('새 녹음', 'New recording'),
                     icon: const MacosIcon(CupertinoIcons.mic_circle),
                     onPressed: _startRecordingFromToolbar,
                     showLabel: false,
-                    tooltipMessage: '새 회의 녹음 시작 (⌘⇧R)',
+                    tooltipMessage: tr('새 회의 녹음 시작 (⌘⇧R)', 'Start a new recording (⌘⇧R)'),
                   ),
                   ToolBarIconButton(
-                    label: '설정',
+                    label: tr('설정', 'Settings'),
                     icon: const MacosIcon(CupertinoIcons.gear),
                     onPressed: () => showSettingsDialog(context, ref),
                     showLabel: false,
@@ -463,7 +464,7 @@ class _WelcomeView extends ConsumerWidget {
                     ),
                     const SizedBox(height: 22),
                     Text(
-                      '새 회의 녹음',
+                      tr('새 회의 녹음', 'New meeting recording'),
                       textAlign: TextAlign.center,
                       style: macosTheme.typography.largeTitle.copyWith(
                         fontWeight: FontWeight.w700,
@@ -473,7 +474,7 @@ class _WelcomeView extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '회의록이 아직 없습니다',
+                      tr('회의록이 아직 없습니다', 'No meetings yet'),
                       textAlign: TextAlign.center,
                       style: macosTheme.typography.subheadline.copyWith(
                         color: secondaryText,
@@ -485,18 +486,18 @@ class _WelcomeView extends ConsumerWidget {
                       controlSize: ControlSize.large,
                       secondary: false,
                       onPressed: () => _startRecording(context, ref),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.fiber_manual_record,
                               size: 14,
                               color: Colors.white,
                             ),
-                            SizedBox(width: 8),
-                            Text('새 녹음 시작'),
+                            const SizedBox(width: 8),
+                            Text(tr('새 녹음 시작', 'Start new recording')),
                           ],
                         ),
                       ),

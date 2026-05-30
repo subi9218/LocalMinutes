@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/isar_service.dart';
 import '../../data/repositories/glossary_repository_impl.dart';
 import '../../domain/entities/glossary_entry.dart';
@@ -106,7 +107,12 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('추가 $added개${skipped > 0 ? ' · 중복 스킵 $skipped개' : ''}'),
+          content: Text(
+            tr(
+              '추가 $added개${skipped > 0 ? ' · 중복 스킵 $skipped개' : ''}',
+              'Added $added${skipped > 0 ? ' · skipped $skipped duplicates' : ''}',
+            ),
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -117,17 +123,22 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('용어 삭제'),
-        content: Text('"${entry.term}" 을(를) 단어집에서 삭제할까요?'),
+        title: Text(tr('용어 삭제', 'Delete term')),
+        content: Text(
+          tr(
+            '"${entry.term}" 을(를) 단어집에서 삭제할까요?',
+            'Delete "${entry.term}" from the glossary?',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-            child: const Text('삭제'),
+            child: Text(tr('삭제', 'Delete')),
           ),
         ],
       ),
@@ -173,12 +184,15 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '회사 단어집',
+                          tr('회사 단어집', 'Glossary'),
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '${_entries.length}개 등록됨 · 요약 생성 시 자동 참조',
+                          tr(
+                            '${_entries.length}개 등록됨 · 요약 생성 시 자동 참조',
+                            '${_entries.length} entries · referenced automatically during summaries',
+                          ),
                           style: TextStyle(
                             fontSize: 11,
                             color: Theme.of(
@@ -191,13 +205,16 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.playlist_add),
-                    tooltip: '일괄 가져오기 (여러 용어 한 번에 추가)',
+                    tooltip: tr(
+                      '일괄 가져오기 (여러 용어 한 번에 추가)',
+                      'Bulk import (add multiple terms at once)',
+                    ),
                     onPressed: _showBulkImportDialog,
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
                     icon: const Icon(Icons.add),
-                    tooltip: '새 용어 추가',
+                    tooltip: tr('새 용어 추가', 'Add term'),
                     onPressed: () => _showEditDialog(),
                     visualDensity: VisualDensity.compact,
                   ),
@@ -216,7 +233,7 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
               child: TextField(
                 controller: _searchCtrl,
                 decoration: InputDecoration(
-                  hintText: '용어 검색...',
+                  hintText: tr('용어 검색...', 'Search terms...'),
                   prefixIcon: const Icon(Icons.search, size: 18),
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
@@ -257,8 +274,11 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
                           const SizedBox(height: 12),
                           Text(
                             _entries.isEmpty
-                                ? '등록된 용어가 없습니다.\n+ 버튼으로 추가하거나\n회의 화면에서 "용어 추출"을 이용하세요.'
-                                : '검색 결과가 없습니다.',
+                                ? tr(
+                                    '등록된 용어가 없습니다.\n+ 버튼으로 추가하거나\n회의 화면에서 "용어 추출"을 이용하세요.',
+                                    'No terms yet.\nAdd one with the + button or\nuse "Extract Terms" on the meeting screen.',
+                                  )
+                                : tr('검색 결과가 없습니다.', 'No results found.'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
@@ -346,7 +366,7 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
                                       const SizedBox(height: 2),
                                       Text(
                                         e.description.isEmpty
-                                            ? '(설명 없음)'
+                                            ? tr('(설명 없음)', '(no description)')
                                             : e.description,
                                         style: TextStyle(
                                           fontSize: 12,
@@ -367,7 +387,7 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
                                     size: 16,
                                     color: Colors.red.shade300,
                                   ),
-                                  tooltip: '삭제',
+                                  tooltip: tr('삭제', 'Delete'),
                                   onPressed: () => _delete(e),
                                   visualDensity: VisualDensity.compact,
                                   padding: EdgeInsets.zero,
@@ -390,7 +410,10 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
                 ),
               ),
               child: Text(
-                '💡 회의 화면의 "용어 추출" 버튼으로 AI가 자동으로 용어를 찾아줍니다.',
+                tr(
+                  '💡 회의 화면의 "용어 추출" 버튼으로 AI가 자동으로 용어를 찾아줍니다.',
+                  '💡 Use the "Extract Terms" button on the meeting screen to let AI find terms automatically.',
+                ),
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
               ),
             ),
@@ -439,7 +462,7 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
     final isEdit = widget.existing != null;
 
     return AlertDialog(
-      title: Text(isEdit ? '용어 수정' : '새 용어 추가'),
+      title: Text(isEdit ? tr('용어 수정', 'Edit term') : tr('새 용어 추가', 'Add term')),
       content: SizedBox(
         width: 380,
         child: Column(
@@ -448,10 +471,10 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
             TextField(
               controller: _termCtrl,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: '용어 *',
-                hintText: '예: RPMS',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: tr('용어 *', 'Term *'),
+                hintText: tr('예: RPMS', 'e.g. RPMS'),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
             ),
@@ -459,10 +482,13 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
             TextField(
               controller: _descCtrl,
               maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: '설명 *',
-                hintText: '예: 실시간 플레이어 매칭 서버 (게임 매칭 인프라)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: tr('설명 *', 'Description *'),
+                hintText: tr(
+                  '예: 실시간 플레이어 매칭 서버 (게임 매칭 인프라)',
+                  'e.g. Real-time player matching server (game matchmaking infra)',
+                ),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
             ),
@@ -470,11 +496,14 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
             TextField(
               controller: _aliasCtrl,
               decoration: InputDecoration(
-                labelText: '별칭 (선택, 콤마 구분)',
-                hintText: '예: 알피엠에스, rpms서버',
+                labelText: tr('별칭 (선택, 콤마 구분)', 'Aliases (optional, comma-separated)'),
+                hintText: tr('예: 알피엠에스, rpms서버', 'e.g. alpiemeseu, rpms-server'),
                 border: const OutlineInputBorder(),
                 isDense: true,
-                helperText: '전사본에서 이 별칭도 같은 용어로 인식합니다.',
+                helperText: tr(
+                  '전사본에서 이 별칭도 같은 용어로 인식합니다.',
+                  'These aliases are recognized as the same term in transcripts.',
+                ),
                 helperStyle: TextStyle(
                   fontSize: 11,
                   color: Colors.grey.shade500,
@@ -487,7 +516,7 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: Text(tr('취소', 'Cancel')),
         ),
         FilledButton(
           onPressed: () {
@@ -495,7 +524,14 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
             final desc = _descCtrl.text.trim();
             if (term.isEmpty || desc.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('용어와 설명을 모두 입력해주세요.')),
+                SnackBar(
+                  content: Text(
+                    tr(
+                      '용어와 설명을 모두 입력해주세요.',
+                      'Please enter both a term and a description.',
+                    ),
+                  ),
+                ),
               );
               return;
             }
@@ -505,7 +541,7 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
               ..aliases = _aliasCtrl.text.trim();
             Navigator.pop(context, entry);
           },
-          child: Text(isEdit ? '저장' : '추가'),
+          child: Text(isEdit ? tr('저장', 'Save') : tr('추가', 'Add')),
         ),
       ],
     );
@@ -674,7 +710,7 @@ GLE :: 벤츠 중형 SUV''';
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('단어집 일괄 가져오기'),
+      title: Text(tr('단어집 일괄 가져오기', 'Bulk import glossary')),
       content: SizedBox(
         width: 560,
         height: 480,
@@ -682,12 +718,18 @@ GLE :: 벤츠 중형 SUV''';
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '한 줄에 한 용어씩 입력하세요. 형식: 용어 :: 설명 :: 별칭(콤마 구분)',
+              tr(
+                '한 줄에 한 용어씩 입력하세요. 형식: 용어 :: 설명 :: 별칭(콤마 구분)',
+                'One term per line. Format: term :: description :: aliases (comma-separated)',
+              ),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 4),
             Text(
-              '· 설명·별칭은 생략 가능 · `#`으로 시작하는 줄은 무시 · 중복 용어는 스킵',
+              tr(
+                '· 설명·별칭은 생략 가능 · `#`으로 시작하는 줄은 무시 · 중복 용어는 스킵',
+                '· Description and aliases are optional · Lines starting with `#` are ignored · Duplicate terms are skipped',
+              ),
               style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 10),
@@ -698,9 +740,9 @@ GLE :: 벤츠 중형 SUV''';
               children: [
                 OutlinedButton.icon(
                   icon: const Icon(Icons.auto_awesome, size: 14),
-                  label: const Text(
-                    '게임 프로젝트 샘플',
-                    style: TextStyle(fontSize: 11),
+                  label: Text(
+                    tr('게임 프로젝트 샘플', 'Game project sample'),
+                    style: const TextStyle(fontSize: 11),
                   ),
                   onPressed: () => _appendSample(_gameProjectSample),
                   style: OutlinedButton.styleFrom(
@@ -713,9 +755,9 @@ GLE :: 벤츠 중형 SUV''';
                 ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.record_voice_over, size: 14),
-                  label: const Text(
-                    '회의 어휘팩 (일반)',
-                    style: TextStyle(fontSize: 11),
+                  label: Text(
+                    tr('회의 어휘팩 (일반)', 'Meeting vocab pack (general)'),
+                    style: const TextStyle(fontSize: 11),
                   ),
                   onPressed: () => _appendSample(_meetingVocabSample),
                   style: OutlinedButton.styleFrom(
@@ -728,9 +770,9 @@ GLE :: 벤츠 중형 SUV''';
                 ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.analytics_outlined, size: 14),
-                  label: const Text(
-                    '데이터·인프라 팩',
-                    style: TextStyle(fontSize: 11),
+                  label: Text(
+                    tr('데이터·인프라 팩', 'Data & infra pack'),
+                    style: const TextStyle(fontSize: 11),
                   ),
                   onPressed: () => _appendSample(_dataInfraSample),
                   style: OutlinedButton.styleFrom(
@@ -742,7 +784,7 @@ GLE :: 벤츠 중형 SUV''';
                   ),
                 ),
                 Text(
-                  '$_previewCount개 감지',
+                  tr('$_previewCount개 감지', '$_previewCount detected'),
                   style: TextStyle(
                     fontSize: 11,
                     color: Theme.of(context).colorScheme.primary,
@@ -760,10 +802,14 @@ GLE :: 벤츠 중형 SUV''';
                 textAlignVertical: TextAlignVertical.top,
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                 decoration: InputDecoration(
-                  hintText:
-                      '예:\n왕의 귀환 :: 넷마블 MMORPG 프로젝트\n'
-                      '세븐나이츠 2 :: 모바일 RPG :: 세나2, 세나 리버스\n'
-                      '앱스플라이어 :: 모바일 어트리뷰션 :: Appsflyer',
+                  hintText: tr(
+                    '예:\n왕의 귀환 :: 넷마블 MMORPG 프로젝트\n'
+                        '세븐나이츠 2 :: 모바일 RPG :: 세나2, 세나 리버스\n'
+                        '앱스플라이어 :: 모바일 어트리뷰션 :: Appsflyer',
+                    'e.g.\nReturn of the King :: Netmarble MMORPG project\n'
+                        'Seven Knights 2 :: Mobile RPG :: SK2, Seven Knights Rebirth\n'
+                        'Appsflyer :: Mobile attribution :: Appsflyer',
+                  ),
                   hintStyle: TextStyle(
                     fontSize: 11,
                     color: Colors.grey.shade400,
@@ -780,13 +826,13 @@ GLE :: 벤츠 중형 SUV''';
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: Text(tr('취소', 'Cancel')),
         ),
         FilledButton(
           onPressed: _previewCount == 0
               ? null
               : () => Navigator.pop(context, _parse(_ctrl.text)),
-          child: Text('$_previewCount개 추가'),
+          child: Text(tr('$_previewCount개 추가', 'Add $_previewCount')),
         ),
       ],
     );

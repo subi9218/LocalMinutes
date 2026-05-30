@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/isar_service.dart';
 import '../../data/repositories/summary_repository_impl.dart';
 import '../../domain/entities/meeting.dart';
@@ -74,9 +75,9 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
         children: [
           Icon(Icons.checklist_outlined, color: Colors.indigo.shade600),
           const SizedBox(width: 8),
-          const Expanded(child: Text('전체 할 일')),
+          Expanded(child: Text(tr('전체 할 일', 'All action items'))),
           IconButton(
-            tooltip: '새로고침',
+            tooltip: tr('새로고침', 'Refresh'),
             onPressed: () {
               ref.invalidate(meetingsProvider);
               ref.invalidate(allSummariesProvider);
@@ -106,7 +107,7 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('닫기'),
+          child: Text(tr('닫기', 'Close')),
         ),
       ],
     );
@@ -117,14 +118,14 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
       children: [
         _StatPill(
           icon: Icons.radio_button_unchecked,
-          label: '미완료',
+          label: tr('미완료', 'Open'),
           value: '$openCount',
           color: Colors.orange.shade700,
         ),
         const SizedBox(width: 8),
         _StatPill(
           icon: Icons.check_circle_outline,
-          label: '완료',
+          label: tr('완료', 'Done'),
           value: '$doneCount',
           color: Colors.green.shade700,
         ),
@@ -136,21 +137,21 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
     return Row(
       children: [
         SegmentedButton<_ActionStatusFilter>(
-          segments: const [
+          segments: [
             ButtonSegment(
               value: _ActionStatusFilter.open,
-              icon: Icon(Icons.radio_button_unchecked, size: 15),
-              label: Text('미완료'),
+              icon: const Icon(Icons.radio_button_unchecked, size: 15),
+              label: Text(tr('미완료', 'Open')),
             ),
             ButtonSegment(
               value: _ActionStatusFilter.all,
-              icon: Icon(Icons.list_alt, size: 15),
-              label: Text('전체'),
+              icon: const Icon(Icons.list_alt, size: 15),
+              label: Text(tr('전체', 'All')),
             ),
             ButtonSegment(
               value: _ActionStatusFilter.done,
-              icon: Icon(Icons.check_circle_outline, size: 15),
-              label: Text('완료'),
+              icon: const Icon(Icons.check_circle_outline, size: 15),
+              label: Text(tr('완료', 'Done')),
             ),
           ],
           selected: {_status},
@@ -163,10 +164,10 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
           child: DropdownButtonFormField<String>(
             initialValue: _owner.isEmpty ? null : _owner,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: '담당자',
+            decoration: InputDecoration(
+              labelText: tr('담당자', 'Owner'),
               isDense: true,
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
             ),
             items: owners
                 .map((o) => DropdownMenuItem(value: o, child: Text(o)))
@@ -177,7 +178,7 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
         if (_owner.isNotEmpty) ...[
           const SizedBox(width: 4),
           IconButton(
-            tooltip: '담당자 필터 해제',
+            tooltip: tr('담당자 필터 해제', 'Clear owner filter'),
             onPressed: () => setState(() => _owner = ''),
             icon: const Icon(Icons.close, size: 16),
             visualDensity: VisualDensity.compact,
@@ -186,11 +187,11 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
         const SizedBox(width: 8),
         Expanded(
           child: TextField(
-            decoration: const InputDecoration(
-              hintText: '할 일, 회의 제목, 마감 검색',
-              prefixIcon: Icon(Icons.search, size: 18),
+            decoration: InputDecoration(
+              hintText: tr('할 일, 회의 제목, 마감 검색', 'Search tasks, meetings, due dates'),
+              prefixIcon: const Icon(Icons.search, size: 18),
               isDense: true,
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
           ),
@@ -203,7 +204,7 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
     if (entries.isEmpty) {
       return Center(
         child: Text(
-          '조건에 맞는 할 일이 없습니다.',
+          tr('조건에 맞는 할 일이 없습니다.', 'No action items match the filters.'),
           style: TextStyle(color: Colors.grey.shade500),
         ),
       );
@@ -215,7 +216,7 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
       itemBuilder: (context, index) {
         final entry = entries[index];
         final item = entry.item;
-        final meetingTitle = entry.meeting?.title ?? '삭제된 회의';
+        final meetingTitle = entry.meeting?.title ?? tr('삭제된 회의', 'Deleted meeting');
         return ListTile(
           dense: true,
           contentPadding: const EdgeInsets.symmetric(
@@ -257,7 +258,7 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
             ),
           ),
           trailing: IconButton(
-            tooltip: '회의 열기',
+            tooltip: tr('회의 열기', 'Open meeting'),
             icon: const Icon(Icons.open_in_new, size: 18),
             onPressed: entry.meeting == null
                 ? null

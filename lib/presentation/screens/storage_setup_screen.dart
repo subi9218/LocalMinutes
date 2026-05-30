@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/isar_service.dart';
 import '../../core/services/security_scoped_bookmark_service.dart';
@@ -19,7 +20,15 @@ PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
 class StorageSetupScreen extends StatefulWidget {
   final ValueChanged<String> onComplete;
 
-  const StorageSetupScreen({super.key, required this.onComplete});
+  /// 첫 단계(step 0)에서 '이전'을 눌렀을 때 호출. null이면 첫 단계에 뒤로가기를
+  /// 표시하지 않는다. (보통 언어 선택 화면으로 되돌아가는 데 사용.)
+  final VoidCallback? onBack;
+
+  const StorageSetupScreen({
+    super.key,
+    required this.onComplete,
+    this.onBack,
+  });
 
   @override
   State<StorageSetupScreen> createState() => _StorageSetupScreenState();
@@ -44,23 +53,25 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
   Future<void> _pickFolder() async {
     setState(() {
       _picking = true;
-      _pickingMessage = '폴더 선택 중...';
+      _pickingMessage = tr('폴더 선택 중...', 'Choosing folder...');
       _error = null;
     });
 
     try {
-      final path = await getDirectoryPath(confirmButtonText: '저장 폴더 선택');
+      final path = await getDirectoryPath(
+        confirmButtonText: tr('저장 폴더 선택', 'Choose folder'),
+      );
       if (!mounted) return;
       if (path == null || path.trim().isEmpty) {
         setState(() {
           _picking = false;
-          _pickingMessage = '선택 중...';
+          _pickingMessage = tr('선택 중...', 'Selecting...');
         });
         return;
       }
 
       final selectedPath = path.trim();
-      setState(() => _pickingMessage = '저장 위치 적용 중...');
+      setState(() => _pickingMessage = tr('저장 위치 적용 중...', 'Applying location...'));
       await SecurityScopedBookmarkService.saveRecordingsFolderSelection(
         selectedPath,
       );
@@ -72,7 +83,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
       }
 
       if (!mounted) return;
-      setState(() => _pickingMessage = '다음 화면으로 이동 중...');
+      setState(() => _pickingMessage = tr('다음 화면으로 이동 중...', 'Moving on...'));
       if (!mounted) return;
       _openNextScreen();
       unawaited(
@@ -85,8 +96,9 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
       if (!mounted) return;
       setState(() {
         _picking = false;
-        _pickingMessage = '선택 중...';
-        _error = '저장 폴더를 설정하지 못했습니다: $e';
+        _pickingMessage = tr('선택 중...', 'Selecting...');
+        _error =
+            '${tr('저장 폴더를 설정하지 못했습니다', 'Could not set the storage folder')}: $e';
       });
     }
   }
@@ -107,61 +119,103 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
     final steps = [
       _OnboardingStep(
         icon: Icons.lock_outline_rounded,
-        title: '회의 내용은 기기 밖으로 나가지 않습니다',
-        description:
-            '녹음, 음성 인식, 발화자 라벨, 요약은 모두 이 기기에서 실행됩니다. 회의 음성이나 전사본을 외부 서버로 전송하지 않습니다.',
-        points: const [
+        title: tr(
+          '회의 내용은 기기 밖으로 나가지 않습니다',
+          'Your meetings never leave this device',
+        ),
+        description: tr(
+          '녹음, 음성 인식, 발화자 라벨, 요약은 모두 이 기기에서 실행됩니다. 회의 음성이나 전사본을 외부 서버로 전송하지 않습니다.',
+          'Recording, speech recognition, speaker labels, and summaries all run on this device. Meeting audio and transcripts are never sent to an external server.',
+        ),
+        points: [
           _OnboardingPoint(
             icon: Icons.cloud_off_outlined,
-            text: '회의 파일을 클라우드로 업로드하지 않습니다.',
+            text: tr(
+              '회의 파일을 클라우드로 업로드하지 않습니다.',
+              'Meeting files are never uploaded to the cloud.',
+            ),
           ),
           _OnboardingPoint(
             icon: Icons.computer_rounded,
-            text: 'AI 처리는 로컬 모델로 이 기기에서 실행됩니다.',
+            text: tr(
+              'AI 처리는 로컬 모델로 이 기기에서 실행됩니다.',
+              'AI runs locally on this device.',
+            ),
           ),
           _OnboardingPoint(
             icon: Icons.security_rounded,
-            text: '네트워크가 불안정해도 회의록 작업을 계속할 수 있습니다.',
+            text: tr(
+              '네트워크가 불안정해도 회의록 작업을 계속할 수 있습니다.',
+              'Works even with an unstable network connection.',
+            ),
           ),
         ],
       ),
       _OnboardingStep(
         icon: Icons.memory_rounded,
-        title: '음성 인식과 요약 모델을 한 번만 준비합니다',
-        description:
-            '처음에는 모델 다운로드가 필요합니다. 용량은 크지만, 설치 후에는 회의마다 외부 서비스 없이 사용할 수 있습니다.',
-        points: const [
+        title: tr(
+          '음성 인식과 요약 모델을 한 번만 준비합니다',
+          'Set up the speech and summary models once',
+        ),
+        description: tr(
+          '처음에는 모델 다운로드가 필요합니다. 용량은 크지만, 설치 후에는 회의마다 외부 서비스 없이 사용할 수 있습니다.',
+          'A one-time model download is required. The files are large, but afterward every meeting works without any external service.',
+        ),
+        points: [
           _OnboardingPoint(
             icon: Icons.graphic_eq_rounded,
-            text: '음성 인식 모델은 녹음 내용을 텍스트로 바꿉니다.',
+            text: tr(
+              '음성 인식 모델은 녹음 내용을 텍스트로 바꿉니다.',
+              'The speech model turns recordings into text.',
+            ),
           ),
           _OnboardingPoint(
             icon: Icons.auto_awesome_rounded,
-            text: '요약 모델은 결정사항과 액션아이템을 정리합니다.',
+            text: tr(
+              '요약 모델은 결정사항과 액션아이템을 정리합니다.',
+              'The summary model organizes decisions and action items.',
+            ),
           ),
           _OnboardingPoint(
             icon: Icons.label_outline_rounded,
-            text: '발화자 라벨은 사람 이름이 아니라 A/B/C 흐름 보조입니다.',
+            text: tr(
+              '발화자 라벨은 사람 이름이 아니라 A/B/C 흐름 보조입니다.',
+              'Speaker labels are A/B/C flow hints, not real names.',
+            ),
           ),
         ],
       ),
       _OnboardingStep(
         icon: Icons.folder_open_rounded,
-        title: '녹음 파일을 저장할 폴더를 선택하세요',
-        description:
-            '회의 녹음과 전사 데이터는 사용자가 선택한 폴더를 기준으로 관리됩니다. 나중에 설정에서 변경할 수 있습니다.',
-        points: const [
+        title: tr(
+          '녹음 파일을 저장할 폴더를 선택하세요',
+          'Choose a folder to store recordings',
+        ),
+        description: tr(
+          '회의 녹음과 전사 데이터는 사용자가 선택한 폴더를 기준으로 관리됩니다. 나중에 설정에서 변경할 수 있습니다.',
+          'Meeting recordings and transcript data are kept in the folder you choose. You can change it later in Settings.',
+        ),
+        points: [
           _OnboardingPoint(
             icon: Icons.folder_rounded,
-            text: '회사 프로젝트 폴더나 개인 문서 폴더를 선택할 수 있습니다.',
+            text: tr(
+              '회사 프로젝트 폴더나 개인 문서 폴더를 선택할 수 있습니다.',
+              'Pick a work project folder or your documents folder.',
+            ),
           ),
           _OnboardingPoint(
             icon: Icons.edit_location_alt_outlined,
-            text: '저장 위치는 설정 화면에서 언제든 변경할 수 있습니다.',
+            text: tr(
+              '저장 위치는 설정 화면에서 언제든 변경할 수 있습니다.',
+              'You can change the location anytime in Settings.',
+            ),
           ),
           _OnboardingPoint(
             icon: Icons.task_alt_rounded,
-            text: '폴더 선택이 끝나면 앱 준비 화면으로 이동합니다.',
+            text: tr(
+              '폴더 선택이 끝나면 앱 준비 화면으로 이동합니다.',
+              'After choosing, you move on to model setup.',
+            ),
           ),
         ],
       ),
@@ -279,13 +333,22 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
                                 child: OutlinedButton.icon(
                                   onPressed: _picking ? null : _previousStep,
                                   icon: const Icon(Icons.chevron_left_rounded),
-                                  label: const Text('이전'),
+                                  label: Text(tr('이전', 'Back')),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ] else if (widget.onBack != null) ...[
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _picking ? null : widget.onBack,
+                                  icon: const Icon(Icons.chevron_left_rounded),
+                                  label: Text(tr('이전', 'Back')),
                                 ),
                               ),
                               const SizedBox(width: 10),
                             ],
                             Expanded(
-                              flex: _step > 0 ? 2 : 1,
+                              flex: (_step > 0 || widget.onBack != null) ? 2 : 1,
                               child: FilledButton.icon(
                                 onPressed: _picking
                                     ? null
@@ -310,8 +373,8 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
                                   _picking
                                       ? _pickingMessage
                                       : isLastStep
-                                      ? '저장 폴더 선택'
-                                      : '다음',
+                                      ? tr('저장 폴더 선택', 'Choose folder')
+                                      : tr('다음', 'Next'),
                                 ),
                               ),
                             ),

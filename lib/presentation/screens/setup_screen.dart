@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_build_config.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/model_download_service.dart';
@@ -22,6 +23,11 @@ PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
 );
 
 /// 모델 파일 설치 안내 + 자동 다운로드 화면
+///
+/// 핵심 동작: "필수 모델 받고 시작" 버튼 한 번으로 음성 인식 + 요약 모델을
+/// 순차 다운로드하고, 완료되면 자동으로 홈 화면으로 진입한다.
+/// 개별 모델 선택은 '고급' 영역으로 접어 두어, 사용자가 한 모델만 받고
+/// 막히는 상황을 만들지 않는다.
 class SetupScreen extends StatefulWidget {
   final VoidCallback onComplete;
   const SetupScreen({super.key, required this.onComplete});
@@ -43,9 +49,15 @@ class _SetupScreenState extends State<SetupScreen> {
   bool _diarEmbOk = false;
   bool _checking = false;
   bool _starting = false;
-  bool _startButtonPressed = false;
+  bool _completing = false;
   String? _startError;
   String _modelsDir = '';
+  bool _showAdvanced = false;
+
+  // ── 일괄(한 번에 받기) 다운로드 상태 ─────────────────────────────
+  bool _bulkActive = false;
+  List<_Target> _bulkSteps = const [];
+  int _bulkStepIndex = 0;
 
   // ── 다운로드 상태 ───────────────────────────────────────────────
   final _sttFastService = ModelDownloadService();
@@ -161,7 +173,7 @@ class _SetupScreenState extends State<SetupScreen> {
     } catch (_) {}
     if (!mounted) return;
     setState(() => _checking = false);
-    if (autoComplete && !_anyDownloading && _hasRequiredModels) {
+    if (autoComplete && !_anyDownloading && !_bulkActive && _hasRequiredModels) {
       await _completeSetup();
     }
   }
@@ -180,10 +192,78 @@ class _SetupScreenState extends State<SetupScreen> {
       _diarSegDl.status == _Status.downloading ||
       _diarEmbDl.status == _Status.downloading;
 
-  bool get _hasRequiredModels =>
-      (_sttFastOk || _sttAccurateOk) && (_llmGemmaOk || _llmQwenOk);
+  bool get _anyStt => _sttFastOk || _sttAccurateOk;
+  bool get _anyLlm => _llmGemmaOk || _llmQwenOk;
+  bool get _hasRequiredModels => _anyStt && _anyLlm;
+
+  // ── 한 번에 받기: 음성 인식 + 요약 모델 순차 다운로드 후 자동 진입 ──
+  Future<void> _downloadAllRequired() async {
+    if (_bulkActive || _anyDownloading) return;
+    await _check();
+    if (_hasRequiredModels) {
+      await _completeSetup();
+      return;
+    }
+    final steps = <_Target>[
+      if (!_anyStt) _Target.sttFast,
+      if (!_anyLlm) _Target.llmGemma,
+    ];
+    if (steps.isEmpty) {
+      await _completeSetup();
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _bulkActive = true;
+      _bulkSteps = steps;
+      _bulkStepIndex = 0;
+      _startError = null;
+    });
+    for (var i = 0; i < steps.length; i++) {
+      if (!mounted) return;
+      setState(() => _bulkStepIndex = i);
+      final ok = await _startDownload(
+        target: steps[i],
+        completeWhenReady: false,
+      );
+      if (!ok) {
+        if (mounted) setState(() => _bulkActive = false);
+        return; // 오류/취소 시 중단 (메시지는 _startDownload가 표시)
+      }
+    }
+    if (!mounted) return;
+    setState(() => _bulkActive = false);
+    await _check(autoComplete: true); // 둘 다 준비됨 → 자동 진입
+  }
+
+  void _cancelBulk() {
+    if (_bulkSteps.isNotEmpty && _bulkStepIndex < _bulkSteps.length) {
+      _cancelDownload(target: _bulkSteps[_bulkStepIndex]);
+    }
+    if (mounted) setState(() => _bulkActive = false);
+  }
+
+  /// 현재 일괄 단계의 다운로드 진행 상태.
+  _DlState get _bulkCurrentDl {
+    if (_bulkSteps.isEmpty || _bulkStepIndex >= _bulkSteps.length) {
+      return const _DlState();
+    }
+    return _dlFor(_bulkSteps[_bulkStepIndex]);
+  }
+
+  _DlState _dlFor(_Target t) => switch (t) {
+    _Target.sttFast => _sttFastDl,
+    _Target.sttFastCoreMl => _sttFastCoreMlDl,
+    _Target.sttAccurate => _sttAccurateDl,
+    _Target.llmGemma => _llmGemmaDl,
+    _Target.llmQwen => _llmQwenDl,
+    _Target.diarSeg => _diarSegDl,
+    _Target.diarEmb => _diarEmbDl,
+  };
 
   Future<void> _completeSetup() async {
+    if (_completing) return;
+    _completing = true;
     try {
       final installed = {
         if (_llmGemmaOk) 'gemma4_e2b',
@@ -195,45 +275,57 @@ class _SetupScreenState extends State<SetupScreen> {
       }
       await AppSettings.instance.setModelsSetupComplete(true);
       if (!mounted) return;
-      _openHomeScreen();
-      unawaited(
-        Future<void>.delayed(
-          const Duration(milliseconds: 250),
-          widget.onComplete,
-        ),
-      );
+      // 루트 상태 동기화 (트레이/플래그).
+      widget.onComplete();
+      // 실제 화면 전환은 pushReplacement로 처리한다.
+      // 이 MacosApp 구조에서는 home: 위젯 스왑만으로는 표시 화면이
+      // 즉시 바뀌지 않으므로, storage_setup_screen과 동일하게 명시 전환한다.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pushReplacement(_instantRoute(const HomeScreen()));
+      });
     } catch (e, st) {
+      _completing = false;
       CrashLogService.instance.recordCaught(
         e,
         st,
         context: 'setupCompleteSetup',
       );
       if (!mounted) return;
-      final message = friendlyErrorText(
-        e,
-        fallbackTitle: '시작 준비 중 문제가 발생했습니다',
-        fallbackMessage: '설정 저장 또는 화면 전환에 실패했습니다.',
-        nextStep: '잠시 후 다시 \'앱 시작\' 버튼을 눌러주세요.',
-      );
-      setState(() => _startError = message);
+      setState(() {
+        _startError = friendlyErrorText(
+          e,
+          fallbackTitle: tr('시작 준비 중 문제가 발생했습니다', 'Could not start the app'),
+          fallbackMessage: tr(
+            '설정 저장 또는 화면 전환에 실패했습니다.',
+            'Saving settings or switching screens failed.',
+          ),
+          nextStep: tr(
+            "잠시 후 다시 '앱 시작' 버튼을 눌러주세요.",
+            'Please tap Start app again in a moment.',
+          ),
+        );
+      });
     }
   }
 
-  void _openHomeScreen() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Navigator.of(
-        context,
-        rootNavigator: true,
-      ).pushReplacement(_instantRoute(const HomeScreen()));
-    });
-  }
-
-  // ── 다운로드 ─────────────────────────────────────────────────────
-  Future<void> _startDownload({required _Target target}) async {
+  // ── 개별 다운로드 ────────────────────────────────────────────────
+  /// 성공하면 true, 오류/취소면 false 반환.
+  Future<bool> _startDownload({
+    required _Target target,
+    bool completeWhenReady = true,
+  }) async {
     if (_anyDownloading) {
-      _showSnack('이미 다운로드 중인 모델이 있습니다. 완료 후 다음 모델을 설치하세요.');
-      return;
+      _showSnack(
+        tr(
+          '이미 다운로드 중인 모델이 있습니다. 완료 후 다음 모델을 설치하세요.',
+          'A model is already downloading. Please wait for it to finish.',
+        ),
+      );
+      return false;
     }
 
     final dir = await _modelsDirectory();
@@ -321,13 +413,14 @@ class _SetupScreenState extends State<SetupScreen> {
 
       if (mounted) {
         _setDl(target, const _DlState(status: _Status.done));
-        await _check(autoComplete: true);
+        await _check(autoComplete: completeWhenReady);
       }
+      return true;
     } on ModelDownloadException catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       if (e.isCancelled) {
         _setDl(target, const _DlState());
-        return;
+        return false;
       }
       if (e.needsAuth) {
         _setDl(target, _DlState(status: _Status.error, errorMsg: e.message));
@@ -335,11 +428,12 @@ class _SetupScreenState extends State<SetupScreen> {
           setState(() => _showTokenField = true);
         }
         _showSnack(e.message, isError: true);
-        return;
+        return false;
       }
       _setDl(target, _DlState(status: _Status.error, errorMsg: e.message));
+      return false;
     } catch (e, st) {
-      if (!mounted) return;
+      if (!mounted) return false;
       CrashLogService.instance.recordCaught(
         e,
         st,
@@ -351,12 +445,19 @@ class _SetupScreenState extends State<SetupScreen> {
           status: _Status.error,
           errorMsg: friendlyErrorText(
             e,
-            fallbackTitle: '모델을 설치하지 못했습니다',
-            fallbackMessage: '다운로드 또는 파일 저장 중 문제가 발생했습니다.',
-            nextStep: '네트워크, 저장 공간, 모델 폴더 권한을 확인한 뒤 다시 시도해주세요.',
+            fallbackTitle: tr('모델을 설치하지 못했습니다', 'Could not install the model'),
+            fallbackMessage: tr(
+              '다운로드 또는 파일 저장 중 문제가 발생했습니다.',
+              'A problem occurred while downloading or saving the file.',
+            ),
+            nextStep: tr(
+              '네트워크, 저장 공간, 모델 폴더 권한을 확인한 뒤 다시 시도해주세요.',
+              'Check your network, disk space, and folder permissions, then try again.',
+            ),
           ),
         ),
       );
+      return false;
     }
   }
 
@@ -402,53 +503,49 @@ class _SetupScreenState extends State<SetupScreen> {
     });
   }
 
-  // ── 확인 완료 ────────────────────────────────────────────────────
+  // ── 확인 완료 (앱 시작 버튼) ─────────────────────────────────────
   Future<void> _confirmCheck() async {
     if (_starting) return;
     setState(() {
       _starting = true;
-      _startButtonPressed = false;
       _startError = null;
     });
 
     try {
       await _check().timeout(
         const Duration(seconds: 8),
-        onTimeout: () => throw TimeoutException('모델 파일 확인 시간이 초과되었습니다.'),
+        onTimeout: () =>
+            throw TimeoutException(tr('모델 파일 확인 시간이 초과되었습니다.', 'Model check timed out.')),
       );
 
-      // STT/LLM 각각 최소 하나 이상 설치 필요
-      final anyStt = _sttFastOk || _sttAccurateOk;
-      final anyLlm = _llmGemmaOk || _llmQwenOk;
-      if (anyStt && anyLlm) {
+      if (_hasRequiredModels) {
         await _completeSetup();
         return;
       }
 
-      // 버튼이 활성화될 땐 이 경로에 도달하지 않지만, 안전장치로 남겨둠.
-      // 친화적인 안내 메시지로 노출.
       final missing = <String>[
-        if (!anyStt) '음성 인식 모델',
-        if (!anyLlm) '요약 모델',
-      ].join('과 ');
-      final message = '$missing을(를) 받아야 시작할 수 있습니다. 위 카드의 \'설치\' 버튼을 눌러주세요.';
+        if (!_anyStt) tr('음성 인식 모델', 'a speech recognition model'),
+        if (!_anyLlm) tr('요약 모델', 'a summary model'),
+      ].join(tr('과(와) ', ' and '));
+      final message = tr(
+        "$missing을(를) 받아야 시작할 수 있습니다. '필수 모델 받고 시작' 버튼을 눌러주세요.",
+        "You still need $missing. Tap 'Get required models & start'.",
+      );
       if (!mounted) return;
       setState(() => _startError = message);
     } catch (e, st) {
-      CrashLogService.instance.recordCaught(
-        e,
-        st,
-        context: 'setupConfirmCheck',
-      );
+      CrashLogService.instance.recordCaught(e, st, context: 'setupConfirmCheck');
       final message = friendlyErrorText(
         e,
-        fallbackTitle: '앱을 시작하지 못했습니다',
-        fallbackMessage: '모델 확인 중 문제가 발생했습니다.',
-        nextStep: '다시 확인을 누르거나 앱을 재실행한 뒤 한 번 더 시도해주세요.',
+        fallbackTitle: tr('앱을 시작하지 못했습니다', 'Could not start the app'),
+        fallbackMessage: tr('모델 확인 중 문제가 발생했습니다.', 'A problem occurred while checking models.'),
+        nextStep: tr(
+          '다시 확인을 누르거나 앱을 재실행한 뒤 한 번 더 시도해주세요.',
+          'Tap re-check or restart the app and try again.',
+        ),
       );
       if (!mounted) return;
       setState(() => _startError = message);
-      _showSnack(message, isError: true);
     } finally {
       if (mounted) {
         setState(() => _starting = false);
@@ -465,7 +562,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
   Future<void> _copyPath() async {
     await Clipboard.setData(ClipboardData(text: _modelsDir));
-    _showSnack('경로가 클립보드에 복사되었습니다.');
+    _showSnack(tr('경로가 클립보드에 복사되었습니다.', 'Path copied to clipboard.'));
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -483,11 +580,7 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final anyStt = _sttFastOk || _sttAccurateOk;
-    final anyLlm = _llmGemmaOk || _llmQwenOk;
-    final allOk = anyStt && anyLlm;
-    final anyDownloading = _anyDownloading;
-    final requiredCount = (anyStt ? 1 : 0) + (anyLlm ? 1 : 0);
+    final allOk = _hasRequiredModels;
 
     return MacosWindow(
       disableWallpaperTinting: true,
@@ -498,7 +591,7 @@ class _SetupScreenState extends State<SetupScreen> {
               backgroundColor: Colors.transparent,
               body: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 680),
+                  constraints: const BoxConstraints(maxWidth: 640),
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 36,
@@ -507,435 +600,15 @@ class _SetupScreenState extends State<SetupScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── 타이틀 ────────────────────────────────────────
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: scheme.primary.withValues(alpha: 0.10),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: scheme.primary.withValues(alpha: 0.18),
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.edit_note,
-                                size: 24,
-                                color: scheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Local Minutes',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '로컬 회의록을 위한 모델 준비',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-
-                        // ── 진척도 배너 ───────────────────────────────────
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: allOk
-                                ? Colors.green.withValues(alpha: 0.08)
-                                : scheme.primary.withValues(alpha: 0.07),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: allOk
-                                  ? Colors.green.shade300.withValues(alpha: 0.6)
-                                  : scheme.primary.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                allOk
-                                    ? Icons.check_circle
-                                    : Icons.info_outline_rounded,
-                                size: 18,
-                                color: allOk
-                                    ? Colors.green.shade700
-                                    : scheme.primary,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      allOk
-                                          ? '필수 모델 준비 완료 (2/2)'
-                                          : '필수 모델 $requiredCount/2 설치됨',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: allOk
-                                            ? Colors.green.shade800
-                                            : scheme.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      allOk
-                                          ? '아래 \'앱 시작\' 버튼으로 진입할 수 있습니다.'
-                                          : '음성 인식 모델 1개와 요약 모델 1개를 모두 받아야 앱을 시작할 수 있습니다.',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        height: 1.4,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-
-                        _SetupSection(
-                          title: '필수 모델',
-                          subtitle: '음성 인식 1개와 요약 모델 1개가 있으면 시작할 수 있습니다.',
-                          children: [
-                            _ModelDownloadCard(
-                              label: '빠른 음성 인식',
-                              filename: AppConstants.sttModelFileFast,
-                              size: '~900 MB',
-                              isOk: _sttFastOk,
-                              dlState: _sttFastDl,
-                              urlCtrl: _sttFastUrlCtrl,
-                              showUrl: _showSttFastUrl,
-                              onToggleUrl: () => setState(
-                                () => _showSttFastUrl = !_showSttFastUrl,
-                              ),
-                              onInstall: () =>
-                                  _startDownload(target: _Target.sttFast),
-                              onCancel: () =>
-                                  _cancelDownload(target: _Target.sttFast),
-                              installDisabled: anyDownloading,
-                            ),
-                            const SizedBox(height: 10),
-                            _ModelDownloadCard(
-                              label: '기본 요약',
-                              filename: AppConstants.llmModelFileGemma4E2B,
-                              size: '~3 GB',
-                              tooltip:
-                                  '크기: 약 3GB\n'
-                                  '속도: 매우 빠름\n'
-                                  '짧은 회의·메모 요약에 적합',
-                              isOk: _llmGemmaOk,
-                              dlState: _llmGemmaDl,
-                              urlCtrl: _llmGemmaUrlCtrl,
-                              showUrl: _showLlmGemmaUrl,
-                              onToggleUrl: () => setState(
-                                () => _showLlmGemmaUrl = !_showLlmGemmaUrl,
-                              ),
-                              onInstall: () =>
-                                  _startDownload(target: _Target.llmGemma),
-                              onCancel: () =>
-                                  _cancelDownload(target: _Target.llmGemma),
-                              installDisabled: anyDownloading,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 22),
-
-                        _SetupSection(
-                          title: '선택 모델',
-                          subtitle: '정확도, 속도, 발화자 라벨이 필요할 때 추가합니다.',
-                          children: [
-                            _ModelDownloadCard(
-                              label: '정확도 높은 음성 인식',
-                              filename: AppConstants.sttModelFileAccurate,
-                              size: '~1.1 GB',
-                              isOk: _sttAccurateOk,
-                              dlState: _sttAccurateDl,
-                              urlCtrl: _sttAccurateUrlCtrl,
-                              showUrl: _showSttAccurateUrl,
-                              onToggleUrl: () => setState(
-                                () =>
-                                    _showSttAccurateUrl = !_showSttAccurateUrl,
-                              ),
-                              onInstall: () =>
-                                  _startDownload(target: _Target.sttAccurate),
-                              onCancel: () =>
-                                  _cancelDownload(target: _Target.sttAccurate),
-                              installDisabled: anyDownloading,
-                            ),
-                            const SizedBox(height: 10),
-                            _ModelDownloadCard(
-                              label: '빠른 음성 인식 가속팩',
-                              filename: AppConstants.sttCoreMlEncoderFileFast,
-                              size: '~1.2 GB',
-                              tooltip:
-                                  'Apple Silicon에서 긴 녹음 전사를 더 빠르게 처리합니다. 없어도 앱은 기존 방식으로 동작합니다.',
-                              isOk: _sttFastCoreMlOk,
-                              dlState: _sttFastCoreMlDl,
-                              urlCtrl: _sttFastCoreMlUrlCtrl,
-                              showUrl: _showSttFastCoreMlUrl,
-                              onToggleUrl: () => setState(
-                                () => _showSttFastCoreMlUrl =
-                                    !_showSttFastCoreMlUrl,
-                              ),
-                              onInstall: () =>
-                                  _startDownload(target: _Target.sttFastCoreMl),
-                              onCancel: () => _cancelDownload(
-                                target: _Target.sttFastCoreMl,
-                              ),
-                              installDisabled: anyDownloading,
-                            ),
-                            const SizedBox(height: 10),
-                            _ModelDownloadCard(
-                              label: '고품질 요약',
-                              filename: AppConstants.llmModelFileQwen25_7B,
-                              size: '~4.7 GB',
-                              tooltip:
-                                  '크기: 약 4.7GB\n'
-                                  '속도: 보통\n'
-                                  '액션아이템/결정사항 구조화에 적합',
-                              isOk: _llmQwenOk,
-                              dlState: _llmQwenDl,
-                              urlCtrl: _llmQwenUrlCtrl,
-                              showUrl: _showLlmQwenUrl,
-                              onToggleUrl: () => setState(
-                                () => _showLlmQwenUrl = !_showLlmQwenUrl,
-                              ),
-                              onInstall: () =>
-                                  _startDownload(target: _Target.llmQwen),
-                              onCancel: () =>
-                                  _cancelDownload(target: _Target.llmQwen),
-                              installDisabled: anyDownloading,
-                            ),
-                            const SizedBox(height: 10),
-                            _ModelDownloadCard(
-                              label: '발화자 라벨 · 세그멘테이션',
-                              filename: AppConstants.diarSegModelFile,
-                              size: '~6 MB',
-                              tooltip:
-                                  'pyannote-segmentation-3.0 (ONNX)\n'
-                                  '음성 활동/발화 경계 검출',
-                              isOk: _diarSegOk,
-                              dlState: _diarSegDl,
-                              urlCtrl: _diarSegUrlCtrl,
-                              showUrl: _showDiarSegUrl,
-                              onToggleUrl: () => setState(
-                                () => _showDiarSegUrl = !_showDiarSegUrl,
-                              ),
-                              onInstall: () =>
-                                  _startDownload(target: _Target.diarSeg),
-                              onCancel: () =>
-                                  _cancelDownload(target: _Target.diarSeg),
-                              installDisabled: anyDownloading,
-                            ),
-                            const SizedBox(height: 10),
-                            _ModelDownloadCard(
-                              label: '발화자 라벨 · 스피커 임베딩',
-                              filename: AppConstants.diarEmbModelFile,
-                              size: '~26 MB',
-                              tooltip:
-                                  '3D-Speaker eres2net base (ONNX)\n'
-                                  '화자별 벡터 임베딩 추출 → 클러스터링',
-                              isOk: _diarEmbOk,
-                              dlState: _diarEmbDl,
-                              urlCtrl: _diarEmbUrlCtrl,
-                              showUrl: _showDiarEmbUrl,
-                              onToggleUrl: () => setState(
-                                () => _showDiarEmbUrl = !_showDiarEmbUrl,
-                              ),
-                              onInstall: () =>
-                                  _startDownload(target: _Target.diarEmb),
-                              onCancel: () =>
-                                  _cancelDownload(target: _Target.diarEmb),
-                              installDisabled: anyDownloading,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        if (!AppBuildConfig.appStoreComplianceMode) ...[
-                          // ── HuggingFace 토큰 ──────────────────────────────
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 200),
-                            child: _showTokenField
-                                ? _buildTokenField(scheme)
-                                : const SizedBox.shrink(),
-                          ),
-                          if (!_showTokenField)
-                            TextButton.icon(
-                              onPressed: () => setState(
-                                () => _showTokenField = !_showTokenField,
-                              ),
-                              icon: const Icon(Icons.key, size: 16),
-                              label: const Text('HuggingFace 토큰 입력'),
-                            ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // ── 설치 경로 ─────────────────────────────────────
-                        Text(
-                          '설치 경로',
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: scheme.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: scheme.outlineVariant),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _modelsDir.isEmpty
-                                      ? '경로 확인 중...'
-                                      : _modelsDir,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontFamily: 'monospace',
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.copy, size: 16),
-                                tooltip: '경로 복사',
-                                onPressed: _modelsDir.isEmpty
-                                    ? null
-                                    : _copyPath,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
+                        _buildHeader(context, scheme),
+                        const SizedBox(height: 24),
+                        _buildHeroCard(context, scheme, allOk),
                         if (_startError != null) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: scheme.errorContainer,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: scheme.error.withValues(alpha: 0.25),
-                              ),
-                            ),
-                            child: Text(
-                              _startError!,
-                              style: TextStyle(
-                                color: scheme.onErrorContainer,
-                                fontSize: 12,
-                                height: 1.35,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
+                          _buildErrorBox(scheme),
                         ],
-
-                        // ── 액션 버튼 ─────────────────────────────────────
-                        Row(
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: _modelsDir.isEmpty
-                                  ? null
-                                  : _openFolder,
-                              icon: const Icon(Icons.folder_open, size: 18),
-                              label: const Text('폴더 열기'),
-                            ),
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              onPressed: _checking || anyDownloading
-                                  ? null
-                                  : () => unawaited(_check(autoComplete: true)),
-                              icon: _checking
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.refresh, size: 18),
-                              label: const Text('다시 확인'),
-                            ),
-                            const Spacer(),
-                            _MacPrimaryActionButton(
-                              label: _starting ? '시작 중...' : '앱 시작',
-                              enabled:
-                                  !_checking &&
-                                  !_starting &&
-                                  !anyDownloading &&
-                                  allOk,
-                              pressed: _startButtonPressed,
-                              onPressedChanged: (value) {
-                                if (!mounted) return;
-                                setState(() => _startButtonPressed = value);
-                              },
-                              onTap: () {
-                                unawaited(_confirmCheck());
-                              },
-                            ),
-                          ],
-                        ),
-                        if (allOk) ...[
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed:
-                                  _checking || _starting || anyDownloading
-                                  ? null
-                                  : () => unawaited(_confirmCheck()),
-                              child: Text(
-                                '버튼이 반응하지 않으면 여기를 눌러 시작',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: scheme.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        const SizedBox(height: 20),
+                        _buildAdvancedSection(context, scheme),
                       ],
                     ),
                   ),
@@ -945,6 +618,509 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, ColorScheme scheme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: scheme.primary.withValues(alpha: 0.18)),
+          ),
+          child: Icon(Icons.edit_note, size: 24, color: scheme.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Local Minutes',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                tr('회의록을 위한 AI 모델 준비', 'Set up the on-device AI models'),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 중심 카드 — 필수 모델 상태 + 단일 기본 동작(받고 시작 / 앱 시작).
+  Widget _buildHeroCard(
+    BuildContext context,
+    ColorScheme scheme,
+    bool allOk,
+  ) {
+    final bulkDl = _bulkCurrentDl;
+    final bulkLabel = _bulkSteps.isEmpty || _bulkStepIndex >= _bulkSteps.length
+        ? ''
+        : _targetDisplayName(_bulkSteps[_bulkStepIndex]);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: allOk
+            ? Colors.green.withValues(alpha: 0.06)
+            : scheme.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: allOk
+              ? Colors.green.shade300.withValues(alpha: 0.6)
+              : scheme.primary.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            tr('필수 모델', 'Required models'),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            tr(
+              '회의를 받아쓰는 음성 인식 모델 1개와, 요약을 만드는 요약 모델 1개가 모두 필요합니다.',
+              'You need both: one speech recognition model (to transcribe) and one summary model (to summarize).',
+            ),
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.4,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 두 필수 항목 상태
+          _RequiredRow(
+            label: tr('음성 인식 (받아쓰기)', 'Speech recognition'),
+            ok: _anyStt,
+            scheme: scheme,
+          ),
+          const SizedBox(height: 8),
+          _RequiredRow(
+            label: tr('요약 (회의록 생성)', 'Summary'),
+            ok: _anyLlm,
+            scheme: scheme,
+          ),
+          const SizedBox(height: 18),
+
+          // 진행 상태 / 기본 버튼
+          if (_bulkActive) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    tr(
+                      '($bulkLabel) 다운로드 중... (${_bulkStepIndex + 1}/${_bulkSteps.length})',
+                      'Downloading $bulkLabel... (${_bulkStepIndex + 1}/${_bulkSteps.length})',
+                    ),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (bulkDl.speedStr.isNotEmpty)
+                  Text(
+                    bulkDl.speedStr,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: bulkDl.progress < 0 ? null : bulkDl.progress,
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Text(
+                  '${bulkDl.receivedStr} / ${bulkDl.totalStr}',
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _cancelBulk,
+                  child: Text(tr('취소', 'Cancel')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              tr(
+                '큰 파일이라 시간이 걸릴 수 있습니다. 완료되면 자동으로 시작됩니다.',
+                'These are large files and may take a while. The app starts automatically when done.',
+              ),
+              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+            ),
+          ] else ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: (_checking || _starting || _anyDownloading)
+                    ? null
+                    : (allOk
+                          ? () => unawaited(_confirmCheck())
+                          : () => unawaited(_downloadAllRequired())),
+                icon: Icon(
+                  allOk ? Icons.play_arrow_rounded : Icons.download_rounded,
+                  size: 20,
+                ),
+                label: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    _starting
+                        ? tr('시작 중...', 'Starting...')
+                        : allOk
+                        ? tr('앱 시작', 'Start app')
+                        : tr(
+                            '필수 모델 받고 시작 (약 3.9GB)',
+                            'Get required models & start (~3.9 GB)',
+                          ),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (!allOk) ...[
+              const SizedBox(height: 8),
+              Text(
+                tr(
+                  '버튼 하나로 음성 인식·요약 모델을 모두 받습니다. 인터넷 연결이 필요합니다.',
+                  'One tap downloads both the speech and summary models. An internet connection is required.',
+                ),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.4,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBox(ColorScheme scheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: scheme.error.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        _startError!,
+        style: TextStyle(
+          color: scheme.onErrorContainer,
+          fontSize: 12,
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+
+  /// 고급: 개별 모델 선택 (접힘 기본). 정확도/속도/발화자 라벨 모델 등.
+  Widget _buildAdvancedSection(BuildContext context, ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Icon(
+                  _showAdvanced
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 18,
+                  color: Colors.grey.shade600,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  tr('고급: 개별 모델 선택', 'Advanced: choose models individually'),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showAdvanced) ...[
+          const SizedBox(height: 8),
+          _buildModelCards(context, scheme),
+          const SizedBox(height: 16),
+          _buildInstallPath(context, scheme),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: _modelsDir.isEmpty ? null : _openFolder,
+                icon: const Icon(Icons.folder_open, size: 18),
+                label: Text(tr('폴더 열기', 'Open folder')),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _checking || _anyDownloading || _bulkActive
+                    ? null
+                    : () => unawaited(_check(autoComplete: true)),
+                icon: _checking
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, size: 18),
+                label: Text(tr('다시 확인', 'Re-check')),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildModelCards(BuildContext context, ColorScheme scheme) {
+    final anyDownloading = _anyDownloading || _bulkActive;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ModelDownloadCard(
+          label: tr('빠른 음성 인식', 'Fast speech recognition'),
+          filename: AppConstants.sttModelFileFast,
+          size: '~900 MB',
+          isOk: _sttFastOk,
+          dlState: _sttFastDl,
+          urlCtrl: _sttFastUrlCtrl,
+          showUrl: _showSttFastUrl,
+          onToggleUrl: () => setState(() => _showSttFastUrl = !_showSttFastUrl),
+          onInstall: () => unawaited(_startDownload(target: _Target.sttFast)),
+          onCancel: () => _cancelDownload(target: _Target.sttFast),
+          installDisabled: anyDownloading,
+        ),
+        const SizedBox(height: 10),
+        _ModelDownloadCard(
+          label: tr('기본 요약', 'Default summary'),
+          filename: AppConstants.llmModelFileGemma4E2B,
+          size: '~3 GB',
+          tooltip: tr(
+            '크기: 약 3GB\n속도: 매우 빠름\n짧은 회의·메모 요약에 적합',
+            'Size: ~3 GB\nSpeed: very fast\nGood for short meetings and notes',
+          ),
+          isOk: _llmGemmaOk,
+          dlState: _llmGemmaDl,
+          urlCtrl: _llmGemmaUrlCtrl,
+          showUrl: _showLlmGemmaUrl,
+          onToggleUrl: () =>
+              setState(() => _showLlmGemmaUrl = !_showLlmGemmaUrl),
+          onInstall: () => unawaited(_startDownload(target: _Target.llmGemma)),
+          onCancel: () => _cancelDownload(target: _Target.llmGemma),
+          installDisabled: anyDownloading,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          tr('선택 모델', 'Optional models'),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          tr(
+            '정확도, 속도, 발화자 라벨이 필요할 때 추가합니다.',
+            'Add these for higher accuracy, speed, or speaker labels.',
+          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 10),
+        _ModelDownloadCard(
+          label: tr('정확도 높은 음성 인식', 'High-accuracy speech recognition'),
+          filename: AppConstants.sttModelFileAccurate,
+          size: '~1.1 GB',
+          isOk: _sttAccurateOk,
+          dlState: _sttAccurateDl,
+          urlCtrl: _sttAccurateUrlCtrl,
+          showUrl: _showSttAccurateUrl,
+          onToggleUrl: () =>
+              setState(() => _showSttAccurateUrl = !_showSttAccurateUrl),
+          onInstall: () =>
+              unawaited(_startDownload(target: _Target.sttAccurate)),
+          onCancel: () => _cancelDownload(target: _Target.sttAccurate),
+          installDisabled: anyDownloading,
+        ),
+        const SizedBox(height: 10),
+        _ModelDownloadCard(
+          label: tr('빠른 음성 인식 가속팩', 'Fast STT acceleration pack'),
+          filename: AppConstants.sttCoreMlEncoderFileFast,
+          size: '~1.2 GB',
+          tooltip: tr(
+            'Apple Silicon에서 긴 녹음 전사를 더 빠르게 처리합니다. 없어도 앱은 기존 방식으로 동작합니다.',
+            'Speeds up long transcriptions on Apple Silicon. The app still works without it.',
+          ),
+          isOk: _sttFastCoreMlOk,
+          dlState: _sttFastCoreMlDl,
+          urlCtrl: _sttFastCoreMlUrlCtrl,
+          showUrl: _showSttFastCoreMlUrl,
+          onToggleUrl: () =>
+              setState(() => _showSttFastCoreMlUrl = !_showSttFastCoreMlUrl),
+          onInstall: () =>
+              unawaited(_startDownload(target: _Target.sttFastCoreMl)),
+          onCancel: () => _cancelDownload(target: _Target.sttFastCoreMl),
+          installDisabled: anyDownloading,
+        ),
+        const SizedBox(height: 10),
+        _ModelDownloadCard(
+          label: tr('고품질 요약', 'High-quality summary'),
+          filename: AppConstants.llmModelFileQwen25_7B,
+          size: '~4.7 GB',
+          tooltip: tr(
+            '크기: 약 4.7GB\n속도: 보통\n액션아이템/결정사항 구조화에 적합',
+            'Size: ~4.7 GB\nSpeed: moderate\nGood for structured action items and decisions',
+          ),
+          isOk: _llmQwenOk,
+          dlState: _llmQwenDl,
+          urlCtrl: _llmQwenUrlCtrl,
+          showUrl: _showLlmQwenUrl,
+          onToggleUrl: () => setState(() => _showLlmQwenUrl = !_showLlmQwenUrl),
+          onInstall: () => unawaited(_startDownload(target: _Target.llmQwen)),
+          onCancel: () => _cancelDownload(target: _Target.llmQwen),
+          installDisabled: anyDownloading,
+        ),
+        const SizedBox(height: 10),
+        _ModelDownloadCard(
+          label: tr('발화자 라벨 · 세그멘테이션', 'Speaker labels · segmentation'),
+          filename: AppConstants.diarSegModelFile,
+          size: '~6 MB',
+          tooltip: tr(
+            'pyannote-segmentation-3.0 (ONNX)\n음성 활동/발화 경계 검출',
+            'pyannote-segmentation-3.0 (ONNX)\nVoice activity / speech boundary detection',
+          ),
+          isOk: _diarSegOk,
+          dlState: _diarSegDl,
+          urlCtrl: _diarSegUrlCtrl,
+          showUrl: _showDiarSegUrl,
+          onToggleUrl: () => setState(() => _showDiarSegUrl = !_showDiarSegUrl),
+          onInstall: () => unawaited(_startDownload(target: _Target.diarSeg)),
+          onCancel: () => _cancelDownload(target: _Target.diarSeg),
+          installDisabled: anyDownloading,
+        ),
+        const SizedBox(height: 10),
+        _ModelDownloadCard(
+          label: tr('발화자 라벨 · 스피커 임베딩', 'Speaker labels · embedding'),
+          filename: AppConstants.diarEmbModelFile,
+          size: '~26 MB',
+          tooltip: tr(
+            '3D-Speaker eres2net base (ONNX)\n화자별 벡터 임베딩 추출 → 클러스터링',
+            '3D-Speaker eres2net base (ONNX)\nPer-speaker embeddings → clustering',
+          ),
+          isOk: _diarEmbOk,
+          dlState: _diarEmbDl,
+          urlCtrl: _diarEmbUrlCtrl,
+          showUrl: _showDiarEmbUrl,
+          onToggleUrl: () => setState(() => _showDiarEmbUrl = !_showDiarEmbUrl),
+          onInstall: () => unawaited(_startDownload(target: _Target.diarEmb)),
+          onCancel: () => _cancelDownload(target: _Target.diarEmb),
+          installDisabled: anyDownloading,
+        ),
+        if (!AppBuildConfig.appStoreComplianceMode) ...[
+          const SizedBox(height: 16),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            child: _showTokenField
+                ? _buildTokenField(scheme)
+                : const SizedBox.shrink(),
+          ),
+          if (!_showTokenField)
+            TextButton.icon(
+              onPressed: () =>
+                  setState(() => _showTokenField = !_showTokenField),
+              icon: const Icon(Icons.key, size: 16),
+              label: Text(tr('HuggingFace 토큰 입력', 'Enter HuggingFace token')),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInstallPath(BuildContext context, ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          tr('설치 경로', 'Install path'),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _modelsDir.isEmpty
+                      ? tr('경로 확인 중...', 'Resolving path...')
+                      : _modelsDir,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, size: 16),
+                tooltip: tr('경로 복사', 'Copy path'),
+                onPressed: _modelsDir.isEmpty ? null : _copyPath,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -965,7 +1141,7 @@ class _SetupScreenState extends State<SetupScreen> {
               Icon(Icons.key, size: 16, color: Colors.amber.shade800),
               const SizedBox(width: 6),
               Text(
-                'HuggingFace 토큰',
+                tr('HuggingFace 토큰', 'HuggingFace token'),
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: Colors.amber.shade900,
@@ -981,8 +1157,12 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '일부 모델 제공 사이트가 권한 확인을 요구할 때만 사용합니다.\n'
-            'huggingface.co → Settings → Access Tokens에서 발급할 수 있습니다.',
+            tr(
+              '일부 모델 제공 사이트가 권한 확인을 요구할 때만 사용합니다.\n'
+                  'huggingface.co → Settings → Access Tokens에서 발급할 수 있습니다.',
+              'Only needed when a model host requires authentication.\n'
+                  'Create one at huggingface.co → Settings → Access Tokens.',
+            ),
             style: TextStyle(
               fontSize: 11,
               color: Colors.amber.shade900,
@@ -1001,7 +1181,7 @@ class _SetupScreenState extends State<SetupScreen> {
               isDense: true,
               suffixIcon: IconButton(
                 icon: const Icon(Icons.open_in_browser, size: 18),
-                tooltip: 'HuggingFace 토큰 발급 페이지',
+                tooltip: tr('HuggingFace 토큰 발급 페이지', 'Open HuggingFace tokens page'),
                 onPressed: () => launchUrl(
                   Uri.parse('https://huggingface.co/settings/tokens'),
                 ),
@@ -1012,116 +1192,56 @@ class _SetupScreenState extends State<SetupScreen> {
       ),
     );
   }
+
+  String _targetDisplayName(_Target t) => switch (t) {
+    _Target.sttFast => tr('음성 인식', 'speech model'),
+    _Target.sttFastCoreMl => tr('가속팩', 'acceleration pack'),
+    _Target.sttAccurate => tr('음성 인식', 'speech model'),
+    _Target.llmGemma => tr('요약', 'summary model'),
+    _Target.llmQwen => tr('요약', 'summary model'),
+    _Target.diarSeg => tr('발화자 라벨', 'speaker labels'),
+    _Target.diarEmb => tr('발화자 라벨', 'speaker labels'),
+  };
 }
 
-class _MacPrimaryActionButton extends StatelessWidget {
+/// 필수 항목 상태 한 줄 (체크/대기).
+class _RequiredRow extends StatelessWidget {
   final String label;
-  final bool enabled;
-  final bool pressed;
-  final ValueChanged<bool> onPressedChanged;
-  final VoidCallback onTap;
+  final bool ok;
+  final ColorScheme scheme;
 
-  const _MacPrimaryActionButton({
+  const _RequiredRow({
     required this.label,
-    required this.enabled,
-    required this.pressed,
-    required this.onPressedChanged,
-    required this.onTap,
+    required this.ok,
+    required this.scheme,
   });
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final background = enabled
-        ? scheme.primary.withValues(alpha: pressed ? 0.82 : 1)
-        : scheme.onSurface.withValues(alpha: 0.12);
-    final foreground = enabled
-        ? scheme.onPrimary
-        : scheme.onSurface.withValues(alpha: 0.38);
-    final border = enabled
-        ? scheme.primary.withValues(alpha: 0.55)
-        : scheme.outlineVariant;
-
-    return MouseRegion(
-      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: enabled ? (_) => onPressedChanged(true) : null,
-        onTapCancel: enabled ? () => onPressedChanged(false) : null,
-        onTapUp: enabled
-            ? (_) {
-                onPressedChanged(false);
-                onTap();
-              }
-            : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 90),
-          width: 132,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(color: border),
-            boxShadow: enabled && !pressed
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      offset: const Offset(0, 1),
-                      blurRadius: 2,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: foreground,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SetupSection extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final List<Widget> children;
-
-  const _SetupSection({
-    required this.title,
-    required this.subtitle,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-          ),
+        Icon(
+          ok ? Icons.check_circle : Icons.radio_button_unchecked,
+          size: 18,
+          color: ok ? Colors.green.shade600 : Colors.grey.shade400,
         ),
-        const SizedBox(height: 3),
+        const SizedBox(width: 8),
         Text(
-          subtitle,
+          label,
           style: TextStyle(
-            fontSize: 12,
-            height: 1.35,
-            color: Colors.grey.shade600,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: ok ? Colors.green.shade800 : scheme.onSurface,
           ),
         ),
-        const SizedBox(height: 10),
-        ...children,
+        const SizedBox(width: 6),
+        Text(
+          ok ? tr('설치됨', 'installed') : tr('필요', 'required'),
+          style: TextStyle(
+            fontSize: 11.5,
+            color: ok ? Colors.green.shade600 : Colors.grey.shade500,
+          ),
+        ),
       ],
     );
   }
@@ -1234,7 +1354,6 @@ class _ModelDownloadCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 상단: 상태 아이콘 + 이름 + 설치 버튼 ──────────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1289,7 +1408,6 @@ class _ModelDownloadCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // 버튼
               if (isOk)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1301,7 +1419,7 @@ class _ModelDownloadCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '설치됨',
+                    tr('설치됨', 'Installed'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1313,7 +1431,7 @@ class _ModelDownloadCard extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: onCancel,
                   icon: const Icon(Icons.stop, size: 16),
-                  label: const Text('취소'),
+                  label: Text(tr('취소', 'Cancel')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red.shade600,
                     side: BorderSide(color: Colors.red.shade300),
@@ -1328,7 +1446,9 @@ class _ModelDownloadCard extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: installDisabled ? null : onInstall,
                   icon: const Icon(Icons.download, size: 16),
-                  label: Text(hasError ? '재시도' : '설치'),
+                  label: Text(
+                    hasError ? tr('재시도', 'Retry') : tr('설치', 'Install'),
+                  ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -1339,8 +1459,6 @@ class _ModelDownloadCard extends StatelessWidget {
                 ),
             ],
           ),
-
-          // ── 다운로드 진행바 ────────────────────────────────────
           if (isDownloading) ...[
             const SizedBox(height: 10),
             ClipRRect(
@@ -1370,8 +1488,6 @@ class _ModelDownloadCard extends StatelessWidget {
               ],
             ),
           ],
-
-          // ── 오류 메시지 ────────────────────────────────────────
           if (hasError) ...[
             const SizedBox(height: 8),
             Text(
@@ -1383,8 +1499,6 @@ class _ModelDownloadCard extends StatelessWidget {
               ),
             ),
           ],
-
-          // ── URL 편집 토글 + 입력 필드 ─────────────────────────
           if (!isDownloading && allowUrlEditing) ...[
             const SizedBox(height: 6),
             GestureDetector(
@@ -1398,7 +1512,9 @@ class _ModelDownloadCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    showUrl ? 'URL 닫기' : '다운로드 URL 변경',
+                    showUrl
+                        ? tr('URL 닫기', 'Close URL')
+                        : tr('다운로드 URL 변경', 'Change download URL'),
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                   ),
                 ],

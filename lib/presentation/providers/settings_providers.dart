@@ -16,3 +16,12 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) {
       return ThemeMode.system;
   }
 });
+
+/// 표시 언어 Provider.
+///
+/// 설정 화면에서 setLanguageCode() 호출 후
+/// ref.read(languageProvider.notifier).state = ... 로 즉시 반영.
+/// 값은 AppSettings.effectiveLanguageCode ('ko' | 'en')를 따른다.
+final languageProvider = StateProvider<String>(
+  (ref) => AppSettings.instance.effectiveLanguageCode,
+);

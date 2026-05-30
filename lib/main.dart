@@ -22,6 +22,7 @@ import 'data/datasources/microphone_service.dart';
 import 'presentation/providers/meeting_providers.dart';
 import 'presentation/providers/settings_providers.dart';
 import 'presentation/screens/home_screen.dart';
+import 'presentation/screens/language_setup_screen.dart';
 import 'presentation/screens/setup_screen.dart';
 import 'presentation/screens/storage_setup_screen.dart';
 
@@ -119,6 +120,7 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
     with WindowListener {
   late bool _showHome;
   late bool _storageReady;
+  late bool _languageChosen;
   AppLifecycleListener? _lifecycleListener;
   StreamSubscription<NativeModelTaskSnapshot>? _nativeTaskSub;
   final _navigatorKey = GlobalKey<NavigatorState>();
@@ -130,6 +132,7 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
     super.initState();
     _showHome = widget.modelsOk || AppSettings.instance.modelsSetupComplete;
     _storageReady = widget.storageReady;
+    _languageChosen = AppSettings.instance.languageChosen;
 
     // 앱 종료 직전 모델 정리 — ggml/Metal destructor abort 방지
     // (백그라운드 Metal init 중에 process exit하면 ggml_abort 발생)
@@ -395,10 +398,65 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
     super.dispose();
   }
 
+  /// 언어 선택 화면 (첫 실행 + 온보딩에서 '이전'으로 되돌아올 때 재사용).
+  Widget _buildLanguageScreen() {
+    return LanguageSetupScreen(
+      onSelected: (code) {
+        ref.read(languageProvider.notifier).state =
+            AppSettings.instance.effectiveLanguageCode;
+        setState(() => _languageChosen = true);
+      },
+      nextScreen: _nextAfterLanguage(),
+    );
+  }
+
+  /// 저장 폴더 설정(온보딩) 화면. 첫 단계에서 '이전'을 누르면 언어 선택으로
+  /// 되돌아간다. home: 스왑과 pushReplacement 양쪽에서 동일하게 쓰이도록 헬퍼로 둔다.
+  Widget _buildStorageScreen() {
+    return StorageSetupScreen(
+      onComplete: (path) {
+        setState(() => _storageReady = true);
+        unawaited(_syncTrayStartState());
+      },
+      onBack: () {
+        setState(() => _languageChosen = false);
+        _navigatorKey.currentState?.pushReplacement(
+          PageRouteBuilder<void>(
+            pageBuilder: (_, _, _) =>
+                _GlobalShortcuts(ref: ref, child: _buildLanguageScreen()),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSetupScreen() {
+    return SetupScreen(
+      onComplete: () async {
+        await AppSettings.instance.setModelsSetupComplete(true);
+        if (!mounted) return;
+        setState(() => _showHome = true);
+        unawaited(_syncTrayStartState());
+      },
+    );
+  }
+
+  /// 언어 선택 후 전환할 다음 화면. 보통 첫 실행이라 저장 폴더 설정으로 가지만,
+  /// 이미 준비된 상태라면 그 다음 단계로 바로 넘어간다.
+  Widget _nextAfterLanguage() {
+    if (!_storageReady) return _buildStorageScreen();
+    if (!_showHome) return _buildSetupScreen();
+    return const HomeScreen();
+  }
+
   @override
   Widget build(BuildContext context) {
     // themeModeProvider를 watch → 설정 화면에서 즉시 반영
     final themeMode = ref.watch(themeModeProvider);
+    // languageProvider를 watch → 설정에서 언어 변경 시 앱 전체 다시 렌더.
+    ref.watch(languageProvider);
     // themeMode 변경을 native 측에 전파해 NSAppearance/traffic light 도 동기화.
     ref.listen<ThemeMode>(themeModeProvider, (_, next) {
       NativeAppearance.setMode(next);
@@ -464,23 +522,13 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
       // 화면 간 전환은 root MacosWindow 가 새로 만들어지지만 macos_ui 가 traffic light/chrome 을 일관되게 처리.
       home: _GlobalShortcuts(
         ref: ref,
-        child: !_storageReady
-            ? StorageSetupScreen(
-                onComplete: (path) {
-                  setState(() => _storageReady = true);
-                  unawaited(_syncTrayStartState());
-                },
-              )
+        child: !_languageChosen
+            ? _buildLanguageScreen()
+            : !_storageReady
+            ? _buildStorageScreen()
             : _showHome
             ? const HomeScreen()
-            : SetupScreen(
-                onComplete: () async {
-                  await AppSettings.instance.setModelsSetupComplete(true);
-                  if (!mounted) return;
-                  setState(() => _showHome = true);
-                  unawaited(_syncTrayStartState());
-                },
-              ),
+            : _buildSetupScreen(),
       ),
     );
   }

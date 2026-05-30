@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/digest_report.dart';
 import '../../core/services/meeting_keyword_search.dart';
@@ -57,7 +58,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       acceptedTypeGroups: const [
         XTypeGroup(label: 'WAV', extensions: ['wav']),
       ],
-      confirmButtonText: '불러오기',
+      confirmButtonText: tr('불러오기', 'Import'),
     );
     if (picked == null) return;
 
@@ -66,7 +67,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('파일을 읽을 수 없습니다.')));
+        ).showSnackBar(SnackBar(content: Text(tr('파일을 읽을 수 없습니다.', 'Cannot read the file.'))));
       }
       return;
     }
@@ -83,12 +84,15 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     final createdAt = stat.modified;
 
     final meeting = Meeting()
-      ..title = '[불러옴] $title'
+      ..title = tr('[불러옴] $title', '[Imported] $title')
       ..createdAt = createdAt
       ..endedAt = createdAt
       ..status = MeetingStatus.done
       ..audioFilePath = picked.path
-      ..transcriptPreview = '(전사본 없음 — 상세 화면에서 "다시 전사" 실행)';
+      ..transcriptPreview = tr(
+        '(전사본 없음 — 상세 화면에서 "다시 전사" 실행)',
+        '(No transcript — run "Re-transcribe" in the detail view)',
+      );
 
     final db = IsarService.instance.db;
     final meetingId = await MeetingRepositoryImpl(db).saveMeeting(meeting);
@@ -98,7 +102,10 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     ref.read(selectedMeetingIdProvider.notifier).state = meetingId;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('WAV 불러옴 — 상세 화면에서 "다시 전사"를 눌러 전사하세요.'),
+        content: Text(tr(
+          'WAV 불러옴 — 상세 화면에서 "다시 전사"를 눌러 전사하세요.',
+          'WAV imported — tap "Re-transcribe" in the detail view to transcribe.',
+        )),
         backgroundColor: Colors.green.shade700,
         duration: const Duration(seconds: 4),
       ),
@@ -116,8 +123,8 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     if (ref.read(isRecordingActiveProvider)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('녹음 중에는 AI 검색을 사용할 수 없습니다.'),
+          SnackBar(
+            content: Text(tr('녹음 중에는 AI 검색을 사용할 수 없습니다.', 'AI search is unavailable while recording.')),
             backgroundColor: Colors.orange,
           ),
         );
@@ -126,7 +133,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     }
 
     ref.read(isAiSearchingProvider.notifier).state = true;
-    ref.read(aiSearchStatusProvider.notifier).state = 'AI 모델 로드 중...';
+    ref.read(aiSearchStatusProvider.notifier).state = tr('AI 모델 로드 중...', 'Loading AI model...');
     ref.read(aiSearchResultsProvider.notifier).state = null;
 
     try {
@@ -141,7 +148,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       );
 
       if (mounted) {
-        ref.read(aiSearchStatusProvider.notifier).state = '검색 중...';
+        ref.read(aiSearchStatusProvider.notifier).state = tr('검색 중...', 'Searching...');
       }
 
       // ── 회의 목록 컨텍스트 구성 ────────────────────────────────
@@ -210,7 +217,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('AI 검색 오류: $e'),
+            content: Text(tr('AI 검색 오류: $e', 'AI search error: $e')),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -344,7 +351,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     if (suggestions.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('아직 자동으로 묶을 정기 회의 후보가 없습니다.')),
+        SnackBar(content: Text(tr('아직 자동으로 묶을 정기 회의 후보가 없습니다.', 'No recurring meeting candidates to group yet.'))),
       );
       return;
     }
@@ -354,7 +361,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('정기 회의 시리즈 추천'),
+          title: Text(tr('정기 회의 시리즈 추천', 'Recurring series suggestions')),
           content: SizedBox(
             width: 520,
             child: SingleChildScrollView(
@@ -382,14 +389,14 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소'),
+              child: Text(tr('취소', 'Cancel')),
             ),
             FilledButton.icon(
               onPressed: selected.isEmpty
                   ? null
                   : () => Navigator.pop(ctx, true),
               icon: const Icon(Icons.folder_special_outlined, size: 16),
-              label: Text('${selected.length}개 적용'),
+              label: Text(tr('${selected.length}개 적용', 'Apply ${selected.length}')),
             ),
           ],
         ),
@@ -428,7 +435,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     ref.invalidate(meetingsProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('정기 회의 시리즈 ${suggestions.length}개를 만들었습니다.'),
+        content: Text(tr('정기 회의 시리즈 ${suggestions.length}개를 만들었습니다.', 'Created ${suggestions.length} recurring series.')),
         backgroundColor: Colors.green.shade700,
       ),
     );
@@ -513,7 +520,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                         ),
                       ),
                       Text(
-                        '내 기기의 로컬 회의록',
+                        tr('내 기기의 로컬 회의록', 'On-device meeting minutes'),
                         style: TextStyle(
                           fontSize: 9,
                           color: Theme.of(
@@ -526,7 +533,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 16),
-                  tooltip: '새로고침',
+                  tooltip: tr('새로고침', 'Refresh'),
                   onPressed: () {
                     ref.invalidate(meetingsProvider);
                     ref.invalidate(groupsProvider);
@@ -536,25 +543,25 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.menu_book_outlined, size: 16),
-                  tooltip: '단어집',
+                  tooltip: tr('단어집', 'Glossary'),
                   onPressed: () => showGlossaryDialog(context),
                   visualDensity: VisualDensity.compact,
                 ),
                 IconButton(
                   icon: const Icon(Icons.checklist_outlined, size: 16),
-                  tooltip: '전체 할 일',
+                  tooltip: tr('전체 할 일', 'All action items'),
                   onPressed: () => showActionItemsDialog(context),
                   visualDensity: VisualDensity.compact,
                 ),
                 IconButton(
                   icon: const Icon(Icons.bar_chart_outlined, size: 16),
-                  tooltip: '통계',
+                  tooltip: tr('통계', 'Statistics'),
                   onPressed: () => showStatsDialog(context),
                   visualDensity: VisualDensity.compact,
                 ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined, size: 16),
-                  tooltip: '설정',
+                  tooltip: tr('설정', 'Settings'),
                   onPressed: () => showSettingsDialog(context, ref),
                   visualDensity: VisualDensity.compact,
                 ),
@@ -595,7 +602,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '녹음 진행 중',
+                            tr('녹음 진행 중', 'Recording in progress'),
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -603,7 +610,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                             ),
                           ),
                           Text(
-                            '탭하면 녹음 화면으로 돌아갑니다',
+                            tr('탭하면 녹음 화면으로 돌아갑니다', 'Tap to return to the recording screen'),
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.red.shade400,
@@ -638,7 +645,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                                 null;
                           },
                     icon: const Icon(Icons.fiber_manual_record, size: 16),
-                    label: const Text('새 녹음'),
+                    label: Text(tr('새 녹음', 'New recording')),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red.shade600,
                       shape: RoundedRectangleBorder(
@@ -650,7 +657,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                 ),
                 const SizedBox(width: 6),
                 Tooltip(
-                  message: '기존 WAV 파일을 불러와 새 회의로 추가',
+                  message: tr('기존 WAV 파일을 불러와 새 회의로 추가', 'Import an existing WAV file as a new meeting'),
                   child: IconButton.outlined(
                     onPressed: isRecording ? null : _importWavFile,
                     icon: const Icon(Icons.file_upload_outlined, size: 16),
@@ -672,7 +679,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                   children: [
                     Expanded(
                       child: _ModeChip(
-                        label: '단어',
+                        label: tr('단어', 'Words'),
                         icon: Icons.abc,
                         selected: !isAiMode,
                         onTap: () {
@@ -704,21 +711,21 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                 Row(
                   children: [
                     _DateChip(
-                      label: '전체',
+                      label: tr('전체', 'All'),
                       selected: dateFilter == DateFilter.all,
                       onTap: () => ref.read(dateFilterProvider.notifier).state =
                           DateFilter.all,
                     ),
                     const SizedBox(width: 4),
                     _DateChip(
-                      label: '이번 달',
+                      label: tr('이번 달', 'This month'),
                       selected: dateFilter == DateFilter.thisMonth,
                       onTap: () => ref.read(dateFilterProvider.notifier).state =
                           DateFilter.thisMonth,
                     ),
                     const SizedBox(width: 4),
                     _DateChip(
-                      label: '이번 주',
+                      label: tr('이번 주', 'This week'),
                       selected: dateFilter == DateFilter.thisWeek,
                       onTap: () => ref.read(dateFilterProvider.notifier).state =
                           DateFilter.thisWeek,
@@ -744,7 +751,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                           )
                         : const Icon(Icons.auto_awesome, size: 14),
                     label: Text(
-                      isAiSearching ? aiStatus : 'AI로 검색',
+                      isAiSearching ? aiStatus : tr('AI로 검색', 'Search with AI'),
                       style: const TextStyle(fontSize: 12),
                     ),
                     style: FilledButton.styleFrom(
@@ -780,7 +787,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '요약 중...',
+                    tr('요약 중...', 'Summarizing...'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
@@ -801,7 +808,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    '오류: $e',
+                    tr('오류: $e', 'Error: $e'),
                     style: TextStyle(fontSize: 12, color: Colors.red.shade700),
                   ),
                 ),
@@ -819,7 +826,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Text(
-                            '검색 오류: $e',
+                            tr('검색 오류: $e', 'Search error: $e'),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.red.shade700,
@@ -873,7 +880,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                         ? null
                         : () => _showDigestSheet(context),
                     icon: const Icon(Icons.event_note_outlined, size: 16),
-                    label: const Text('다이제스트', style: TextStyle(fontSize: 12)),
+                    label: Text(tr('다이제스트', 'Digest'), style: const TextStyle(fontSize: 12)),
                     style: TextButton.styleFrom(
                       foregroundColor: Theme.of(context).colorScheme.primary,
                       visualDensity: VisualDensity.compact,
@@ -887,7 +894,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                         ? null
                         : () => _showSeriesOverviewSheet(context),
                     icon: const Icon(Icons.bar_chart_rounded, size: 16),
-                    label: const Text('시리즈 비교', style: TextStyle(fontSize: 12)),
+                    label: Text(tr('시리즈 비교', 'Compare series'), style: const TextStyle(fontSize: 12)),
                     style: TextButton.styleFrom(
                       foregroundColor: Theme.of(context).colorScheme.primary,
                       visualDensity: VisualDensity.compact,
@@ -920,7 +927,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                 ),
                 Expanded(
                   child: Tooltip(
-                    message: '제목, 태그, 참석자가 비슷한 회의를 자동으로 묶기',
+                    message: tr('제목, 태그, 참석자가 비슷한 회의를 자동으로 묶기', 'Auto-group meetings with similar titles, tags, and attendees'),
                     child: TextButton.icon(
                       onPressed: allMeetings.length < 2
                           ? null
@@ -930,9 +937,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                               groups,
                             ),
                       icon: const Icon(Icons.auto_awesome_motion, size: 16),
-                      label: const Text(
-                        '시리즈 추천',
-                        style: TextStyle(fontSize: 12),
+                      label: Text(
+                        tr('시리즈 추천', 'Suggest series'),
+                        style: const TextStyle(fontSize: 12),
                       ),
                       style: TextButton.styleFrom(
                         foregroundColor: Theme.of(context).colorScheme.primary,
@@ -967,9 +974,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     String query,
   ) {
     if (hits.isEmpty) {
-      return const _SidebarEmptyState(
+      return _SidebarEmptyState(
         icon: Icons.search_off,
-        title: '검색 결과 없음',
+        title: tr('검색 결과 없음', 'No search results'),
       );
     }
     final meetingById = {for (final m in meetings) m.id: m};
@@ -984,7 +991,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: Text(
-            '검색 결과 ${hits.length}개',
+            tr('검색 결과 ${hits.length}개', '${hits.length} results'),
             style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
           ),
         ),
@@ -1036,17 +1043,17 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
 
     // 아직 검색 안 함
     if (aiResults == null) {
-      return const _SidebarEmptyState(
+      return _SidebarEmptyState(
         icon: Icons.auto_awesome,
-        title: 'AI 검색 대기 중',
+        title: tr('AI 검색 대기 중', 'Waiting for AI search'),
       );
     }
 
     // 결과 없음
     if (aiResults.isEmpty) {
-      return const _SidebarEmptyState(
+      return _SidebarEmptyState(
         icon: Icons.search_off,
-        title: '관련 회의 없음',
+        title: tr('관련 회의 없음', 'No matching meetings'),
       );
     }
 
@@ -1074,7 +1081,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
               ),
               const SizedBox(width: 4),
               Text(
-                'AI 검색 결과 ${matched.length}개',
+                tr('AI 검색 결과 ${matched.length}개', '${matched.length} AI results'),
                 style: TextStyle(
                   fontSize: 11,
                   color: Colors.deepPurple.shade600,
@@ -1140,9 +1147,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     bool isRecording,
   ) {
     if (meetings.isEmpty) {
-      return const _SidebarEmptyState(
+      return _SidebarEmptyState(
         icon: Icons.event_note_outlined,
-        title: '회의 없음',
+        title: tr('회의 없음', 'No meetings'),
       );
     }
 
@@ -1313,7 +1320,7 @@ class _SearchMatchList extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 3, left: 2),
               child: Text(
-                '외 ${hit.totalMatches - hit.topMatches.length}건 더 일치',
+                tr('외 ${hit.totalMatches - hit.topMatches.length}건 더 일치', '${hit.totalMatches - hit.topMatches.length} more matches'),
                 style: TextStyle(
                   fontSize: 10,
                   color: Colors.grey.shade500,
@@ -1651,7 +1658,7 @@ class _GroupSectionState extends State<_GroupSection> {
                   ),
                   const SizedBox(width: 2),
                   IconButton(
-                    tooltip: '시리즈 진행',
+                    tooltip: tr('시리즈 진행', 'Series progress'),
                     icon: Icon(
                       Icons.timeline,
                       size: 14,
@@ -1676,15 +1683,15 @@ class _GroupSectionState extends State<_GroupSection> {
                       color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
                     ),
                     iconSize: 14,
-                    tooltip: '그룹 관리',
+                    tooltip: tr('그룹 관리', 'Manage group'),
                     itemBuilder: (_) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'rename',
                         child: Row(
                           children: [
-                            Icon(Icons.edit, size: 16),
-                            SizedBox(width: 8),
-                            Text('그룹명 수정', style: TextStyle(fontSize: 13)),
+                            const Icon(Icons.edit, size: 16),
+                            const SizedBox(width: 8),
+                            Text(tr('그룹명 수정', 'Rename group'), style: const TextStyle(fontSize: 13)),
                           ],
                         ),
                       ),
@@ -1698,9 +1705,9 @@ class _GroupSectionState extends State<_GroupSection> {
                               color: Colors.red,
                             ),
                             const SizedBox(width: 8),
-                            const Text(
-                              '그룹 삭제',
-                              style: TextStyle(fontSize: 13, color: Colors.red),
+                            Text(
+                              tr('그룹 삭제', 'Delete group'),
+                              style: const TextStyle(fontSize: 13, color: Colors.red),
                             ),
                           ],
                         ),
@@ -1737,13 +1744,13 @@ class _GroupSectionState extends State<_GroupSection> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('그룹명 수정'),
+        title: Text(tr('그룹명 수정', 'Rename group')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '그룹명',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: tr('그룹명', 'Group name'),
+            border: const OutlineInputBorder(),
           ),
           onSubmitted: (v) {
             if (v.trim().isNotEmpty) {
@@ -1755,7 +1762,7 @@ class _GroupSectionState extends State<_GroupSection> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           FilledButton(
             onPressed: () {
@@ -1764,7 +1771,7 @@ class _GroupSectionState extends State<_GroupSection> {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('저장'),
+            child: Text(tr('저장', 'Save')),
           ),
         ],
       ),
@@ -1775,15 +1782,17 @@ class _GroupSectionState extends State<_GroupSection> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('그룹 삭제'),
+        title: Text(tr('그룹 삭제', 'Delete group')),
         content: Text(
-          '「${widget.group.name}」 그룹을 삭제합니다.\n'
-          '그룹 내 회의는 미분류로 이동됩니다.',
+          tr(
+            '「${widget.group.name}」 그룹을 삭제합니다.\n그룹 내 회의는 미분류로 이동됩니다.',
+            'Delete the group "${widget.group.name}".\nMeetings in it will move to Ungrouped.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           TextButton(
             onPressed: () {
@@ -1791,7 +1800,7 @@ class _GroupSectionState extends State<_GroupSection> {
               Navigator.pop(ctx);
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('삭제'),
+            child: Text(tr('삭제', 'Delete')),
           ),
         ],
       ),
@@ -1865,7 +1874,7 @@ class _UngroupedSectionState extends State<_UngroupedSection> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '미분류',
+                        tr('미분류', 'Ungrouped'),
                         style: TextStyle(
                           fontSize: 12,
                           color: scheme.onSurfaceVariant,
@@ -1928,8 +1937,8 @@ class _MeetingTile extends StatelessWidget {
       meeting.processingReportJson,
     );
     final qualityLabel = switch (report.inputQualityStatus) {
-      'empty' => '마이크 입력 낮음',
-      'low' => '전사 부족',
+      'empty' => tr('마이크 입력 낮음', 'Low mic input'),
+      'low' => tr('전사 부족', 'Sparse transcript'),
       _ => '',
     };
     final qualityColor = report.inputQualityStatus == 'empty'
@@ -1954,18 +1963,18 @@ class _MeetingTile extends StatelessWidget {
         return await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('회의 삭제'),
-                content: Text('「${meeting.title}」을(를) 삭제하시겠습니까?'),
+                title: Text(tr('회의 삭제', 'Delete meeting')),
+                content: Text(tr('「${meeting.title}」을(를) 삭제하시겠습니까?', 'Delete "${meeting.title}"?')),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('취소'),
+                    child: Text(tr('취소', 'Cancel')),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text(
-                      '삭제',
-                      style: TextStyle(color: Colors.red),
+                    child: Text(
+                      tr('삭제', 'Delete'),
+                      style: const TextStyle(color: Colors.red),
                     ),
                   ),
                 ],
@@ -2083,15 +2092,15 @@ class _MeetingTile extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('제목 수정'),
+        title: Text(tr('제목 수정', 'Rename')),
         content: SizedBox(
           width: 360,
           child: TextField(
             controller: ctrl,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: '회의 제목',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: tr('회의 제목', 'Meeting title'),
+              border: const OutlineInputBorder(),
             ),
             onSubmitted: (_) {
               if (ctrl.text.trim().isNotEmpty) {
@@ -2104,7 +2113,7 @@ class _MeetingTile extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           FilledButton(
             onPressed: () {
@@ -2113,7 +2122,7 @@ class _MeetingTile extends StatelessWidget {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('저장'),
+            child: Text(tr('저장', 'Save')),
           ),
         ],
       ),
@@ -2131,7 +2140,7 @@ class _MeetingTile extends StatelessWidget {
             children: [
               Icon(Icons.edit_outlined, size: 15, color: Colors.grey.shade700),
               const SizedBox(width: 8),
-              const Text('제목 수정', style: TextStyle(fontSize: 13)),
+              Text(tr('제목 수정', 'Rename'), style: const TextStyle(fontSize: 13)),
             ],
           ),
         ),
@@ -2140,7 +2149,7 @@ class _MeetingTile extends StatelessWidget {
           enabled: false,
           height: 28,
           child: Text(
-            '그룹으로 이동',
+            tr('그룹으로 이동', 'Move to group'),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -2149,13 +2158,13 @@ class _MeetingTile extends StatelessWidget {
           ),
         ),
         if (meeting.groupId != null)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'group_null',
             child: Row(
               children: [
-                Icon(Icons.folder_open, size: 15),
-                SizedBox(width: 8),
-                Text('미분류', style: TextStyle(fontSize: 13)),
+                const Icon(Icons.folder_open, size: 15),
+                const SizedBox(width: 8),
+                Text(tr('미분류', 'Ungrouped'), style: const TextStyle(fontSize: 13)),
               ],
             ),
           ),
@@ -2179,7 +2188,7 @@ class _MeetingTile extends StatelessWidget {
               Icon(Icons.delete_outline, size: 15, color: Colors.red.shade600),
               const SizedBox(width: 8),
               Text(
-                '삭제',
+                tr('삭제', 'Delete'),
                 style: TextStyle(fontSize: 13, color: Colors.red.shade600),
               ),
             ],
@@ -2272,7 +2281,10 @@ class _SeriesSuggestionTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${suggestion.meetings.length}개 회의 · ${suggestion.reasons.join(' · ')}',
+                tr(
+                  '${suggestion.meetings.length}개 회의 · ${suggestion.reasons.join(' · ')}',
+                  '${suggestion.meetings.length} meetings · ${suggestion.reasons.join(' · ')}',
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
@@ -2362,7 +2374,7 @@ class _AddGroupButton extends StatelessWidget {
     return TextButton.icon(
       onPressed: () => _showDialog(context),
       icon: const Icon(Icons.create_new_folder_outlined, size: 16),
-      label: const Text('그룹 추가', style: TextStyle(fontSize: 12)),
+      label: Text(tr('그룹 추가', 'Add group'), style: const TextStyle(fontSize: 12)),
       style: TextButton.styleFrom(
         foregroundColor: Colors.grey.shade600,
         visualDensity: VisualDensity.compact,
@@ -2376,13 +2388,13 @@ class _AddGroupButton extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('새 그룹'),
+        title: Text(tr('새 그룹', 'New group')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '그룹명',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: tr('그룹명', 'Group name'),
+            border: const OutlineInputBorder(),
           ),
           onSubmitted: (v) async {
             if (v.trim().isNotEmpty) {
@@ -2394,7 +2406,7 @@ class _AddGroupButton extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           FilledButton(
             onPressed: () async {
@@ -2403,7 +2415,7 @@ class _AddGroupButton extends StatelessWidget {
                 if (ctx.mounted) Navigator.pop(ctx);
               }
             },
-            child: const Text('추가'),
+            child: Text(tr('추가', 'Add')),
           ),
         ],
       ),
@@ -2552,7 +2564,7 @@ class _SidebarSearchTopState extends ConsumerState<SidebarSearchTop> {
         controller: _ctrl,
         focusNode: _focus,
         decoration: InputDecoration(
-          hintText: '회의 검색...',
+          hintText: tr('회의 검색...', 'Search meetings...'),
           hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
           prefixIcon: Icon(Icons.search, size: 16, color: Colors.grey.shade500),
           suffixIcon: query.isNotEmpty
@@ -2653,7 +2665,7 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${_period.label} 다이제스트',
+                    tr('${_period.label} 다이제스트', '${_period.label} digest'),
                     style: MacosTheme.of(
                       context,
                     ).typography.title2.copyWith(fontWeight: FontWeight.w700),
@@ -2664,14 +2676,14 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                     style: const ButtonStyle(
                       visualDensity: VisualDensity.compact,
                     ),
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                         value: DigestPeriod.week,
-                        label: Text('주간', style: TextStyle(fontSize: 11)),
+                        label: Text(tr('주간', 'Weekly'), style: const TextStyle(fontSize: 11)),
                       ),
                       ButtonSegment(
                         value: DigestPeriod.month,
-                        label: Text('월간', style: TextStyle(fontSize: 11)),
+                        label: Text(tr('월간', 'Monthly'), style: const TextStyle(fontSize: 11)),
                       ),
                     ],
                     selected: {_period},
@@ -2680,7 +2692,7 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                   ),
                   const SizedBox(width: 8),
                   MacosTooltip(
-                    message: '닫기',
+                    message: tr('닫기', 'Close'),
                     child: MacosIconButton(
                       icon: const Icon(Icons.close, size: 18),
                       backgroundColor: Colors.transparent,
@@ -2704,7 +2716,7 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                       return const Center(child: ProgressCircle());
                     }
                     if (snap.hasError) {
-                      return Center(child: Text('오류: ${snap.error}'));
+                      return Center(child: Text(tr('오류: ${snap.error}', 'Error: ${snap.error}')));
                     }
                     final r = snap.data!;
                     if (r.isEmpty) {
@@ -2719,7 +2731,7 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '${_period.label}에는 회의가 없습니다.',
+                              tr('${_period.label}에는 회의가 없습니다.', 'No meetings in this ${_period.label.toLowerCase()}.'),
                               style: TextStyle(color: Colors.grey.shade600),
                             ),
                           ],
@@ -2743,19 +2755,19 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                                 ),
                                 _DigestMetaPill(
                                   icon: Icons.event,
-                                  text: '회의 ${r.meetingCount}회',
+                                  text: tr('회의 ${r.meetingCount}회', '${r.meetingCount} meetings'),
                                 ),
                                 _DigestMetaPill(
                                   icon: Icons.check_circle_outline,
-                                  text: '미완료 액션 ${r.pendingActions.length}건',
+                                  text: tr('미완료 액션 ${r.pendingActions.length}건', '${r.pendingActions.length} open actions'),
                                 ),
                                 _DigestMetaPill(
                                   icon: Icons.gavel_rounded,
-                                  text: '결정 ${r.decisions.length}건',
+                                  text: tr('결정 ${r.decisions.length}건', '${r.decisions.length} decisions'),
                                 ),
                                 _DigestMetaPill(
                                   icon: Icons.help_outline,
-                                  text: '미해결 이슈 ${r.openIssues.length}건',
+                                  text: tr('미해결 이슈 ${r.openIssues.length}건', '${r.openIssues.length} open issues'),
                                 ),
                               ],
                             ),
@@ -2763,9 +2775,9 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                           // 미완료 액션
                           _DigestSection(
                             icon: Icons.check_circle_outline,
-                            title: '미완료 액션',
+                            title: tr('미완료 액션', 'Open actions'),
                             empty: r.pendingActions.isEmpty,
-                            emptyText: '완료되지 않은 액션이 없습니다.',
+                            emptyText: tr('완료되지 않은 액션이 없습니다.', 'No incomplete actions.'),
                             children: [
                               for (final a in r.pendingActions)
                                 _DigestRow(
@@ -2784,9 +2796,9 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                           const SizedBox(height: 12),
                           _DigestSection(
                             icon: Icons.gavel_rounded,
-                            title: '결정 사항',
+                            title: tr('결정 사항', 'Decisions'),
                             empty: r.decisions.isEmpty,
-                            emptyText: '결정사항이 없습니다.',
+                            emptyText: tr('결정사항이 없습니다.', 'No decisions.'),
                             children: [
                               for (final d in r.decisions)
                                 _DigestRow(
@@ -2799,9 +2811,9 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                           const SizedBox(height: 12),
                           _DigestSection(
                             icon: Icons.help_outline,
-                            title: '미해결 이슈',
+                            title: tr('미해결 이슈', 'Open issues'),
                             empty: r.openIssues.isEmpty,
-                            emptyText: '미해결 이슈가 없습니다.',
+                            emptyText: tr('미해결 이슈가 없습니다.', 'No open issues.'),
                             children: [
                               for (final q in r.openIssues)
                                 _DigestRow(
@@ -3015,14 +3027,14 @@ class _SeriesOverviewSheetState extends ConsumerState<_SeriesOverviewSheet> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '시리즈 비교',
+                    tr('시리즈 비교', 'Compare series'),
                     style: MacosTheme.of(
                       context,
                     ).typography.title2.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),
                   MacosTooltip(
-                    message: '닫기',
+                    message: tr('닫기', 'Close'),
                     child: MacosIconButton(
                       icon: const Icon(Icons.close, size: 18),
                       backgroundColor: Colors.transparent,
@@ -3039,7 +3051,10 @@ class _SeriesOverviewSheetState extends ConsumerState<_SeriesOverviewSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                '회의 1회 이상 묶인 시리즈를 마지막 회의가 최신인 순으로 표시합니다.',
+                tr(
+                  '회의 1회 이상 묶인 시리즈를 마지막 회의가 최신인 순으로 표시합니다.',
+                  'Series with at least one meeting, ordered by most recent meeting.',
+                ),
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
               const Divider(height: 20),
@@ -3051,7 +3066,7 @@ class _SeriesOverviewSheetState extends ConsumerState<_SeriesOverviewSheet> {
                       return const Center(child: ProgressCircle());
                     }
                     if (snap.hasError) {
-                      return Center(child: Text('오류: ${snap.error}'));
+                      return Center(child: Text(tr('오류: ${snap.error}', 'Error: ${snap.error}')));
                     }
                     final items = snap.data!;
                     if (items.isEmpty) {
@@ -3066,7 +3081,7 @@ class _SeriesOverviewSheetState extends ConsumerState<_SeriesOverviewSheet> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '아직 회의가 묶인 시리즈가 없습니다.',
+                              tr('아직 회의가 묶인 시리즈가 없습니다.', 'No series with grouped meetings yet.'),
                               style: TextStyle(color: Colors.grey.shade600),
                             ),
                           ],
@@ -3134,7 +3149,7 @@ class _SeriesOverviewCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${report.meetingCount}회',
+                    tr('${report.meetingCount}회', '${report.meetingCount}×'),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade700,
@@ -3158,30 +3173,30 @@ class _SeriesOverviewCard extends StatelessWidget {
                   if (report.averageIntervalDays != null)
                     _OverviewChip(
                       icon: Icons.schedule,
-                      text: '평균 ${report.averageIntervalDays}일',
+                      text: tr('평균 ${report.averageIntervalDays}일', 'Avg ${report.averageIntervalDays}d'),
                     ),
                   if (daysAgo != null)
                     _OverviewChip(
                       icon: Icons.history,
-                      text: daysAgo == 0 ? '오늘 회의' : '$daysAgo일 전',
+                      text: daysAgo == 0 ? tr('오늘 회의', 'Met today') : tr('$daysAgo일 전', '$daysAgo days ago'),
                     ),
                   _OverviewChip(
                     icon: Icons.check_circle_outline,
-                    text: '미완료 $pendingCount',
+                    text: tr('미완료 $pendingCount', 'Open $pendingCount'),
                     color: pendingCount > 0
                         ? Colors.orange.shade700
                         : Colors.grey.shade600,
                   ),
                   _OverviewChip(
                     icon: Icons.warning_amber_rounded,
-                    text: '지속 이슈 $issuesCount',
+                    text: tr('지속 이슈 $issuesCount', 'Recurring $issuesCount'),
                     color: issuesCount > 0
                         ? Colors.red.shade600
                         : Colors.grey.shade600,
                   ),
                   _OverviewChip(
                     icon: Icons.gavel_rounded,
-                    text: '결정 $decisionsCount',
+                    text: tr('결정 $decisionsCount', 'Decisions $decisionsCount'),
                   ),
                 ],
               ),

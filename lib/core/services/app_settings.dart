@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_build_config.dart';
 import '../constants/app_constants.dart';
@@ -132,6 +134,33 @@ class AppSettings {
       _prefs.getBool('modelsSetupComplete') ?? false;
   Future<void> setModelsSetupComplete(bool v) =>
       _prefs.setBool('modelsSetupComplete', v);
+
+  // ── 표시 언어 ────────────────────────────────────────────────────
+  /// 사용자가 선택한 표시 언어. '' = 미선택(시스템 따름), 'ko', 'en'.
+  /// 첫 실행 시 언어 선택 화면을 보여줄지 판단하는 데에도 사용한다.
+  String get languageCode => _prefs.getString('languageCode') ?? '';
+  Future<void> setLanguageCode(String v) =>
+      _prefs.setString('languageCode', v);
+
+  /// 사용자가 언어를 직접 선택했는지 여부 (첫 실행 게이트).
+  bool get languageChosen {
+    final v = languageCode;
+    return v == 'ko' || v == 'en';
+  }
+
+  /// 실제 적용할 언어 코드. 미선택이면 시스템 로케일을 따른다.
+  /// 한국어 계열이면 'ko', 그 외에는 'en'으로 폴백한다.
+  String get effectiveLanguageCode {
+    final saved = languageCode;
+    if (saved == 'ko' || saved == 'en') return saved;
+    String sys = '';
+    try {
+      sys = Platform.localeName; // 예: en_US, ko_KR
+    } catch (_) {}
+    return sys.toLowerCase().startsWith('ko') ? 'ko' : 'en';
+  }
+
+  bool get isEnglish => effectiveLanguageCode == 'en';
 
   // ── 사이드바 레이아웃 ─────────────────────────────────────────────
   /// 회의 목록 사이드바 폭. macOS 사이드바처럼 사용자가 드래그로 조절 가능.

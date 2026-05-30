@@ -6,6 +6,7 @@ import '../../data/repositories/meeting_repository_impl.dart';
 import '../../data/repositories/summary_repository_impl.dart';
 import '../../domain/entities/meeting.dart';
 import '../../domain/entities/summary.dart';
+import '../../core/l10n/app_tr.dart';
 import '../providers/meeting_providers.dart';
 import 'glossary_screen.dart';
 
@@ -130,20 +131,25 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     // 회의 길이 분포 (0-15 / 15-30 / 30-60 / 60-120 / 120+ 분)
-    final bucketOrder = <String>['~15분', '15–30분', '30–60분', '1–2시간', '2시간+'];
+    final b0 = tr('~15분', '~15 min');
+    final b1 = tr('15–30분', '15–30 min');
+    final b2 = tr('30–60분', '30–60 min');
+    final b3 = tr('1–2시간', '1–2 h');
+    final b4 = tr('2시간+', '2 h+');
+    final bucketOrder = <String>[b0, b1, b2, b3, b4];
     final Map<String, int> buckets = {for (final k in bucketOrder) k: 0};
     for (final m in meetings) {
       final minutes = m.durationSeconds ~/ 60;
       if (minutes < 15) {
-        buckets['~15분'] = buckets['~15분']! + 1;
+        buckets[b0] = buckets[b0]! + 1;
       } else if (minutes < 30) {
-        buckets['15–30분'] = buckets['15–30분']! + 1;
+        buckets[b1] = buckets[b1]! + 1;
       } else if (minutes < 60) {
-        buckets['30–60분'] = buckets['30–60분']! + 1;
+        buckets[b2] = buckets[b2]! + 1;
       } else if (minutes < 120) {
-        buckets['1–2시간'] = buckets['1–2시간']! + 1;
+        buckets[b3] = buckets[b3]! + 1;
       } else {
-        buckets['2시간+'] = buckets['2시간+']! + 1;
+        buckets[b4] = buckets[b4]! + 1;
       }
     }
     final durationBuckets =
@@ -258,8 +264,8 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
   String _fmtTime(int seconds) {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
-    if (h > 0) return '$h시간 $m분';
-    return '$m분';
+    if (h > 0) return tr('$h시간 $m분', '${h}h ${m}m');
+    return tr('$m분', '${m}m');
   }
 
   @override
@@ -288,7 +294,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                   Icon(Icons.bar_chart,
                       color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 10),
-                  Text('회의 통계',
+                  Text(tr('회의 통계', 'Meeting Stats'),
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -352,8 +358,8 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
       Expanded(
         child: _StatCard(
           icon: Icons.meeting_room_outlined,
-          label: '전체 회의',
-          value: '${d.totalMeetings}건',
+          label: tr('전체 회의', 'All meetings'),
+          value: tr('${d.totalMeetings}건', '${d.totalMeetings}'),
           color: Colors.indigo,
         ),
       ),
@@ -361,8 +367,8 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
       Expanded(
         child: _StatCard(
           icon: Icons.calendar_month_outlined,
-          label: '이번 달',
-          value: '$thisMonthCount건',
+          label: tr('이번 달', 'This month'),
+          value: tr('$thisMonthCount건', '$thisMonthCount'),
           color: Colors.teal,
         ),
       ),
@@ -370,7 +376,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
       Expanded(
         child: _StatCard(
           icon: Icons.timer_outlined,
-          label: '총 녹음',
+          label: tr('총 녹음', 'Total recording'),
           value: d.totalSeconds > 0 ? _fmtTime(d.totalSeconds) : '-',
           color: Colors.deepPurple,
         ),
@@ -394,7 +400,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
               size: 15,
               color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 6),
-          Text('최근 6개월',
+          Text(tr('최근 6개월', 'Last 6 months'),
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -443,7 +449,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text('$label월',
+                      Text(tr('$label월', label),
                           style: TextStyle(
                               fontSize: 11, color: Colors.grey.shade500)),
                     ],
@@ -475,7 +481,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
           Icon(Icons.timelapse,
               size: 15, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 6),
-          Text('회의 길이 분포',
+          Text(tr('회의 길이 분포', 'Duration distribution'),
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -548,8 +554,23 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
     }
     if (maxVal == 0) return const SizedBox.shrink();
 
-    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-    const timeLabels = ['이른', '오전', '점심', '오후', '마감', '야근'];
+    final weekdays = [
+      tr('월', 'Mon'),
+      tr('화', 'Tue'),
+      tr('수', 'Wed'),
+      tr('목', 'Thu'),
+      tr('금', 'Fri'),
+      tr('토', 'Sat'),
+      tr('일', 'Sun'),
+    ];
+    final timeLabels = [
+      tr('이른', 'Early'),
+      tr('오전', 'AM'),
+      tr('점심', 'Lunch'),
+      tr('오후', 'PM'),
+      tr('마감', 'EOD'),
+      tr('야근', 'Late'),
+    ];
     final primary = Theme.of(context).colorScheme.primary;
 
     Color cellColor(int v) {
@@ -565,7 +586,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
           Icon(Icons.grid_view_outlined,
               size: 15, color: primary),
           const SizedBox(width: 6),
-          Text('요일 × 시간대',
+          Text(tr('요일 × 시간대', 'Day × Time'),
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -652,7 +673,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
     Widget header = Row(children: [
       Icon(Icons.tag, size: 15, color: primary),
       const SizedBox(width: 6),
-      Text('자주 등장한 키워드',
+      Text(tr('자주 등장한 키워드', 'Frequent keywords'),
           style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -665,7 +686,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
         children: [
           header,
           const SizedBox(height: 8),
-          Text('요약된 회의 데이터가 부족합니다.',
+          Text(tr('요약된 회의 데이터가 부족합니다.', 'Not enough summarized meeting data.'),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
         ],
       );
@@ -689,7 +710,8 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('칩을 클릭하면 단어집에 추가할 수 있습니다. ✓ 는 이미 등록됨',
+              Text(tr('칩을 클릭하면 단어집에 추가할 수 있습니다. ✓ 는 이미 등록됨',
+                  'Tap a chip to add it to the glossary. ✓ means already added'),
                   style: TextStyle(
                       fontSize: 10.5, color: Colors.grey.shade500)),
               const SizedBox(height: 8),
@@ -763,13 +785,13 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
     final header = Row(children: [
       Icon(Icons.cloud_outlined, size: 15, color: primary),
       const SizedBox(width: 6),
-      Text('태그 클라우드',
+      Text(tr('태그 클라우드', 'Tag cloud'),
           style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: primary)),
       const SizedBox(width: 6),
-      Text('· 클릭하면 검색됩니다',
+      Text(tr('· 클릭하면 검색됩니다', '· Tap to search'),
           style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
     ]);
 
@@ -779,7 +801,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
         children: [
           header,
           const SizedBox(height: 8),
-          Text('회의에 태그가 추가되면 여기에 표시됩니다.',
+          Text(tr('회의에 태그가 추가되면 여기에 표시됩니다.', 'Tags added to meetings will appear here.'),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
         ],
       );
@@ -822,7 +844,8 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
               final fontSize = sizeFor(s.count);
               final alpha = opacityFor(s.count);
               return Tooltip(
-                message: '#${s.tag} · ${s.count}회 회의',
+                message: tr('#${s.tag} · ${s.count}회 회의',
+                    '#${s.tag} · ${s.count} meetings'),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(999),
                   onTap: () => _searchByTag(s.tag),
@@ -881,7 +904,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 2),
-        content: Text('태그 "$tag"로 검색합니다'),
+        content: Text(tr('태그 "$tag"로 검색합니다', 'Searching for tag "$tag"')),
         backgroundColor: Colors.indigo.shade600,
       ),
     );
@@ -894,7 +917,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
       Icon(Icons.sell_outlined,
           size: 15, color: Theme.of(context).colorScheme.primary),
       const SizedBox(width: 6),
-      Text('태그별 분석',
+      Text(tr('태그별 분석', 'Tag analysis'),
           style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -907,7 +930,8 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
         children: [
           header,
           const SizedBox(height: 8),
-          Text('회의 상세에서 태그를 추가하면 여기에 분석이 표시됩니다.',
+          Text(tr('회의 상세에서 태그를 추가하면 여기에 분석이 표시됩니다.',
+              'Add tags in meeting details to see analysis here.'),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
         ],
       );
@@ -965,7 +989,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                     const SizedBox(width: 8),
                     SizedBox(
                       width: 56,
-                      child: Text('${s.count}회',
+                      child: Text(tr('${s.count}회', '${s.count}×'),
                           textAlign: TextAlign.right,
                           style: TextStyle(
                               fontSize: 11, color: Colors.grey.shade600)),
@@ -973,7 +997,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                     const SizedBox(width: 6),
                     SizedBox(
                       width: 70,
-                      child: Text('평균 ${_fmtTime(s.avgSeconds)}',
+                      child: Text(tr('평균 ${_fmtTime(s.avgSeconds)}', 'avg ${_fmtTime(s.avgSeconds)}'),
                           textAlign: TextAlign.right,
                           style: TextStyle(
                               fontSize: 11, color: Colors.grey.shade500)),
@@ -999,14 +1023,14 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                 size: 15,
                 color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 6),
-            Text('자주 등장한 참석자',
+            Text(tr('자주 등장한 참석자', 'Frequent attendees'),
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: Theme.of(context).colorScheme.primary)),
           ]),
           const SizedBox(height: 8),
-          Text('요약된 회의에서 참석자 정보가 없습니다.',
+          Text(tr('요약된 회의에서 참석자 정보가 없습니다.', 'No attendee info in summarized meetings.'),
               style:
                   TextStyle(fontSize: 12, color: Colors.grey.shade500)),
         ],
@@ -1023,7 +1047,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
               size: 15,
               color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 6),
-          Text('자주 등장한 참석자',
+          Text(tr('자주 등장한 참석자', 'Frequent attendees'),
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -1071,7 +1095,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text('${e.value}회',
+                  Text(tr('${e.value}회', '${e.value}×'),
                       style: TextStyle(
                           fontSize: 11, color: Colors.grey.shade500)),
                 ]),

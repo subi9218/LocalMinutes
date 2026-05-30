@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:macos_ui/macos_ui.dart';
 import '../../core/ffi/on_device_model_manager.dart';
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/export_service.dart';
@@ -76,7 +77,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     final duration = Duration(milliseconds: ms);
     final minutes = duration.inMinutes;
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes분 $seconds초';
+    return tr('$minutes분 $seconds초', '${minutes}m ${seconds}s');
   }
 
   @override
@@ -89,7 +90,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     if (!_isSummarizing || _cancelSummaryRequested) return;
     setState(() {
       _cancelSummaryRequested = true;
-      _summarizingStatus = '요약 중지 요청 중...';
+      _summarizingStatus = tr('요약 중지 요청 중...', 'Requesting summary stop...');
     });
     LlmService.instance.requestCancelActiveGeneration();
   }
@@ -98,14 +99,14 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     if (!_isRerunningStt || _cancelRerunSttRequested) return;
     setState(() {
       _cancelRerunSttRequested = true;
-      _rerunSttStatus = '음성 인식 중지 요청 중... 현재 청크를 마무리하고 멈춥니다.';
+      _rerunSttStatus = tr('음성 인식 중지 요청 중... 현재 청크를 마무리하고 멈춥니다.', 'Requesting transcription stop... Finishing the current chunk before stopping.');
     });
   }
 
   String? _nativeTaskBlockReason(String actionLabel) {
     final active = OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (active == null) return null;
-    return '현재 $active 작업 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.';
+    return tr('현재 $active 작업 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.', '$active is currently running. Please try $actionLabel again after it finishes.');
   }
 
   void _showNativeTaskBlocked(String actionLabel) {
@@ -162,7 +163,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     if (duration <= Duration.zero) return '-';
     final minutes = duration.inMinutes;
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes분 $seconds초';
+    return tr('$minutes분 $seconds초', '${minutes}m ${seconds}s');
   }
 
   /// Meeting.bookmarksJson을 Bookmark 리스트로 파싱
@@ -225,8 +226,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         duration: Duration(seconds: ok ? 2 : 4),
         content: Text(
           ok
-              ? '검색 결과 — ${_secStr(startSec)} 시점 재생'
-              : '검색 결과 — ${_secStr(startSec)} 시점 전사로 이동 · $err',
+              ? tr('검색 결과 — ${_secStr(startSec)} 시점 재생', 'Search result — playing at ${_secStr(startSec)}')
+              : tr('검색 결과 — ${_secStr(startSec)} 시점 전사로 이동 · $err', 'Search result — jumped to transcript at ${_secStr(startSec)} · $err'),
         ),
         backgroundColor: ok ? Colors.indigo.shade600 : Colors.blueGrey.shade600,
       ),
@@ -287,8 +288,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         duration: Duration(seconds: ok ? 2 : 4),
         content: Text(
           ok
-              ? '$evidenceTs 시점 — 전사로 이동 + 오디오 재생'
-              : '$evidenceTs 시점 전사로 이동 · $audioErr',
+              ? tr('$evidenceTs 시점 — 전사로 이동 + 오디오 재생', 'At $evidenceTs — jumped to transcript + playing audio')
+              : tr('$evidenceTs 시점 전사로 이동 · $audioErr', 'Jumped to transcript at $evidenceTs · $audioErr'),
         ),
         backgroundColor: ok ? Colors.indigo.shade600 : Colors.blueGrey.shade600,
       ),
@@ -321,7 +322,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                   border: Border.all(color: Colors.orange.shade200),
                 ),
                 child: Text(
-                  '확인 필요',
+                  tr('확인 필요', 'Needs review'),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -354,7 +355,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               const SizedBox(height: 12),
               if (candidates.isEmpty)
                 Text(
-                  '전사본에서 직접 연결할 만한 구간을 찾지 못했습니다.',
+                  tr('전사본에서 직접 연결할 만한 구간을 찾지 못했습니다.', 'No directly matching segment was found in the transcript.'),
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                 )
               else
@@ -367,7 +368,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       final c = candidates[i];
                       final speaker = c.transcript.speakerLabel == null
                           ? ''
-                          : ' · 화자 ${c.transcript.speakerLabel}';
+                          : tr(' · 화자 ${c.transcript.speakerLabel}', ' · Speaker ${c.transcript.speakerLabel}');
                       final canJump = _seekTranscriptAudio != null;
                       return InkWell(
                         borderRadius: BorderRadius.circular(6),
@@ -387,8 +388,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                     duration: Duration(seconds: okJump ? 2 : 4),
                                     content: Text(
                                       okJump
-                                          ? '${_secStr(startSec)} 시점 — 전사로 이동 + 오디오 재생'
-                                          : '${_secStr(startSec)} 시점 전사로 이동 · $audioErr',
+                                          ? tr('${_secStr(startSec)} 시점 — 전사로 이동 + 오디오 재생', 'At ${_secStr(startSec)} — jumped to transcript + playing audio')
+                                          : tr('${_secStr(startSec)} 시점 전사로 이동 · $audioErr', 'Jumped to transcript at ${_secStr(startSec)} · $audioErr'),
                                     ),
                                     backgroundColor: okJump
                                         ? Colors.indigo.shade600
@@ -427,7 +428,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                   if (canJump) ...[
                                     const SizedBox(width: 6),
                                     Text(
-                                      '클릭하여 이동',
+                                      tr('클릭하여 이동', 'Click to jump'),
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: Colors.grey.shade500,
@@ -437,7 +438,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                   ],
                                   const Spacer(),
                                   Text(
-                                    '유사도 ${(c.score * 100).clamp(0, 99).toStringAsFixed(0)}%',
+                                    tr('유사도 ${(c.score * 100).clamp(0, 99).toStringAsFixed(0)}%', 'Similarity ${(c.score * 100).clamp(0, 99).toStringAsFixed(0)}%'),
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.grey.shade500,
@@ -466,7 +467,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('닫기'),
+          child: Text(tr('닫기', 'Close')),
         ),
       ),
     );
@@ -615,13 +616,13 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.auto_awesome, size: 34),
-                            SizedBox(width: 12),
+                            const Icon(Icons.auto_awesome, size: 34),
+                            const SizedBox(width: 12),
                             Text(
-                              '회의 유형 / 재생성 스타일',
-                              style: TextStyle(
+                              tr('회의 유형 / 재생성 스타일', 'Meeting type / Regeneration style'),
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -648,7 +649,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                           4,
                                         ),
                                         child: Text(
-                                          '회의 유형',
+                                          tr('회의 유형', 'Meeting type'),
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
@@ -665,8 +666,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                           children: [
                                             tile(
                                               null,
-                                              '설정값 사용',
-                                              '설정 화면에서 지정한 회의 유형을 그대로 적용',
+                                              tr('설정값 사용', 'Use settings value'),
+                                              tr('설정 화면에서 지정한 회의 유형을 그대로 적용', 'Apply the meeting type set in Settings'),
                                             ),
                                             const Divider(height: 8),
                                             for (final t
@@ -674,13 +675,13 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                               tile(t.id, t.name, t.description),
                                             tile(
                                               SummaryTemplates.customId1,
-                                              '커스텀1',
-                                              '설정에 저장된 사용자 지침 슬롯 1 사용',
+                                              tr('커스텀1', 'Custom 1'),
+                                              tr('설정에 저장된 사용자 지침 슬롯 1 사용', 'Use custom instruction slot 1 saved in Settings'),
                                             ),
                                             tile(
                                               SummaryTemplates.customId2,
-                                              '커스텀2',
-                                              '설정에 저장된 사용자 지침 슬롯 2 사용',
+                                              tr('커스텀2', 'Custom 2'),
+                                              tr('설정에 저장된 사용자 지침 슬롯 2 사용', 'Use custom instruction slot 2 saved in Settings'),
                                             ),
                                           ],
                                         ),
@@ -700,7 +701,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                     Row(
                                       children: [
                                         Text(
-                                          '재생성 스타일',
+                                          tr('재생성 스타일', 'Regeneration style'),
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
@@ -709,9 +710,11 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                         ),
                                         const SizedBox(width: 6),
                                         MacosTooltip(
-                                          message:
+                                          message: tr(
                                               '같은 전사본을 다른 톤/길이로 다시 분석합니다.\n'
                                               '회의 유형 위에 누적 적용됩니다.',
+                                              'Re-analyzes the same transcript with a different tone/length.\n'
+                                              'Applied on top of the meeting type.'),
                                           child: Icon(
                                             Icons.info_outline,
                                             size: 14,
@@ -777,7 +780,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                 onPressed: () => Navigator.of(
                                   ctx,
                                 ).pop(const _TemplatePickResult.cancelled()),
-                                child: const Text('취소'),
+                                child: Text(tr('취소', 'Cancel')),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -791,7 +794,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                     styleMode: style,
                                   ),
                                 ),
-                                child: const Text('요약 실행'),
+                                child: Text(tr('요약 실행', 'Run summary')),
                               ),
                             ),
                           ],
@@ -839,9 +842,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     String tipOf(String id) {
       switch (id) {
         case 'qwen25_7b':
-          return 'Qwen 2.5 7B Instruct Q4_K_M (~4.7GB)\n한국어·구조화 출력 강함';
+          return tr('Qwen 2.5 7B Instruct Q4_K_M (~4.7GB)\n한국어·구조화 출력 강함', 'Qwen 2.5 7B Instruct Q4_K_M (~4.7GB)\nStrong Korean & structured output');
         default:
-          return 'Gemma 4 E2B Q8_0 (~3GB)\n빠름, 기본 품질';
+          return tr('Gemma 4 E2B Q8_0 (~3GB)\n빠름, 기본 품질', 'Gemma 4 E2B Q8_0 (~3GB)\nFast, baseline quality');
       }
     }
 
@@ -852,7 +855,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         builder: (ctx, setD) {
           return MacosAlertDialog(
             appIcon: const Icon(Icons.auto_awesome, size: 48),
-            title: const Text('요약 모델 선택'),
+            title: Text(tr('요약 모델 선택', 'Select summary model')),
             message: SizedBox(
               width: 420,
               child: Column(
@@ -860,7 +863,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '마우스를 올리면 모델 설명이 보입니다.',
+                    tr('마우스를 올리면 모델 설명이 보입니다.', 'Hover to see model descriptions.'),
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 12),
@@ -887,13 +890,13 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             primaryButton: PushButton(
               controlSize: ControlSize.large,
               onPressed: () => Navigator.of(ctx).pop(selected),
-              child: const Text('요약 실행'),
+              child: Text(tr('요약 실행', 'Run summary')),
             ),
             secondaryButton: PushButton(
               controlSize: ControlSize.large,
               secondary: true,
               onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('취소'),
+              child: Text(tr('취소', 'Cancel')),
             ),
           );
         },
@@ -909,8 +912,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     Meeting? meeting,
   }) async {
     if (transcripts.isEmpty || _isSummarizing) return;
-    if (_nativeTaskBlockReason('요약') != null) {
-      _showNativeTaskBlocked('요약');
+    if (_nativeTaskBlockReason(tr('요약', 'summary')) != null) {
+      _showNativeTaskBlocked(tr('요약', 'summary'));
       return;
     }
 
@@ -934,7 +937,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     setState(() {
       _isSummarizing = true;
       _cancelSummaryRequested = false;
-      _summarizingStatus = '요약 모델 준비 중...';
+      _summarizingStatus = tr('요약 모델 준비 중...', 'Preparing summary model...');
       _summarizingProgress = 0.0;
       _summaryStartTime = DateTime.now();
     });
@@ -952,7 +955,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       );
       if (_cancelSummaryRequested) throw const SummaryCancelledException();
 
-      if (mounted) setState(() => _summarizingStatus = '회의 내용 재분석 중...');
+      if (mounted) setState(() => _summarizingStatus = tr('회의 내용 재분석 중...', 'Re-analyzing meeting content...'));
 
       final now = DateTime.now();
       final dateStr =
@@ -1018,7 +1021,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
 
       // 기존 요약 → 이력으로 이동
       if (currentSummary != null) {
-        if (mounted) setState(() => _summarizingStatus = '이력 저장 중...');
+        if (mounted) setState(() => _summarizingStatus = tr('이력 저장 중...', 'Saving history...'));
         final nextVer = await versionRepo.nextVersion(widget.meetingId);
         final sv = SummaryVersion()
           ..meetingId = widget.meetingId
@@ -1064,7 +1067,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       if (AppSettings.instance.summarySpeedMode !=
           AppSettings.summaryModeFast) {
         try {
-          if (mounted) setState(() => _summarizingStatus = '태그 자동 추출 중...');
+          if (mounted) setState(() => _summarizingStatus = tr('태그 자동 추출 중...', 'Auto-extracting tags...'));
           final tags = await TagExtractor.extractFromSummary(
             newSummary,
             notes: notes,
@@ -1088,8 +1091,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         final totalElapsed = _summaryStartTime == null
             ? Duration.zero
             : DateTime.now().difference(_summaryStartTime!);
-        final totalStr =
-            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초';
+        final totalStr = tr(
+            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초',
+            '${totalElapsed.inMinutes}m ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}s');
         setState(() {
           _isSummarizing = false;
           _cancelSummaryRequested = false;
@@ -1100,7 +1104,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             : ' (${picked.styleMode.displayName})';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('재요약 완료$styleSuffix · 총 소요 $totalStr'),
+            content: Text(tr('재요약 완료$styleSuffix · 총 소요 $totalStr', 'Re-summarize complete$styleSuffix · Total $totalStr')),
             backgroundColor: Colors.green.shade700,
           ),
         );
@@ -1112,8 +1116,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         final totalElapsed = _summaryStartTime == null
             ? Duration.zero
             : DateTime.now().difference(_summaryStartTime!);
-        final totalStr =
-            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초';
+        final totalStr = tr(
+            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초',
+            '${totalElapsed.inMinutes}m ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}s');
         setState(() {
           _isSummarizing = false;
           _cancelSummaryRequested = false;
@@ -1123,9 +1128,11 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           SnackBar(
             content: Text(
               e is SummaryCancelledException
-                  ? '재요약 중지됨 · 총 소요 $totalStr'
-                  : '재요약 오류 · 총 소요 $totalStr\n'
+                  ? tr('재요약 중지됨 · 총 소요 $totalStr', 'Re-summarize stopped · Total $totalStr')
+                  : tr('재요약 오류 · 총 소요 $totalStr\n'
                         '${friendlyErrorText(e, fallbackTitle: '요약을 다시 만들지 못했습니다', fallbackMessage: 'AI 요약 생성 중 문제가 발생했습니다.', nextStep: '잠시 후 다시 시도하거나 더 빠른 요약 모델을 선택해주세요.')}',
+                        'Re-summarize error · Total $totalStr\n'
+                        '${friendlyErrorText(e, fallbackTitle: 'Could not regenerate the summary', fallbackMessage: 'A problem occurred while generating the AI summary.', nextStep: 'Please try again later or choose a faster summary model.')}'),
             ),
             backgroundColor: e is SummaryCancelledException
                 ? Colors.orange.shade700
@@ -1139,8 +1146,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   // ── 음성 인식 다시 돌리기 ───────────────────────────────────────
   Future<void> _rerunStt(Meeting meeting) async {
     if (_isRerunningStt || _isSummarizing) return;
-    if (_nativeTaskBlockReason('음성 인식') != null) {
-      _showNativeTaskBlocked('음성 인식');
+    if (_nativeTaskBlockReason(tr('음성 인식', 'transcription')) != null) {
+      _showNativeTaskBlocked(tr('음성 인식', 'transcription'));
       return;
     }
     final audioPath = meeting.audioFilePath;
@@ -1149,7 +1156,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('오디오 파일을 찾을 수 없습니다: $audioPath'),
+            content: Text(tr('오디오 파일을 찾을 수 없습니다: $audioPath', 'Audio file not found: $audioPath')),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -1170,7 +1177,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('설치된 음성 인식 모델이 없습니다. 설정 → 모델 관리에서 다운로드하세요.'),
+            content: Text(tr('설치된 음성 인식 모델이 없습니다. 설정 → 모델 관리에서 다운로드하세요.', 'No transcription model installed. Download one from Settings → Model management.')),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -1306,7 +1313,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        '음성 인식 다시 돌리기',
+                        tr('음성 인식 다시 돌리기', 'Re-run transcription'),
                         textAlign: TextAlign.center,
                         style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
@@ -1320,27 +1327,28 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const Text(
-                                '기존 전사본을 삭제하고 오디오 파일에서 다시 받아쓰기를 실행합니다. 기존 요약은 유지되며, 필요하면 다시 요약할 수 있습니다.',
-                                style: TextStyle(fontSize: 13, height: 1.5),
+                              Text(
+                                tr('기존 전사본을 삭제하고 오디오 파일에서 다시 받아쓰기를 실행합니다. 기존 요약은 유지되며, 필요하면 다시 요약할 수 있습니다.', 'Deletes the existing transcript and re-transcribes from the audio file. The existing summary is kept, and you can re-summarize if needed.'),
+                                style: const TextStyle(fontSize: 13, height: 1.5),
                               ),
                               const SizedBox(height: 14),
                               _EstimateRow(
-                                label: '오디오 길이',
+                                label: tr('오디오 길이', 'Audio length'),
                                 value: audioDuration > Duration.zero
                                     ? _durationKr(audioDuration)
-                                    : '확인 불가',
+                                    : tr('확인 불가', 'Unavailable'),
                               ),
                               _EstimateRow(
-                                label:
+                                label: tr(
                                     '${AppSettings.sttProcessingModeLabel(sttMode)} 음성 인식',
+                                    '${AppSettings.sttProcessingModeLabel(sttMode)} transcription'),
                                 value: audioDuration > Duration.zero
-                                    ? '약 ${_durationKr(currentSttEstimate())}'
-                                    : '실행 후 표시',
+                                    ? tr('약 ${_durationKr(currentSttEstimate())}', '~${_durationKr(currentSttEstimate())}')
+                                    : tr('실행 후 표시', 'Shown after run'),
                               ),
                               if (previousEstimateRatioFor(sttMode) != null)
                                 Text(
-                                  '이 회의의 이전 음성 인식 시간을 반영했습니다.',
+                                  tr('이 회의의 이전 음성 인식 시간을 반영했습니다.', 'Based on this meeting\'s previous transcription time.'),
                                   textAlign: TextAlign.right,
                                   style: TextStyle(
                                     fontSize: 11,
@@ -1350,23 +1358,23 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                 ),
                               if (useDiarization)
                                 _EstimateRow(
-                                  label: '발화자 라벨',
+                                  label: tr('발화자 라벨', 'Speaker labels'),
                                   value: audioDuration > Duration.zero
-                                      ? '약 ${_durationKr(diarizationEstimate)}'
-                                      : '실행 후 표시',
+                                      ? tr('약 ${_durationKr(diarizationEstimate)}', '~${_durationKr(diarizationEstimate)}')
+                                      : tr('실행 후 표시', 'Shown after run'),
                                 ),
                               const Divider(height: 22),
                               _EstimateRow(
-                                label: '총 예상',
+                                label: tr('총 예상', 'Total estimate'),
                                 value: audioDuration > Duration.zero
-                                    ? '약 ${_durationKr(totalEstimate())}'
-                                    : '실행 후 진행률 표시',
+                                    ? tr('약 ${_durationKr(totalEstimate())}', '~${_durationKr(totalEstimate())}')
+                                    : tr('실행 후 진행률 표시', 'Progress shown after run'),
                                 emphasis: true,
                               ),
                               const SizedBox(height: 14),
-                              const Text(
-                                '음성 인식 방식',
-                                style: TextStyle(
+                              Text(
+                                tr('음성 인식 방식', 'Transcription mode'),
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1377,22 +1385,28 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                   ButtonSegment(
                                     value: AppSettings.sttModeUltraFast,
                                     icon: MacosTooltip(
-                                      message:
+                                      message: tr(
                                           'Whisper large-v3-turbo Q8 (~900MB)\n'
                                           '대기 시간을 조금 더 줄이는 방식입니다.\n'
                                           '파일: ${AppConstants.sttModelFileFast}',
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          'Reduces latency a bit more.\n'
+                                          'File: ${AppConstants.sttModelFileFast}'),
                                       child: const Icon(
                                         Icons.flash_on,
                                         size: 14,
                                       ),
                                     ),
                                     label: MacosTooltip(
-                                      message:
+                                      message: tr(
                                           'Whisper large-v3-turbo Q8 (~900MB)\n'
                                           '대기 시간을 조금 더 줄이는 방식입니다.\n'
                                           '파일: ${AppConstants.sttModelFileFast}',
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          'Reduces latency a bit more.\n'
+                                          'File: ${AppConstants.sttModelFileFast}'),
                                       child: Text(
-                                        fastInstalled ? '빠름' : '빠름 (미설치)',
+                                        fastInstalled ? tr('빠름', 'Fast') : tr('빠름 (미설치)', 'Fast (not installed)'),
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -1401,19 +1415,25 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                   ButtonSegment(
                                     value: AppSettings.sttModeBalanced,
                                     icon: MacosTooltip(
-                                      message:
+                                      message: tr(
                                           'Whisper large-v3-turbo Q8 (~900MB)\n'
                                           '속도와 전사 품질을 함께 고려합니다.\n'
                                           '파일: ${AppConstants.sttModelFileFast}',
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          'Balances speed and transcription quality.\n'
+                                          'File: ${AppConstants.sttModelFileFast}'),
                                       child: const Icon(Icons.speed, size: 14),
                                     ),
                                     label: MacosTooltip(
-                                      message:
+                                      message: tr(
                                           'Whisper large-v3-turbo Q8 (~900MB)\n'
                                           '속도와 전사 품질을 함께 고려합니다.\n'
                                           '파일: ${AppConstants.sttModelFileFast}',
+                                          'Whisper large-v3-turbo Q8 (~900MB)\n'
+                                          'Balances speed and transcription quality.\n'
+                                          'File: ${AppConstants.sttModelFileFast}'),
                                       child: Text(
-                                        fastInstalled ? '표준' : '표준 (미설치)',
+                                        fastInstalled ? tr('표준', 'Standard') : tr('표준 (미설치)', 'Standard (not installed)'),
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -1422,22 +1442,28 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                   ButtonSegment(
                                     value: AppSettings.sttModeAccurate,
                                     icon: MacosTooltip(
-                                      message:
+                                      message: tr(
                                           'Whisper large-v3 Q5_0 (~1.1GB)\n'
                                           '품질 우선, 표준보다 오래 걸립니다.\n'
                                           '파일: ${AppConstants.sttModelFileAccurate}',
+                                          'Whisper large-v3 Q5_0 (~1.1GB)\n'
+                                          'Quality first; takes longer than Standard.\n'
+                                          'File: ${AppConstants.sttModelFileAccurate}'),
                                       child: const Icon(
                                         Icons.verified,
                                         size: 14,
                                       ),
                                     ),
                                     label: MacosTooltip(
-                                      message:
+                                      message: tr(
                                           'Whisper large-v3 Q5_0 (~1.1GB)\n'
                                           '품질 우선, 표준보다 오래 걸립니다.\n'
                                           '파일: ${AppConstants.sttModelFileAccurate}',
+                                          'Whisper large-v3 Q5_0 (~1.1GB)\n'
+                                          'Quality first; takes longer than Standard.\n'
+                                          'File: ${AppConstants.sttModelFileAccurate}'),
                                       child: Text(
-                                        accurateInstalled ? '정밀' : '정밀 (미설치)',
+                                        accurateInstalled ? tr('정밀', 'Precise') : tr('정밀 (미설치)', 'Precise (not installed)'),
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -1465,9 +1491,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
                                 initialValue: sttLanguage,
-                                decoration: const InputDecoration(
-                                  labelText: '음성 인식 언어',
-                                  border: OutlineInputBorder(),
+                                decoration: InputDecoration(
+                                  labelText: tr('음성 인식 언어', 'Transcription language'),
+                                  border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
                                 items: [
@@ -1499,11 +1525,11 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                               SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
                                 value: useDiarization,
-                                title: const Text('발화자 라벨 사용'),
+                                title: Text(tr('발화자 라벨 사용', 'Use speaker labels')),
                                 subtitle: Text(
                                   diarizationModelsReady
-                                      ? '끄면 더 빠르게 끝나지만, A/B/C 발화 흐름 정보는 제거됩니다.'
-                                      : '발화자 라벨 모델이 설치되어 있지 않습니다.',
+                                      ? tr('끄면 더 빠르게 끝나지만, A/B/C 발화 흐름 정보는 제거됩니다.', 'Turning this off finishes faster but removes A/B/C speaker flow information.')
+                                      : tr('발화자 라벨 모델이 설치되어 있지 않습니다.', 'The speaker label model is not installed.'),
                                 ),
                                 onChanged: diarizationModelsReady
                                     ? (v) => setDialog(() => useDiarization = v)
@@ -1521,7 +1547,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                               controlSize: ControlSize.large,
                               secondary: true,
                               onPressed: () => Navigator.pop(ctx),
-                              child: const Text('취소'),
+                              child: Text(tr('취소', 'Cancel')),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -1536,7 +1562,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                   sttLanguage: sttLanguage,
                                 ),
                               ),
-                              child: const Text('실행'),
+                              child: Text(tr('실행', 'Run')),
                             ),
                           ),
                         ],
@@ -1562,7 +1588,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     setState(() {
       _isRerunningStt = true;
       _cancelRerunSttRequested = false;
-      _rerunSttStatus = 'Whisper 모델 로드 중...';
+      _rerunSttStatus = tr('Whisper 모델 로드 중...', 'Loading Whisper model...');
       _rerunSttProgress = 0.0;
       _rerunSttProcessedMs = 0;
       _rerunSttTotalMs = 0;
@@ -1583,8 +1609,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
 
       if (mounted) {
         setState(
-          () => _rerunSttStatus =
+          () => _rerunSttStatus = tr(
               '${AppSettings.sttLanguageLabel(options.sttLanguage)} 음성 인식 중...',
+              '${AppSettings.sttLanguageLabel(options.sttLanguage)} transcription in progress...'),
         );
       }
       final sttSw = Stopwatch()..start();
@@ -1615,7 +1642,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           if (_cancelRerunSttRequested) throw const SttCancelledException();
           if (mounted) {
             setState(() {
-              _rerunSttStatus = '발화자 라벨 생성 중... 긴 녹음은 몇 분 걸릴 수 있습니다.';
+              _rerunSttStatus = tr('발화자 라벨 생성 중... 긴 녹음은 몇 분 걸릴 수 있습니다.', 'Generating speaker labels... Long recordings may take a few minutes.');
               _rerunSttProgress = 0.0;
               _rerunSttProcessedMs = 0;
               _rerunSttTotalMs = 0;
@@ -1631,8 +1658,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               setState(() {
                 _rerunSttProgress = completed ? 1.0 : 0.0;
                 _rerunSttStatus = completed
-                    ? '발화자 라벨 분석 완료. 전사본을 저장하고 있습니다.'
-                    : '발화자 라벨 생성 중... 오디오를 분석하고 있습니다.';
+                    ? tr('발화자 라벨 분석 완료. 전사본을 저장하고 있습니다.', 'Speaker label analysis complete. Saving the transcript.')
+                    : tr('발화자 라벨 생성 중... 오디오를 분석하고 있습니다.', 'Generating speaker labels... Analyzing the audio.');
               });
             },
           );
@@ -1655,13 +1682,13 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           );
           if (mounted) {
             setState(() {
-              _rerunSttStatus = '발화자 구분에 실패했습니다. 라벨 없이 전사본을 저장합니다.';
+              _rerunSttStatus = tr('발화자 구분에 실패했습니다. 라벨 없이 전사본을 저장합니다.', 'Speaker separation failed. Saving the transcript without labels.');
             });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
                   friendlyDiarizationFailureMessage(
-                    nextStep: '전사본은 발화자 라벨 없이 저장합니다.',
+                    nextStep: tr('전사본은 발화자 라벨 없이 저장합니다.', 'The transcript will be saved without speaker labels.'),
                   ),
                 ),
                 backgroundColor: Colors.orange.shade700,
@@ -1672,12 +1699,12 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         }
       }
 
-      if (mounted) setState(() => _rerunSttStatus = '기존 전사본 삭제 중...');
+      if (mounted) setState(() => _rerunSttStatus = tr('기존 전사본 삭제 중...', 'Deleting existing transcript...'));
       final db = IsarService.instance.db;
       final transcriptRepo = TranscriptRepositoryImpl(db);
       await transcriptRepo.deleteByMeetingId(widget.meetingId);
 
-      if (mounted) setState(() => _rerunSttStatus = '새 전사본 저장 중...');
+      if (mounted) setState(() => _rerunSttStatus = tr('새 전사본 저장 중...', 'Saving new transcript...'));
       final now = DateTime.now();
       for (int i = 0; i < segments.length; i++) {
         final seg = segments[i];
@@ -1732,12 +1759,13 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         final totalElapsed = _rerunSttStartTime == null
             ? Duration.zero
             : DateTime.now().difference(_rerunSttStartTime!);
-        final totalStr =
-            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초';
+        final totalStr = tr(
+            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초',
+            '${totalElapsed.inMinutes}m ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}s');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '음성 인식 완료 — ${segments.length}개 세그먼트 · 총 소요 $totalStr',
+              tr('음성 인식 완료 — ${segments.length}개 세그먼트 · 총 소요 $totalStr', 'Transcription complete — ${segments.length} segments · Total $totalStr'),
             ),
             backgroundColor: Colors.green.shade700,
           ),
@@ -1750,8 +1778,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         final totalElapsed = _rerunSttStartTime == null
             ? Duration.zero
             : DateTime.now().difference(_rerunSttStartTime!);
-        final totalStr =
-            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초';
+        final totalStr = tr(
+            '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초',
+            '${totalElapsed.inMinutes}m ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}s');
         _rerunTicker?.cancel();
         _rerunTicker = null;
         setState(() {
@@ -1763,9 +1792,11 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           SnackBar(
             content: Text(
               e is SttCancelledException
-                  ? '음성 인식 중지됨 · 총 소요 $totalStr'
-                  : '음성 인식 오류 · 총 소요 $totalStr\n'
+                  ? tr('음성 인식 중지됨 · 총 소요 $totalStr', 'Transcription stopped · Total $totalStr')
+                  : tr('음성 인식 오류 · 총 소요 $totalStr\n'
                         '${friendlyErrorText(e, fallbackTitle: '음성 인식을 완료하지 못했습니다', fallbackMessage: '녹음 파일을 텍스트로 변환하는 중 문제가 발생했습니다.', nextStep: '오디오 파일과 AI 모델 설치 상태를 확인한 뒤 다시 시도해주세요.')}',
+                        'Transcription error · Total $totalStr\n'
+                        '${friendlyErrorText(e, fallbackTitle: 'Could not complete transcription', fallbackMessage: 'A problem occurred while converting the recording to text.', nextStep: 'Check the audio file and AI model installation, then try again.')}'),
             ),
             backgroundColor: e is SttCancelledException
                 ? Colors.orange.shade700
@@ -1849,7 +1880,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       if (extracted.isEmpty) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('추출된 전문 용어가 없습니다.')));
+        ).showSnackBar(SnackBar(content: Text(tr('추출된 전문 용어가 없습니다.', 'No technical terms were extracted.'))));
         return;
       }
 
@@ -1879,9 +1910,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             content: Text(
               friendlyErrorText(
                 e,
-                fallbackTitle: '용어를 추출하지 못했습니다',
-                fallbackMessage: '전사본에서 용어를 찾는 중 문제가 발생했습니다.',
-                nextStep: '회의록 내용은 그대로 유지됩니다. 잠시 후 다시 시도해주세요.',
+                fallbackTitle: tr('용어를 추출하지 못했습니다', 'Could not extract terms'),
+                fallbackMessage: tr('전사본에서 용어를 찾는 중 문제가 발생했습니다.', 'A problem occurred while finding terms in the transcript.'),
+                nextStep: tr('회의록 내용은 그대로 유지됩니다. 잠시 후 다시 시도해주세요.', 'The meeting notes are kept unchanged. Please try again later.'),
               ),
             ),
             backgroundColor: Colors.red.shade700,
@@ -1944,9 +1975,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       ref.invalidate(meetingSummaryProvider(widget.meetingId));
       ref.invalidate(summaryVersionsProvider(widget.meetingId));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('요약을 수정했습니다. 이전 버전은 이력에 저장되었습니다.'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(tr('요약을 수정했습니다. 이전 버전은 이력에 저장되었습니다.', 'Summary updated. The previous version was saved to history.')),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -1997,7 +2028,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       if (_isSummarizing) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('이미 요약을 생성하고 있습니다.'),
+            content: Text(tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.')),
             backgroundColor: Colors.orange.shade700,
           ),
         );
@@ -2013,7 +2044,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('요약할 전사 내용이 없습니다. 먼저 음성 인식을 실행해주세요.'),
+            content: Text(tr('요약할 전사 내용이 없습니다. 먼저 음성 인식을 실행해주세요.', 'There is no transcript to summarize. Please run transcription first.')),
             backgroundColor: Colors.orange.shade700,
           ),
         );
@@ -2125,7 +2156,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         ? _buildSummarizingIndicator()
         : summaryAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('요약 로드 오류: $e')),
+            error: (e, _) => Center(child: Text(tr('요약 로드 오류: $e', 'Summary load error: $e'))),
             data: (s) => s == null
                 ? _buildNoSummary(transcripts ?? [], null, meeting: meeting)
                 : _buildSummarySection(context, s, transcripts ?? [], meeting),
@@ -2138,7 +2169,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   ) {
     return transcriptAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('녹취록 로드 오류: $e')),
+      error: (e, _) => Center(child: Text(tr('녹취록 로드 오류: $e', 'Transcript load error: $e'))),
       data: (segments) => _isRerunningStt
           ? _buildRerunSttIndicator()
           : _TranscriptWithAudio(
@@ -2173,7 +2204,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     final elapsedStr =
         '${elapsed.inMinutes}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
     final pctStr = (_rerunSttProgress * 100).toStringAsFixed(1);
-    final isDiarizing = _rerunSttStatus.contains('발화자 라벨');
+    final isDiarizing =
+        _rerunSttStatus.contains('발화자 라벨') ||
+        _rerunSttStatus.toLowerCase().contains('speaker label');
 
     // 남은 시간 추정: (1 - progress) / progress * elapsed — 첫 5% 이후에만 표시
     String etaStr = '';
@@ -2181,8 +2214,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       final remainSec =
           ((1 - _rerunSttProgress) / _rerunSttProgress * elapsed.inSeconds)
               .round();
-      etaStr =
-          '  ·  남은 ~${(remainSec ~/ 60)}:${(remainSec % 60).toString().padLeft(2, '0')}';
+      etaStr = tr(
+          '  ·  남은 ~${(remainSec ~/ 60)}:${(remainSec % 60).toString().padLeft(2, '0')}',
+          '  ·  ~${(remainSec ~/ 60)}:${(remainSec % 60).toString().padLeft(2, '0')} left');
     }
 
     return Padding(
@@ -2226,7 +2260,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _cancelRerunSttRequested ? '중지 중' : '중지',
+                        _cancelRerunSttRequested ? tr('중지 중', 'Stopping') : tr('중지', 'Stop'),
                         style: TextStyle(color: Colors.red.shade300),
                       ),
                     ],
@@ -2238,7 +2272,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           if (isDiarizing) ...[
             const SizedBox(height: 6),
             Text(
-              '말한 사람별 구간을 찾고 있습니다. 이 단계는 진행률이 자주 갱신되지 않을 수 있습니다.',
+              tr('말한 사람별 구간을 찾고 있습니다. 이 단계는 진행률이 자주 갱신되지 않을 수 있습니다.', 'Finding segments by speaker. Progress may not update frequently during this step.'),
               style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
             ),
           ],
@@ -2258,8 +2292,10 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           const SizedBox(height: 6),
           if (_rerunSttTotalMs > 0 && !isDiarizing)
             Text(
-              '${fmtMs(_rerunSttProcessedMs)} / ${fmtMs(_rerunSttTotalMs)}  '
+              tr('${fmtMs(_rerunSttProcessedMs)} / ${fmtMs(_rerunSttTotalMs)}  '
               '·  $pctStr%  ·  경과 $elapsedStr$etaStr',
+              '${fmtMs(_rerunSttProcessedMs)} / ${fmtMs(_rerunSttTotalMs)}  '
+              '·  $pctStr%  ·  elapsed $elapsedStr$etaStr'),
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.grey.shade500,
@@ -2268,7 +2304,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             )
           else
             Text(
-              '오디오 분석 중... · 경과 $elapsedStr',
+              tr('오디오 분석 중... · 경과 $elapsedStr', 'Analyzing audio... · elapsed $elapsedStr'),
               style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
             ),
         ],
@@ -2305,7 +2341,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               Expanded(
                 child: Text(
                   _summarizingStatus.isEmpty
-                      ? '요약 준비 중...'
+                      ? tr('요약 준비 중...', 'Preparing summary...')
                       : _summarizingStatus,
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade300),
                   overflow: TextOverflow.ellipsis,
@@ -2330,7 +2366,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _cancelSummaryRequested ? '중지 중' : '중지',
+                        _cancelSummaryRequested ? tr('중지 중', 'Stopping') : tr('중지', 'Stop'),
                         style: TextStyle(color: Colors.red.shade300),
                       ),
                     ],
@@ -2339,7 +2375,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               ),
               const SizedBox(width: 8),
               Text(
-                '$pctStr%  ·  경과 $elapsedStr',
+                tr('$pctStr%  ·  경과 $elapsedStr', '$pctStr%  ·  elapsed $elapsedStr'),
                 style: TextStyle(
                   fontSize: 11,
                   color: Colors.grey.shade500,
@@ -2387,7 +2423,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         '${created.hour.toString().padLeft(2, '0')}:'
         '${created.minute.toString().padLeft(2, '0')}';
     final durStr = meeting.durationSeconds > 0
-        ? '${meeting.durationSeconds ~/ 60}분 ${meeting.durationSeconds % 60}초'
+        ? tr('${meeting.durationSeconds ~/ 60}분 ${meeting.durationSeconds % 60}초', '${meeting.durationSeconds ~/ 60}m ${meeting.durationSeconds % 60}s')
         : null;
     final scheme = Theme.of(context).colorScheme;
 
@@ -2426,7 +2462,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       ),
                       const SizedBox(width: 6),
                       MacosTooltip(
-                        message: '제목 수정',
+                        message: tr('제목 수정', 'Edit title'),
                         child: MacosIconButton(
                           icon: Icon(
                             Icons.edit_outlined,
@@ -2511,15 +2547,15 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       context: context,
       builder: (ctx) => MacosAlertDialog(
         appIcon: const Icon(Icons.edit_outlined, size: 48),
-        title: const Text('제목 수정'),
+        title: Text(tr('제목 수정', 'Edit title')),
         message: SizedBox(
           width: 400,
           child: TextField(
             controller: ctrl,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: '회의 제목',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: tr('회의 제목', 'Meeting title'),
+              border: const OutlineInputBorder(),
             ),
             onSubmitted: (_) => _saveTitleEdit(ctx, ref, meeting, ctrl.text),
           ),
@@ -2527,13 +2563,13 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           onPressed: () => _saveTitleEdit(ctx, ref, meeting, ctrl.text),
-          child: const Text('저장'),
+          child: Text(tr('저장', 'Save')),
         ),
         secondaryButton: PushButton(
           controlSize: ControlSize.large,
           secondary: true,
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('취소'),
+          child: Text(tr('취소', 'Cancel')),
         ),
       ),
     );
@@ -2591,9 +2627,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     Meeting? meeting,
   ]) {
     final displayTitle = _badTitles.contains(s.meetingTitle.trim())
-        ? '회의 요약'
+        ? tr('회의 요약', 'Meeting summary')
         : s.meetingTitle.trim().isEmpty
-        ? '회의 요약'
+        ? tr('회의 요약', 'Meeting summary')
         : s.meetingTitle;
     return SingleChildScrollView(
       child: Column(
@@ -2608,7 +2644,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             children: [
               _SummaryToolbarButton(
                 icon: Icons.book_outlined,
-                label: '용어 추출',
+                label: tr('용어 추출', 'Extract terms'),
                 loading: _isExtractingTerms,
                 onPressed:
                     (_isExtractingTerms ||
@@ -2619,12 +2655,12 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               ),
               _SummaryToolbarButton(
                 icon: Icons.edit_outlined,
-                label: '편집',
+                label: tr('편집', 'Edit'),
                 onPressed: _isSummarizing ? null : () => _showEditSummary(s),
               ),
               _SummaryToolbarButton(
                 icon: Icons.history,
-                label: '이력',
+                label: tr('이력', 'History'),
                 onPressed: () => _showHistory(context),
               ),
               StreamBuilder<NativeModelTaskSnapshot>(
@@ -2634,7 +2670,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                   final active = snapshot.data?.activeLabel;
                   final reason = active == null
                       ? null
-                      : '현재 $active 작업 중입니다. 완료 후 다시 요약해주세요.';
+                      : tr('현재 $active 작업 중입니다. 완료 후 다시 요약해주세요.', '$active is currently running. Please re-summarize after it finishes.');
                   final disabled =
                       transcripts.isEmpty ||
                       _isSummarizing ||
@@ -2644,7 +2680,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                     reason,
                     _SummaryToolbarButton(
                       icon: Icons.auto_awesome,
-                      label: '다시 요약',
+                      label: tr('다시 요약', 'Re-summarize'),
                       primary: true,
                       onPressed: disabled
                           ? null
@@ -2678,7 +2714,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           ),
           const SizedBox(height: 8),
           _SectionCard(
-            title: '회의 요약',
+            title: tr('회의 요약', 'Meeting summary'),
             icon: Icons.auto_awesome,
             child: SelectableText(
               displayTitle,
@@ -2688,7 +2724,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           if (s.participants.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SectionCard(
-              title: '참석자',
+              title: tr('참석자', 'Participants'),
               icon: Icons.people_outline,
               child: SelectableText(
                 s.participants.join(', '),
@@ -2726,7 +2762,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                       SnackBar(
                         duration: Duration(seconds: ok ? 2 : 4),
                         content: Text(
-                          ok ? '북마크 지점으로 이동 + 오디오 재생' : '북마크 지점 전사로 이동 · $err',
+                          ok ? tr('북마크 지점으로 이동 + 오디오 재생', 'Jumped to bookmark + playing audio') : tr('북마크 지점 전사로 이동 · $err', 'Jumped to bookmark transcript · $err'),
                         ),
                         backgroundColor: ok
                             ? Colors.indigo.shade600
@@ -2741,7 +2777,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           if (s.keyDiscussions.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SectionCard(
-              title: '주요 논의',
+              title: tr('주요 논의', 'Key discussion'),
               icon: Icons.chat_bubble_outline,
               child: _EvidenceBulletList(
                 items: s.keyDiscussions,
@@ -2750,7 +2786,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                 onEvidence: (item) {
                   final idx = s.keyDiscussions.indexOf(item);
                   _handleEvidenceTap(
-                    title: '주요 논의 근거',
+                    title: tr('주요 논의 근거', 'Key discussion evidence'),
                     query: item,
                     transcripts: transcripts,
                     evidenceTs: _evidenceAt(s, 'keyDiscussions', idx),
@@ -2762,7 +2798,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           if (s.decisions.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SectionCard(
-              title: '결정 사항',
+              title: tr('결정 사항', 'Decisions'),
               icon: Icons.gavel,
               child: _EvidenceBulletList(
                 items: s.decisions,
@@ -2771,7 +2807,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                 onEvidence: (item) {
                   final idx = s.decisions.indexOf(item);
                   _handleEvidenceTap(
-                    title: '결정 사항 근거',
+                    title: tr('결정 사항 근거', 'Decisions evidence'),
                     query: item,
                     transcripts: transcripts,
                     evidenceTs: _evidenceAt(s, 'decisions', idx),
@@ -2784,7 +2820,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           if (s.openQuestions.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SectionCard(
-              title: '미해결 이슈',
+              title: tr('미해결 이슈', 'Open issues'),
               icon: Icons.help_outline,
               child: _EvidenceBulletList(
                 items: s.openQuestions,
@@ -2793,7 +2829,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                 onEvidence: (item) {
                   final idx = s.openQuestions.indexOf(item);
                   _handleEvidenceTap(
-                    title: '미해결 이슈 근거',
+                    title: tr('미해결 이슈 근거', 'Open issues evidence'),
                     query: item,
                     transcripts: transcripts,
                     evidenceTs: _evidenceAt(s, 'openQuestions', idx),
@@ -2806,7 +2842,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           if (meeting != null && meeting.notes.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SectionCard(
-              title: '내 메모',
+              title: tr('내 메모', 'My notes'),
               icon: Icons.edit_note,
               child: _NotesEditor(
                 meeting: meeting,
@@ -2838,10 +2874,10 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     return [
       const SizedBox(height: 8),
       _SectionCard(
-        title: items.isEmpty ? '액션 아이템' : '액션 아이템 ($doneCount/${items.length})',
+        title: items.isEmpty ? tr('액션 아이템', 'Action items') : tr('액션 아이템 ($doneCount/${items.length})', 'Action items ($doneCount/${items.length})'),
         icon: Icons.check_box_outlined,
         trailing: MacosTooltip(
-          message: '액션 아이템 추가',
+          message: tr('액션 아이템 추가', 'Add action item'),
           child: MacosIconButton(
             icon: const Icon(Icons.add_circle_outline, size: 18),
             backgroundColor: Colors.transparent,
@@ -2859,7 +2895,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             ? Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Text(
-                  '아직 등록된 항목이 없습니다. + 버튼으로 추가하세요.',
+                  tr('아직 등록된 항목이 없습니다. + 버튼으로 추가하세요.', 'No items yet. Add one with the + button.'),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                 ),
               )
@@ -2891,7 +2927,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                 if (item.deadline.isNotEmpty) item.deadline,
                               ];
                               _handleEvidenceTap(
-                                title: '액션 아이템 근거',
+                                title: tr('액션 아이템 근거', 'Action item evidence'),
                                 query: parts.join(' '),
                                 transcripts: transcripts,
                                 evidenceTs: _evidenceAt(s, 'actionItems', i),
@@ -2919,7 +2955,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           icon: report.inputQualityStatus == 'empty'
               ? Icons.hearing_disabled_outlined
               : Icons.warning_amber_rounded,
-          label: '녹음 품질',
+          label: tr('녹음 품질', 'Recording quality'),
           value: _inputQualityStatusLabel(report.inputQualityStatus),
           subLabel: report.inputQualityReason,
           accentColor: report.inputQualityStatus == 'empty'
@@ -2932,7 +2968,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       items.add(
         _ReportMetric(
           icon: Icons.graphic_eq,
-          label: '음성 인식',
+          label: tr('음성 인식', 'Transcription'),
           value: _durationKrFromMs(report.sttElapsedMs),
           subLabel: '',
         ),
@@ -2942,7 +2978,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       items.add(
         _ReportMetric(
           icon: Icons.record_voice_over_outlined,
-          label: '발화자 라벨',
+          label: tr('발화자 라벨', 'Speaker labels'),
           value: report.diarizationStatus == 'success'
               ? _durationKrFromMs(report.diarizationElapsedMs)
               : _diarizationStatusLabel(report.diarizationStatus),
@@ -2954,7 +2990,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       items.add(
         _ReportMetric(
           icon: Icons.auto_awesome,
-          label: '요약 생성',
+          label: tr('요약 생성', 'Summary generation'),
           value: _durationKrFromMs(report.summaryElapsedMs),
           subLabel: '',
         ),
@@ -2963,7 +2999,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
 
     if (items.isEmpty) return const SizedBox.shrink();
     return _SectionCard(
-      title: '작업 시간',
+      title: tr('작업 시간', 'Processing time'),
       icon: Icons.speed_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2977,17 +3013,17 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   }
 
   String _diarizationStatusLabel(String status) => switch (status) {
-    'success' => '성공',
-    'failed' => '실패',
-    'skipped' => '건너뜀',
-    'disabled' => '비활성',
+    'success' => tr('성공', 'Success'),
+    'failed' => tr('실패', 'Failed'),
+    'skipped' => tr('건너뜀', 'Skipped'),
+    'disabled' => tr('비활성', 'Disabled'),
     _ => status.isEmpty ? '-' : status,
   };
 
   String _inputQualityStatusLabel(String status) => switch (status) {
-    'empty' => '마이크 입력 낮음',
-    'low' => '전사 부족',
-    'ok' => '정상',
+    'empty' => tr('마이크 입력 낮음', 'Low mic input'),
+    'low' => tr('전사 부족', 'Insufficient transcript'),
+    'ok' => tr('정상', 'OK'),
     _ => status.isEmpty ? '-' : status,
   };
 
@@ -3043,22 +3079,22 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           color: Colors.orange,
           size: 48,
         ),
-        title: const Text('액션 아이템 삭제'),
+        title: Text(tr('액션 아이템 삭제', 'Delete action item')),
         message: Text(
-          '"${items[index].task}" 을(를) 삭제할까요?',
+          tr('"${items[index].task}" 을(를) 삭제할까요?', 'Delete "${items[index].task}"?'),
           textAlign: TextAlign.center,
         ),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           color: MacosColors.systemRedColor,
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('삭제', style: TextStyle(color: MacosColors.white)),
+          child: Text(tr('삭제', 'Delete'), style: const TextStyle(color: MacosColors.white)),
         ),
         secondaryButton: PushButton(
           controlSize: ControlSize.large,
           secondary: true,
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('취소'),
+          child: Text(tr('취소', 'Cancel')),
         ),
       ),
     );
@@ -3085,7 +3121,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       children: [
         Icon(Icons.summarize_outlined, size: 40, color: Colors.grey.shade400),
         const SizedBox(height: 8),
-        Text('요약이 없습니다.', style: TextStyle(color: Colors.grey.shade500)),
+        Text(tr('요약이 없습니다.', 'No summary yet.'), style: TextStyle(color: Colors.grey.shade500)),
         if (transcripts.isNotEmpty) ...[
           const SizedBox(height: 16),
           StreamBuilder<NativeModelTaskSnapshot>(
@@ -3095,7 +3131,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               final active = snapshot.data?.activeLabel;
               final reason = active == null
                   ? null
-                  : '현재 $active 작업 중입니다. 완료 후 요약을 생성해주세요.';
+                  : tr('현재 $active 작업 중입니다. 완료 후 요약을 생성해주세요.', '$active is currently running. Please generate the summary after it finishes.');
               final disabled =
                   _isSummarizing || _isRerunningStt || reason != null;
               return _withDisabledReason(
@@ -3106,7 +3142,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                     textStyle: const TextStyle(fontSize: 13),
                   ),
                   icon: const Icon(Icons.auto_awesome, size: 15),
-                  label: const Text('요약 생성'),
+                  label: Text(tr('요약 생성', 'Generate summary')),
                   onPressed: disabled
                       ? null
                       : () => _runResummarize(
@@ -3320,9 +3356,9 @@ class _ExportMenuState extends State<_ExportMenu> {
           );
           if (mounted) {
             if (path != null) {
-              _showSnack('텍스트 저장 완료 — 클릭하여 열기', openPath: path);
+              _showSnack(tr('텍스트 저장 완료 — 클릭하여 열기', 'Text saved — click to open'), openPath: path);
             } else {
-              _showSnack('저장 취소됨');
+              _showSnack(tr('저장 취소됨', 'Save cancelled'));
             }
           }
           break;
@@ -3335,9 +3371,9 @@ class _ExportMenuState extends State<_ExportMenu> {
           );
           if (mounted) {
             if (path != null) {
-              _showSnack('Markdown 저장 완료 — 클릭하여 열기', openPath: path);
+              _showSnack(tr('Markdown 저장 완료 — 클릭하여 열기', 'Markdown saved — click to open'), openPath: path);
             } else {
-              _showSnack('저장 취소됨');
+              _showSnack(tr('저장 취소됨', 'Save cancelled'));
             }
           }
           break;
@@ -3348,7 +3384,7 @@ class _ExportMenuState extends State<_ExportMenu> {
             widget.summary,
             widget.transcripts,
           );
-          if (mounted) _showSnack('Markdown 복사 완료');
+          if (mounted) _showSnack(tr('Markdown 복사 완료', 'Markdown copied'));
           break;
 
         case 'copy_notion':
@@ -3356,7 +3392,7 @@ class _ExportMenuState extends State<_ExportMenu> {
             widget.meeting,
             widget.summary,
           );
-          if (mounted) _showSnack('Notion용 요약 복사 완료');
+          if (mounted) _showSnack(tr('Notion용 요약 복사 완료', 'Notion summary copied'));
           break;
 
         case 'copy_report':
@@ -3364,7 +3400,7 @@ class _ExportMenuState extends State<_ExportMenu> {
             widget.meeting,
             widget.summary,
           );
-          if (mounted) _showSnack('보고서 형식 복사 완료');
+          if (mounted) _showSnack(tr('보고서 형식 복사 완료', 'Report format copied'));
           break;
 
         case 'report_pdf':
@@ -3375,9 +3411,9 @@ class _ExportMenuState extends State<_ExportMenu> {
           );
           if (mounted) {
             if (path != null) {
-              _showSnack('보고서 PDF 저장 완료 — 클릭하여 열기', openPath: path);
+              _showSnack(tr('보고서 PDF 저장 완료 — 클릭하여 열기', 'Report PDF saved — click to open'), openPath: path);
             } else {
-              _showSnack('저장 취소됨');
+              _showSnack(tr('저장 취소됨', 'Save cancelled'));
             }
           }
           break;
@@ -3389,16 +3425,16 @@ class _ExportMenuState extends State<_ExportMenu> {
           );
           if (mounted) {
             if (path != null) {
-              _showSnack('보고서 Word 문서 저장 완료 — 클릭하여 열기', openPath: path);
+              _showSnack(tr('보고서 Word 문서 저장 완료 — 클릭하여 열기', 'Report Word document saved — click to open'), openPath: path);
             } else {
-              _showSnack('저장 취소됨');
+              _showSnack(tr('저장 취소됨', 'Save cancelled'));
             }
           }
           break;
 
         case 'copy_actions':
           await ExportService.copyActionItems(widget.meeting, widget.summary);
-          if (mounted) _showSnack('액션아이템 복사 완료');
+          if (mounted) _showSnack(tr('액션아이템 복사 완료', 'Action items copied'));
           break;
 
         case 'pdf':
@@ -3410,7 +3446,7 @@ class _ExportMenuState extends State<_ExportMenu> {
             onFontError: () {
               if (mounted) {
                 _showSnack(
-                  '한국어 폰트를 찾을 수 없습니다. 텍스트(.txt)로 저장해주세요.',
+                  tr('한국어 폰트를 찾을 수 없습니다. 텍스트(.txt)로 저장해주세요.', 'Korean font not found. Please save as text (.txt).'),
                   isError: true,
                 );
               }
@@ -3418,7 +3454,7 @@ class _ExportMenuState extends State<_ExportMenu> {
           );
           if (mounted) {
             if (path != null) {
-              _showSnack('PDF 저장 완료 — 클릭하여 열기', openPath: path);
+              _showSnack(tr('PDF 저장 완료 — 클릭하여 열기', 'PDF saved — click to open'), openPath: path);
             }
           }
           break;
@@ -3431,9 +3467,9 @@ class _ExportMenuState extends State<_ExportMenu> {
           );
           if (mounted) {
             if (path != null) {
-              _showSnack('Word 문서 저장 완료 — 클릭하여 열기', openPath: path);
+              _showSnack(tr('Word 문서 저장 완료 — 클릭하여 열기', 'Word document saved — click to open'), openPath: path);
             } else {
-              _showSnack('저장 취소됨');
+              _showSnack(tr('저장 취소됨', 'Save cancelled'));
             }
           }
           break;
@@ -3444,7 +3480,7 @@ class _ExportMenuState extends State<_ExportMenu> {
             widget.summary,
           );
           if (mounted && !ok) {
-            _showSnack('메일 앱을 열 수 없습니다.', isError: true);
+            _showSnack(tr('메일 앱을 열 수 없습니다.', 'Could not open the mail app.'), isError: true);
           }
           break;
 
@@ -3457,7 +3493,7 @@ class _ExportMenuState extends State<_ExportMenu> {
           break;
       }
     } catch (e) {
-      if (mounted) _showSnack('내보내기 오류: $e', isError: true);
+      if (mounted) _showSnack(tr('내보내기 오류: $e', 'Export error: $e'), isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -3505,7 +3541,7 @@ class _ExportMenuState extends State<_ExportMenu> {
           )
         : PopupMenuButton<String>(
             enabled: widget.enabled,
-            tooltip: '내보내기',
+            tooltip: tr('내보내기', 'Export'),
             icon: Icon(
               Icons.ios_share,
               color: widget.enabled
@@ -3514,38 +3550,38 @@ class _ExportMenuState extends State<_ExportMenu> {
             ),
             onSelected: _handle,
             itemBuilder: (ctx) => [
-              _menuItem('txt', Icons.text_snippet_outlined, '텍스트로 저장 (.txt)'),
+              _menuItem('txt', Icons.text_snippet_outlined, tr('텍스트로 저장 (.txt)', 'Save as text (.txt)')),
               _menuItem(
                 'markdown',
                 Icons.integration_instructions_outlined,
-                'Markdown으로 저장 (.md)',
+                tr('Markdown으로 저장 (.md)', 'Save as Markdown (.md)'),
               ),
               _menuItem(
                 'copy_markdown',
                 Icons.content_copy_outlined,
-                'Markdown 복사',
+                tr('Markdown 복사', 'Copy Markdown'),
               ),
               _menuItem(
                 'copy_notion',
                 Icons.dashboard_customize_outlined,
-                'Notion용 요약 복사',
+                tr('Notion용 요약 복사', 'Copy summary for Notion'),
               ),
-              _menuItem('copy_report', Icons.assignment_outlined, '보고서 형식 복사'),
+              _menuItem('copy_report', Icons.assignment_outlined, tr('보고서 형식 복사', 'Copy report format')),
               _menuItem(
                 'report_pdf',
                 Icons.request_page_outlined,
-                '보고서 PDF 저장',
+                tr('보고서 PDF 저장', 'Save report PDF'),
               ),
-              _menuItem('report_docx', Icons.article_outlined, '보고서 Word 저장'),
-              _menuItem('copy_actions', Icons.checklist_outlined, '액션아이템만 복사'),
-              _menuItem('pdf', Icons.picture_as_pdf_outlined, 'PDF로 저장 (.pdf)'),
+              _menuItem('report_docx', Icons.article_outlined, tr('보고서 Word 저장', 'Save report Word')),
+              _menuItem('copy_actions', Icons.checklist_outlined, tr('액션아이템만 복사', 'Copy action items only')),
+              _menuItem('pdf', Icons.picture_as_pdf_outlined, tr('PDF로 저장 (.pdf)', 'Save as PDF (.pdf)')),
               _menuItem(
                 'docx',
                 Icons.description_outlined,
-                'Word 문서로 저장 (.docx)',
+                tr('Word 문서로 저장 (.docx)', 'Save as Word document (.docx)'),
               ),
               const PopupMenuDivider(),
-              _menuItem('email', Icons.email_outlined, '이메일로 보내기'),
+              _menuItem('email', Icons.email_outlined, tr('이메일로 보내기', 'Send via email')),
             ],
           );
   }
@@ -3576,7 +3612,7 @@ class _BookmarksCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final amber = Colors.amber.shade700;
     return _SectionCard(
-      title: '핵심 마킹 (${bookmarks.length})',
+      title: tr('핵심 마킹 (${bookmarks.length})', 'Key markers (${bookmarks.length})'),
       icon: Icons.bookmark_rounded,
       child: Wrap(
         spacing: 6,
@@ -3584,7 +3620,7 @@ class _BookmarksCard extends StatelessWidget {
         children: [
           for (final b in bookmarks)
             MacosTooltip(
-              message: '${b.timeStr} 시점으로 이동',
+              message: tr('${b.timeStr} 시점으로 이동', 'Jump to ${b.timeStr}'),
               child: InkWell(
                 borderRadius: BorderRadius.circular(999),
                 onTap: () => onJump(b.sec),
@@ -3652,9 +3688,9 @@ class _AgendaCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '회의 어젠다',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              Text(
+                tr('회의 어젠다', 'Meeting agenda'),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -3664,7 +3700,7 @@ class _AgendaCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '한 줄에 하나씩 입력하세요. 다시 요약 시 항목별로 정리됩니다.',
+                      tr('한 줄에 하나씩 입력하세요. 다시 요약 시 항목별로 정리됩니다.', 'Enter one per line. They will be organized by item on the next summary.'),
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade600,
@@ -3677,7 +3713,7 @@ class _AgendaCard extends StatelessWidget {
                       minLines: 4,
                       autofocus: true,
                       decoration: InputDecoration(
-                        hintText: '예:\n- 신규 피처 일정\n- QA 리소스 확보',
+                        hintText: tr('예:\n- 신규 피처 일정\n- QA 리소스 확보', 'e.g.:\n- New feature schedule\n- Secure QA resources'),
                         hintStyle: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade400,
@@ -3698,9 +3734,9 @@ class _AgendaCard extends StatelessWidget {
                       controlSize: ControlSize.large,
                       secondary: true,
                       onPressed: () => Navigator.pop(ctx, ''),
-                      child: const Text(
-                        '지우기',
-                        style: TextStyle(color: Colors.red),
+                      child: Text(
+                        tr('지우기', 'Clear'),
+                        style: const TextStyle(color: Colors.red),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -3709,13 +3745,13 @@ class _AgendaCard extends StatelessWidget {
                     controlSize: ControlSize.large,
                     secondary: true,
                     onPressed: () => Navigator.pop(ctx, null),
-                    child: const Text('취소'),
+                    child: Text(tr('취소', 'Cancel')),
                   ),
                   const SizedBox(width: 8),
                   PushButton(
                     controlSize: ControlSize.large,
                     onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                    child: const Text('저장'),
+                    child: Text(tr('저장', 'Save')),
                   ),
                 ],
               ),
@@ -3740,10 +3776,10 @@ class _AgendaCard extends StatelessWidget {
         .toList();
 
     return _SectionCard(
-      title: '어젠다',
+      title: tr('어젠다', 'Agenda'),
       icon: Icons.checklist_rtl_outlined,
       trailing: MacosTooltip(
-        message: agenda.isEmpty ? '어젠다 추가' : '어젠다 편집',
+        message: agenda.isEmpty ? tr('어젠다 추가', 'Add agenda') : tr('어젠다 편집', 'Edit agenda'),
         child: MacosIconButton(
           icon: Icon(
             agenda.isEmpty ? Icons.add_circle_outline : Icons.edit_outlined,
@@ -3764,7 +3800,7 @@ class _AgendaCard extends StatelessWidget {
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Text(
-                '어젠다가 없습니다. + 버튼으로 추가하면 다음 요약에 반영됩니다.',
+                tr('어젠다가 없습니다. + 버튼으로 추가하면 다음 요약에 반영됩니다.', 'No agenda. Add one with the + button to include it in the next summary.'),
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
             )
@@ -3866,15 +3902,15 @@ class _SpeakerStatsCard extends StatelessWidget {
 
   String _displayLabel(String label) {
     final name = speakerNames[label]?.trim();
-    if (name == null || name.isEmpty) return '화자 $label';
-    return '$name (화자 $label)';
+    if (name == null || name.isEmpty) return tr('화자 $label', 'Speaker $label');
+    return tr('$name (화자 $label)', '$name (Speaker $label)');
   }
 
   String _formatDuration(Duration d) {
     final m = d.inMinutes;
     final s = d.inSeconds % 60;
-    if (m == 0) return '$s초';
-    return '$m분 $s초';
+    if (m == 0) return tr('$s초', '${s}s');
+    return tr('$m분 $s초', '${m}m ${s}s');
   }
 
   @override
@@ -3885,10 +3921,10 @@ class _SpeakerStatsCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return _SectionCard(
-      title: '발언 통계',
+      title: tr('발언 통계', 'Speaking stats'),
       icon: Icons.record_voice_over_outlined,
       trailing: Text(
-        '${report.speakerCount}명 식별 · ${_formatDuration(report.labeledDuration)}',
+        tr('${report.speakerCount}명 식별 · ${_formatDuration(report.labeledDuration)}', '${report.speakerCount} identified · ${_formatDuration(report.labeledDuration)}'),
         style: TextStyle(
           fontSize: 11,
           color: Colors.grey.shade600,
@@ -3959,7 +3995,7 @@ class _SpeakerStatsCard extends StatelessWidget {
                   SizedBox(
                     width: 76,
                     child: Text(
-                      '${_formatDuration(report.speakers[i].duration)} · ${report.speakers[i].segmentCount}회',
+                      tr('${_formatDuration(report.speakers[i].duration)} · ${report.speakers[i].segmentCount}회', '${_formatDuration(report.speakers[i].duration)} · ${report.speakers[i].segmentCount}x'),
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade600,
@@ -3986,7 +4022,7 @@ class _SpeakerStatsCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '미식별 (${report.unlabeledSegmentCount}개 세그먼트)',
+                    tr('미식별 (${report.unlabeledSegmentCount}개 세그먼트)', 'Unidentified (${report.unlabeledSegmentCount} segments)'),
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                   ),
                 ),
@@ -4012,7 +4048,7 @@ class _QualityScoreCard extends StatelessWidget {
     if (report.isEmpty) return const SizedBox.shrink();
     final gradeColor = _gradeColor(report.overallScore);
     return _SectionCard(
-      title: '회의 품질',
+      title: tr('회의 품질', 'Meeting quality'),
       icon: Icons.insights_outlined,
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -4037,10 +4073,10 @@ class _QualityScoreCard extends StatelessWidget {
             spacing: 14,
             runSpacing: 8,
             children: [
-              _QualitySubScore(label: '결정', score: report.decisionsScore),
-              _QualitySubScore(label: '액션', score: report.actionsScore),
-              _QualitySubScore(label: '발화 균형', score: report.balanceScore),
-              _QualitySubScore(label: '근거', score: report.evidenceScore),
+              _QualitySubScore(label: tr('결정', 'Decisions'), score: report.decisionsScore),
+              _QualitySubScore(label: tr('액션', 'Actions'), score: report.actionsScore),
+              _QualitySubScore(label: tr('발화 균형', 'Speaking balance'), score: report.balanceScore),
+              _QualitySubScore(label: tr('근거', 'Evidence'), score: report.evidenceScore),
             ],
           ),
           if (report.hints.isNotEmpty) ...[
@@ -4214,8 +4250,8 @@ class _AdvancedReportInfo extends StatelessWidget {
   const _AdvancedReportInfo({required this.report});
 
   String _sttModeLabel(String model) {
-    if (model.contains('turbo')) return '빠른 모드';
-    if (model.contains('q5') || model.contains('large-v3')) return '정확 모드';
+    if (model.contains('turbo')) return tr('빠른 모드', 'Fast mode');
+    if (model.contains('q5') || model.contains('large-v3')) return tr('정확 모드', 'Accurate mode');
     return model.isEmpty ? '-' : model;
   }
 
@@ -4226,17 +4262,17 @@ class _AdvancedReportInfo extends StatelessWidget {
   };
 
   String _diarStatusLabel(String status) => switch (status) {
-    'success' => '성공',
-    'failed' => '실패',
-    'skipped' => '건너뜀',
-    'disabled' => '비활성',
+    'success' => tr('성공', 'Success'),
+    'failed' => tr('실패', 'Failed'),
+    'skipped' => tr('건너뜀', 'Skipped'),
+    'disabled' => tr('비활성', 'Disabled'),
     _ => status.isEmpty ? '-' : status,
   };
 
   String _inputQualityLabel(String status) => switch (status) {
-    'empty' => '거의 빈 녹음',
-    'low' => '요약 품질 낮을 수 있음',
-    'ok' => '정상',
+    'empty' => tr('거의 빈 녹음', 'Nearly empty recording'),
+    'low' => tr('요약 품질 낮을 수 있음', 'Summary quality may be low'),
+    'ok' => tr('정상', 'OK'),
     _ => status.isEmpty ? '-' : status,
   };
 
@@ -4245,7 +4281,7 @@ class _AdvancedReportInfo extends StatelessWidget {
     final d = Duration(milliseconds: ms);
     final m = d.inMinutes;
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$m분 $s초';
+    return tr('$m분 $s초', '${m}m ${s}s');
   }
 
   @override
@@ -4255,26 +4291,27 @@ class _AdvancedReportInfo extends StatelessWidget {
     if (report.inputQualityStatus.isNotEmpty) {
       rows.add(
         _AdvancedRow(
-          label: '녹음 품질',
+          label: tr('녹음 품질', 'Recording quality'),
           value: _inputQualityLabel(report.inputQualityStatus),
         ),
       );
       if (report.inputQualityReason.isNotEmpty) {
         rows.add(
-          _AdvancedRow(label: '품질 사유', value: report.inputQualityReason),
+          _AdvancedRow(label: tr('품질 사유', 'Quality reason'), value: report.inputQualityReason),
         );
       }
       rows.add(
         _AdvancedRow(
-          label: '전사 글자/세그먼트',
-          value:
+          label: tr('전사 글자/세그먼트', 'Transcript chars/segments'),
+          value: tr(
               '${report.inputRecognizedChars}자 / ${report.inputSegmentCount}개',
+              '${report.inputRecognizedChars} chars / ${report.inputSegmentCount}'),
         ),
       );
       if (report.inputMaxLevel > 0) {
         rows.add(
           _AdvancedRow(
-            label: '최대 입력 레벨',
+            label: tr('최대 입력 레벨', 'Max input level'),
             value: '${(report.inputMaxLevel * 100).toStringAsFixed(0)}%',
           ),
         );
@@ -4283,12 +4320,12 @@ class _AdvancedReportInfo extends StatelessWidget {
 
     if (report.sttModel.isNotEmpty || report.sttAudioMs > 0) {
       rows.add(
-        _AdvancedRow(label: '음성 인식 모드', value: _sttModeLabel(report.sttModel)),
+        _AdvancedRow(label: tr('음성 인식 모드', 'Transcription mode'), value: _sttModeLabel(report.sttModel)),
       );
       if (report.sttProcessingMode.isNotEmpty) {
         rows.add(
           _AdvancedRow(
-            label: '음성 인식 처리 방식',
+            label: tr('음성 인식 처리 방식', 'Transcription processing mode'),
             value: AppSettings.sttProcessingModeLabel(report.sttProcessingMode),
           ),
         );
@@ -4296,23 +4333,23 @@ class _AdvancedReportInfo extends StatelessWidget {
       if (report.sttLanguage.isNotEmpty) {
         rows.add(
           _AdvancedRow(
-            label: '음성 인식 언어',
+            label: tr('음성 인식 언어', 'Transcription language'),
             value: AppSettings.sttLanguageLabel(report.sttLanguage),
           ),
         );
       }
       if (report.sttModel.isNotEmpty) {
-        rows.add(_AdvancedRow(label: '음성 인식 모델 파일', value: report.sttModel));
+        rows.add(_AdvancedRow(label: tr('음성 인식 모델 파일', 'Transcription model file'), value: report.sttModel));
       }
       if (report.sttAudioMs > 0) {
         rows.add(
-          _AdvancedRow(label: '오디오 길이', value: _durationKr(report.sttAudioMs)),
+          _AdvancedRow(label: tr('오디오 길이', 'Audio length'), value: _durationKr(report.sttAudioMs)),
         );
       }
       if (report.sttRtf > 0) {
         rows.add(
           _AdvancedRow(
-            label: '처리 속도(RTF)',
+            label: tr('처리 속도(RTF)', 'Processing speed (RTF)'),
             value: '${report.sttRtf.toStringAsFixed(2)}x',
           ),
         );
@@ -4322,7 +4359,7 @@ class _AdvancedReportInfo extends StatelessWidget {
     if (report.diarizationEnabled || report.diarizationStatus.isNotEmpty) {
       rows.add(
         _AdvancedRow(
-          label: '발화자 라벨 상태',
+          label: tr('발화자 라벨 상태', 'Speaker label status'),
           value: _diarStatusLabel(report.diarizationStatus),
         ),
       );
@@ -4330,9 +4367,9 @@ class _AdvancedReportInfo extends StatelessWidget {
 
     if (report.llmModel.isNotEmpty) {
       rows.add(
-        _AdvancedRow(label: '요약 모델', value: _llmDisplayName(report.llmModel)),
+        _AdvancedRow(label: tr('요약 모델', 'Summary model'), value: _llmDisplayName(report.llmModel)),
       );
-      rows.add(_AdvancedRow(label: '요약 모델 ID', value: report.llmModel));
+      rows.add(_AdvancedRow(label: tr('요약 모델 ID', 'Summary model ID'), value: report.llmModel));
     }
 
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -4346,7 +4383,7 @@ class _AdvancedReportInfo extends StatelessWidget {
         dense: true,
         visualDensity: const VisualDensity(horizontal: -3, vertical: -3),
         title: Text(
-          '고급 정보',
+          tr('고급 정보', 'Advanced info'),
           style: TextStyle(
             fontSize: 11,
             color: Colors.grey.shade600,
@@ -4536,8 +4573,8 @@ class _EvidenceButton extends StatelessWidget {
 
     return MacosTooltip(
       message: hasTimestamp
-          ? '$ts 시점으로 이동'
-          : 'LLM이 근거 타임스탬프를 명시하지 않았습니다. 키워드 검색으로 후보 구간을 찾아보세요.',
+          ? tr('$ts 시점으로 이동', 'Jump to $ts')
+          : tr('LLM이 근거 타임스탬프를 명시하지 않았습니다. 키워드 검색으로 후보 구간을 찾아보세요.', 'The LLM did not specify an evidence timestamp. Search by keyword to find candidate segments.'),
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
           visualDensity: VisualDensity.compact,
@@ -4555,7 +4592,7 @@ class _EvidenceButton extends StatelessWidget {
               : Icons.warning_amber_rounded,
           size: 13,
         ),
-        label: Text(hasTimestamp ? '근거 $ts' : '근거 미명시'),
+        label: Text(hasTimestamp ? tr('근거 $ts', 'Evidence $ts') : tr('근거 미명시', 'No evidence')),
         onPressed: onPressed,
       ),
     );
@@ -4628,7 +4665,7 @@ class _GroupSelector extends StatelessWidget {
         : scheme.onSurfaceVariant;
 
     return PopupMenuButton<int?>(
-      tooltip: '그룹 변경',
+      tooltip: tr('그룹 변경', 'Change group'),
       offset: const Offset(0, 24),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -4647,7 +4684,7 @@ class _GroupSelector extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Text(
-              currentGroup?.name ?? '미분류',
+              currentGroup?.name ?? tr('미분류', 'Uncategorized'),
               style: TextStyle(fontSize: 12, color: foregroundColor),
             ),
             const SizedBox(width: 2),
@@ -4664,7 +4701,7 @@ class _GroupSelector extends StatelessWidget {
               Icon(Icons.folder_open, size: 16, color: Colors.grey.shade500),
               const SizedBox(width: 8),
               Text(
-                '미분류',
+                tr('미분류', 'Uncategorized'),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: meeting.groupId == null
@@ -4734,11 +4771,11 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
 
   String? _tagSuggestionBlockReason() {
     if (ref.read(isSummarizingProvider)) {
-      return '요약 작업이 끝난 뒤 태그 추천을 다시 시도해주세요.';
+      return tr('요약 작업이 끝난 뒤 태그 추천을 다시 시도해주세요.', 'Please try tag suggestions again after the summary task finishes.');
     }
     final active = OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (active != null) {
-      return '현재 $active 작업 중입니다. 완료 후 태그 추천을 다시 시도해주세요.';
+      return tr('현재 $active 작업 중입니다. 완료 후 태그 추천을 다시 시도해주세요.', '$active is currently running. Please try tag suggestions again after it finishes.');
     }
     return null;
   }
@@ -4766,7 +4803,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
       context: context,
       builder: (ctx) => MacosAlertDialog(
         appIcon: const Icon(Icons.tag, size: 48),
-        title: const Text('태그 추가'),
+        title: Text(tr('태그 추가', 'Add tag')),
         message: SizedBox(
           width: 360,
           child: Column(
@@ -4776,17 +4813,17 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
               TextField(
                 controller: ctrl,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: '태그 이름',
-                  hintText: '예: 기획, 1on1, 리뷰',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: tr('태그 이름', 'Tag name'),
+                  hintText: tr('예: 기획, 1on1, 리뷰', 'e.g., planning, 1on1, review'),
+                  border: const OutlineInputBorder(),
                 ),
                 onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
               ),
               if (suggestions.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
-                  '기존 태그',
+                  tr('기존 태그', 'Existing tags'),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 6),
@@ -4808,13 +4845,13 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-          child: const Text('추가'),
+          child: Text(tr('추가', 'Add')),
         ),
         secondaryButton: PushButton(
           controlSize: ControlSize.large,
           secondary: true,
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('취소'),
+          child: Text(tr('취소', 'Cancel')),
         ),
       ),
     );
@@ -4839,7 +4876,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
       db,
     ).getSummaryByMeetingId(widget.meeting.id);
     if (summary == null) {
-      _showTagSnack('요약을 먼저 생성하면 태그를 추천할 수 있습니다.');
+      _showTagSnack(tr('요약을 먼저 생성하면 태그를 추천할 수 있습니다.', 'Generate a summary first to get tag suggestions.'));
       return;
     }
 
@@ -4848,7 +4885,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
     final modelFile = AppSettings.llmModelFileFor(llmId);
     final modelPath = '${appSupport.path}/models/$modelFile';
     if (!await File(modelPath).exists()) {
-      _showTagSnack('요약 모델을 먼저 준비한 뒤 태그 추천을 사용할 수 있습니다.');
+      _showTagSnack(tr('요약 모델을 먼저 준비한 뒤 태그 추천을 사용할 수 있습니다.', 'Prepare the summary model first to use tag suggestions.'));
       return;
     }
 
@@ -4875,7 +4912,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
           .toList();
     } catch (e, st) {
       debugPrint('[TagExtractor] manual suggestion failed: $e\n$st');
-      _showTagSnack('태그 추천에 실패했습니다. 잠시 뒤 다시 시도해주세요.');
+      _showTagSnack(tr('태그 추천에 실패했습니다. 잠시 뒤 다시 시도해주세요.', 'Tag suggestion failed. Please try again shortly.'));
       return;
     } finally {
       await OnDeviceModelManager.instance.unloadLlm().catchError((_) {});
@@ -4884,7 +4921,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
 
     if (!mounted) return;
     if (candidates.isEmpty) {
-      _showTagSnack('새로 추천할 태그가 없습니다.');
+      _showTagSnack(tr('새로 추천할 태그가 없습니다.', 'No new tags to suggest.'));
       return;
     }
 
@@ -4898,7 +4935,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
       );
     });
     await _save();
-    _showTagSnack('추천 태그를 추가했습니다.', backgroundColor: Colors.green.shade700);
+    _showTagSnack(tr('추천 태그를 추가했습니다.', 'Suggested tags added.'), backgroundColor: Colors.green.shade700);
   }
 
   Future<List<String>?> _pickSuggestedTags(List<String> candidates) {
@@ -4908,7 +4945,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => MacosAlertDialog(
           appIcon: const Icon(Icons.sell_outlined, size: 48),
-          title: const Text('추천 태그'),
+          title: Text(tr('추천 태그', 'Suggested tags')),
           message: SizedBox(
             width: 360,
             child: Wrap(
@@ -4937,13 +4974,13 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
             onPressed: selected.isEmpty
                 ? null
                 : () => Navigator.pop(ctx, selected.toList()),
-            child: const Text('선택한 태그 추가'),
+            child: Text(tr('선택한 태그 추가', 'Add selected tags')),
           ),
           secondaryButton: PushButton(
             controlSize: ControlSize.large,
             secondary: true,
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
         ),
       ),
@@ -4982,7 +5019,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 2),
-        content: Text('태그 "$tag"로 검색합니다'),
+        content: Text(tr('태그 "$tag"로 검색합니다', 'Searching for tag "$tag"')),
         backgroundColor: Colors.indigo.shade600,
       ),
     );
@@ -5020,12 +5057,12 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-            tooltip: '#$t 태그로 검색',
+            tooltip: tr('#$t 태그로 검색', 'Search by #$t tag'),
           ),
         ActionChip(
           avatar: Icon(Icons.add, size: 13, color: neutralText),
           label: Text(
-            tags.isEmpty ? '태그 추가' : '추가',
+            tags.isEmpty ? tr('태그 추가', 'Add tag') : tr('추가', 'Add'),
             style: TextStyle(fontSize: 11, color: neutralText),
           ),
           onPressed: _addTag,
@@ -5047,7 +5084,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
                 )
               : Icon(Icons.auto_awesome, size: 13, color: suggestText),
           label: Text(
-            _isSuggestingTags ? '추천 중' : '추천',
+            _isSuggestingTags ? tr('추천 중', 'Suggesting') : tr('추천', 'Suggest'),
             style: TextStyle(fontSize: 11, color: suggestText),
           ),
           onPressed: _isSuggestingTags ? null : _suggestTags,
@@ -5056,7 +5093,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-          tooltip: '요약 내용으로 태그 추천',
+          tooltip: tr('요약 내용으로 태그 추천', 'Suggest tags from summary content'),
         ),
       ],
     );
@@ -5161,7 +5198,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
   /// 2) 오디오 플레이어가 준비됐으면 추가로 seek + 자동 재생
   /// 반환: null=오디오까지 성공, 외에는 실패 사유 문자열.
   Future<String?> jumpToSegmentDetailed(double sec) async {
-    if (widget.segments.isEmpty) return '전사 세그먼트가 없습니다';
+    if (widget.segments.isEmpty) return tr('전사 세그먼트가 없습니다', 'No transcript segments');
 
     // 1) 시간이 포함된 세그먼트 찾기 (없으면 가장 가까운 것)
     int targetIdx = -1;
@@ -5182,7 +5219,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
         }
       }
     }
-    if (targetIdx < 0) return '대응되는 전사 세그먼트를 찾지 못했습니다';
+    if (targetIdx < 0) return tr('대응되는 전사 세그먼트를 찾지 못했습니다', 'No matching transcript segment found');
 
     // 검색 필터가 걸려있으면 해제 (점프한 항목이 보이도록)
     if (_searchQuery.isNotEmpty) {
@@ -5194,7 +5231,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     final targetSeg = widget.segments[targetIdx];
     setState(() {
       _flashSegmentIdx = targetIdx;
-      _navHint = '${_secToStr(targetSeg.startTimeSeconds)} 시점으로 이동';
+      _navHint = tr('${_secToStr(targetSeg.startTimeSeconds)} 시점으로 이동', 'Jump to ${_secToStr(targetSeg.startTimeSeconds)}');
     });
     _flashTimer?.cancel();
     _flashTimer = Timer(const Duration(milliseconds: 2500), () {
@@ -5230,7 +5267,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     }
     final p = _player;
     if (p == null || !_playerReady) {
-      return _playerInitError ?? '오디오 플레이어가 준비되지 않았습니다';
+      return _playerInitError ?? tr('오디오 플레이어가 준비되지 않았습니다', 'The audio player is not ready');
     }
     debugPrint(
       '[seek BEFORE] state=${p.processingState} playing=${p.playing} '
@@ -5265,13 +5302,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
           await Future.delayed(const Duration(milliseconds: 150));
         } catch (_) {}
         if (!p.playing) {
-          return '오디오 명령은 들어갔지만 재생되지 않음 (시스템 음량/스피커 확인)';
+          return tr('오디오 명령은 들어갔지만 재생되지 않음 (시스템 음량/스피커 확인)', 'Audio command was issued but playback did not start (check system volume/speakers)');
         }
       }
       return null;
     } catch (e) {
       debugPrint('[jumpToSegmentDetailed] 오디오 시킹 실패: $e');
-      return '오디오 시킹 실패: $e';
+      return tr('오디오 시킹 실패: $e', 'Audio seek failed: $e');
     }
   }
 
@@ -5400,7 +5437,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
       context: context,
       builder: (ctx) => MacosAlertDialog(
         appIcon: const Icon(Icons.book_outlined, size: 48),
-        title: const Text('단어집에 추가'),
+        title: Text(tr('단어집에 추가', 'Add to glossary')),
         message: SizedBox(
           width: 380,
           child: Column(
@@ -5409,34 +5446,34 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
             children: [
               TextField(
                 controller: termCtrl,
-                decoration: const InputDecoration(
-                  labelText: '용어 (예: 빅쿼리)',
+                decoration: InputDecoration(
+                  labelText: tr('용어 (예: 빅쿼리)', 'Term (e.g., BigQuery)'),
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: descCtrl,
-                decoration: const InputDecoration(
-                  labelText: '설명',
+                decoration: InputDecoration(
+                  labelText: tr('설명', 'Description'),
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: aliasCtrl,
-                decoration: const InputDecoration(
-                  labelText: '별칭(옵션) — 콤마로 구분 (예: 비커리, 빅커리)',
+                decoration: InputDecoration(
+                  labelText: tr('별칭(옵션) — 콤마로 구분 (예: 비커리, 빅커리)', 'Aliases (optional) — comma-separated (e.g., Bigqery, Bigquerry)'),
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                '* 별칭은 다음 녹음/요약에서 자동으로 용어로 교정됩니다.',
+                tr('* 별칭은 다음 녹음/요약에서 자동으로 용어로 교정됩니다.', '* Aliases are auto-corrected to the term in future recordings/summaries.'),
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
               ),
             ],
@@ -5448,13 +5485,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
             if (termCtrl.text.trim().isEmpty) return;
             Navigator.pop(ctx, true);
           },
-          child: const Text('추가'),
+          child: Text(tr('추가', 'Add')),
         ),
         secondaryButton: PushButton(
           controlSize: ControlSize.large,
           secondary: true,
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('취소'),
+          child: Text(tr('취소', 'Cancel')),
         ),
       ),
     );
@@ -5469,7 +5506,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('단어집에 "${entry.term}" 추가됨'),
+          content: Text(tr('단어집에 "${entry.term}" 추가됨', 'Added "${entry.term}" to glossary')),
           backgroundColor: Colors.green.shade700,
         ),
       );
@@ -5486,7 +5523,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => MacosAlertDialog(
           appIcon: const Icon(Icons.find_replace, size: 48),
-          title: const Text('전사본 단어 치환'),
+          title: Text(tr('전사본 단어 치환', 'Replace word in transcript')),
           message: SizedBox(
             width: 380,
             child: Column(
@@ -5495,20 +5532,20 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               children: [
                 TextField(
                   controller: findCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '찾을 단어',
+                  decoration: InputDecoration(
+                    labelText: tr('찾을 단어', 'Find'),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: replaceCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '바꿀 단어',
+                  decoration: InputDecoration(
+                    labelText: tr('바꿀 단어', 'Replace with'),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -5518,9 +5555,9 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                   controlAffinity: ListTileControlAffinity.leading,
                   value: addToGlossary,
                   onChanged: (v) => setS(() => addToGlossary = v ?? false),
-                  title: const Text(
-                    '단어집에도 별칭으로 추가 (다음 녹음/요약 자동 교정)',
-                    style: TextStyle(fontSize: 12),
+                  title: Text(
+                    tr('단어집에도 별칭으로 추가 (다음 녹음/요약 자동 교정)', 'Also add as glossary alias (auto-correct in future recordings/summaries)'),
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ),
               ],
@@ -5532,13 +5569,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               if (findCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx, true);
             },
-            child: const Text('치환'),
+            child: Text(tr('치환', 'Replace')),
           ),
           secondaryButton: PushButton(
             controlSize: ControlSize.large,
             secondary: true,
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
         ),
       ),
@@ -5565,7 +5602,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
       final glossaryRepo = GlossaryRepositoryImpl(IsarService.instance.db);
       final entry = GlossaryEntry()
         ..term = replace
-        ..description = '전사본 치환에서 자동 추가'
+        ..description = tr('전사본 치환에서 자동 추가', 'Auto-added from transcript replacement')
         ..aliases = find;
       await glossaryRepo.saveEntry(entry);
     }
@@ -5576,9 +5613,11 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
         SnackBar(
           content: Text(
             changed == 0
-                ? '"$find" 을(를) 찾지 못했습니다.'
-                : '$changed개 세그먼트에서 "$find" → "$replace" 치환됨'
+                ? tr('"$find" 을(를) 찾지 못했습니다.', 'Could not find "$find".')
+                : tr('$changed개 세그먼트에서 "$find" → "$replace" 치환됨'
                       '${addToGlossary ? ' · 단어집에 추가됨' : ''}',
+                      'Replaced "$find" → "$replace" in $changed segments'
+                      '${addToGlossary ? ' · added to glossary' : ''}'),
           ),
           backgroundColor: changed == 0
               ? Colors.orange.shade700
@@ -5629,7 +5668,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
         return StatefulBuilder(
           builder: (ctx, setS) => MacosAlertDialog(
             appIcon: const Icon(Icons.person_outline, size: 48),
-            title: Text('화자 $letter 편집'),
+            title: Text(tr('화자 $letter 편집', 'Edit speaker $letter')),
             message: SizedBox(
               width: 380,
               child: Column(
@@ -5637,7 +5676,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '이름 (회의 내에서만 적용)',
+                    tr('이름 (회의 내에서만 적용)', 'Name (applies within this meeting only)'),
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey.shade700,
@@ -5649,13 +5688,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                     controller: nameCtrl,
                     autofocus: true,
                     decoration: InputDecoration(
-                      hintText: '예: 철수, 김부장, PM',
+                      hintText: tr('예: 철수, 김부장, PM', 'e.g., John, Manager Kim, PM'),
                       isDense: true,
                       border: const OutlineInputBorder(),
                       suffixIcon: nameCtrl.text.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 16),
-                              tooltip: '이름 삭제',
+                              tooltip: tr('이름 삭제', 'Clear name'),
                               onPressed: () {
                                 setS(() => nameCtrl.clear());
                               },
@@ -5666,7 +5705,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '다른 화자로 통합 (선택)',
+                    tr('다른 화자로 통합 (선택)', 'Merge into another speaker (optional)'),
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey.shade700,
@@ -5675,8 +5714,10 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '이 화자의 모든 발화를 다른 화자로 합칩니다.\n'
+                    tr('이 화자의 모든 발화를 다른 화자로 합칩니다.\n'
                     '한 사람을 시스템이 두 개 화자로 분리한 경우 사용하세요.',
+                    'Merges all of this speaker\'s utterances into another speaker.\n'
+                    'Use when the system split one person into two speakers.'),
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.grey.shade600,
@@ -5687,15 +5728,15 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                   DropdownButtonFormField<String?>(
                     initialValue: mergeInto,
                     isExpanded: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       isDense: true,
-                      border: OutlineInputBorder(),
-                      hintText: '합치지 않음',
+                      border: const OutlineInputBorder(),
+                      hintText: tr('합치지 않음', 'Do not merge'),
                     ),
                     items: [
-                      const DropdownMenuItem<String?>(
+                      DropdownMenuItem<String?>(
                         value: null,
-                        child: Text('합치지 않음', style: TextStyle(fontSize: 13)),
+                        child: Text(tr('합치지 않음', 'Do not merge'), style: const TextStyle(fontSize: 13)),
                       ),
                       for (final l in allLetters)
                         if (l != letter)
@@ -5703,8 +5744,8 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                             value: l,
                             child: Text(
                               namesMap[l]?.isNotEmpty == true
-                                  ? '화자 $l (${namesMap[l]})'
-                                  : '화자 $l',
+                                  ? tr('화자 $l (${namesMap[l]})', 'Speaker $l (${namesMap[l]})')
+                                  : tr('화자 $l', 'Speaker $l'),
                               style: const TextStyle(fontSize: 13),
                             ),
                           ),
@@ -5723,13 +5764,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                   mergeInto: mergeInto,
                 ),
               ),
-              child: const Text('저장'),
+              child: Text(tr('저장', 'Save')),
             ),
             secondaryButton: PushButton(
               controlSize: ControlSize.large,
               secondary: true,
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소'),
+              child: Text(tr('취소', 'Cancel')),
             ),
           ),
         );
@@ -5771,10 +5812,10 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
           duration: const Duration(seconds: 2),
           content: Text(
             mergedCount > 0
-                ? '$mergedCount개 발화가 화자 ${result.mergeInto}로 통합되었습니다'
+                ? tr('$mergedCount개 발화가 화자 ${result.mergeInto}로 통합되었습니다', '$mergedCount utterances merged into speaker ${result.mergeInto}')
                 : (result.name.isEmpty
-                      ? '화자 $letter 이름이 초기화되었습니다'
-                      : '화자 $letter → "${result.name}" 으로 저장되었습니다'),
+                      ? tr('화자 $letter 이름이 초기화되었습니다', 'Speaker $letter name was reset')
+                      : tr('화자 $letter → "${result.name}" 으로 저장되었습니다', 'Speaker $letter saved as "${result.name}"')),
           ),
           backgroundColor: Colors.green.shade700,
         ),
@@ -5804,8 +5845,8 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
         SnackBar(
           content: Text(
             changed == 0
-                ? '단어집 별칭으로 교정할 내용을 찾지 못했습니다.'
-                : '$changed개 세그먼트에서 단어집 별칭 기반 교정 적용됨',
+                ? tr('단어집 별칭으로 교정할 내용을 찾지 못했습니다.', 'Nothing to correct using glossary aliases.')
+                : tr('$changed개 세그먼트에서 단어집 별칭 기반 교정 적용됨', 'Applied glossary alias corrections to $changed segments'),
           ),
           backgroundColor: changed == 0
               ? Colors.blueGrey.shade600
@@ -5820,13 +5861,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
 
   Future<void> _initPlayer() async {
     if (widget.audioFilePath == null) {
-      _playerInitError = '회의 데이터에 오디오 파일 경로가 없습니다 (자동 삭제됨)';
+      _playerInitError = tr('회의 데이터에 오디오 파일 경로가 없습니다 (자동 삭제됨)', 'The meeting data has no audio file path (auto-deleted)');
       debugPrint('[_initPlayer] audioFilePath is null');
       return;
     }
     final file = File(widget.audioFilePath!);
     if (!await file.exists()) {
-      _playerInitError = '오디오 파일을 찾을 수 없습니다: ${widget.audioFilePath}';
+      _playerInitError = tr('오디오 파일을 찾을 수 없습니다: ${widget.audioFilePath}', 'Audio file not found: ${widget.audioFilePath}');
       debugPrint('[_initPlayer] file does not exist: ${widget.audioFilePath}');
       return;
     }
@@ -5835,7 +5876,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     try {
       await player.setFilePath(widget.audioFilePath!);
     } catch (e) {
-      _playerInitError = '오디오 로드 실패: $e';
+      _playerInitError = tr('오디오 로드 실패: $e', 'Audio load failed: $e');
       debugPrint('[_initPlayer] setFilePath failed: $e');
       player.dispose();
       return;
@@ -5941,7 +5982,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
       child: Row(
         children: [
           MacosTooltip(
-            message: '10초 뒤로',
+            message: tr('10초 뒤로', 'Back 10s'),
             child: MacosIconButton(
               padding: EdgeInsets.zero,
               backgroundColor: Colors.transparent,
@@ -5980,7 +6021,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
             ),
           ),
           MacosTooltip(
-            message: '10초 앞으로',
+            message: tr('10초 앞으로', 'Forward 10s'),
             child: MacosIconButton(
               padding: EdgeInsets.zero,
               backgroundColor: Colors.transparent,
@@ -6100,7 +6141,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               controller: _searchCtrl,
               style: const TextStyle(fontSize: 12),
               decoration: InputDecoration(
-                hintText: '녹취록 검색…',
+                hintText: tr('녹취록 검색…', 'Search transcript…'),
                 hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
                 prefixIcon: Icon(
                   Icons.search,
@@ -6169,7 +6210,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                 ),
               ),
               child: Text(
-                matchCount > 0 ? '$matchCount / $totalCount' : '없음',
+                matchCount > 0 ? '$matchCount / $totalCount' : tr('없음', 'None'),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -6269,7 +6310,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '녹취록',
+                      tr('녹취록', 'Transcript'),
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0,
@@ -6278,7 +6319,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                     const SizedBox(width: 6),
                     if (widget.segments.isNotEmpty)
                       Text(
-                        '${widget.segments.length}개',
+                        tr('${widget.segments.length}개', '${widget.segments.length}'),
                         style: TextStyle(
                           fontSize: 11,
                           color: scheme.onSurfaceVariant,
@@ -6308,7 +6349,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '오디오',
+                              tr('오디오', 'Audio'),
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w600,
@@ -6333,13 +6374,13 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                           final active = snapshot.data?.activeLabel;
                           final reason = active == null
                               ? null
-                              : '현재 $active 작업 중입니다. 완료 후 음성 인식을 다시 시도해주세요.';
+                              : tr('현재 $active 작업 중입니다. 완료 후 음성 인식을 다시 시도해주세요.', '$active is currently running. Please retry transcription after it finishes.');
                           final disabled = widget.isRerunning || reason != null;
                           return MacosTooltip(
-                            message: reason ?? '음성 인식 다시',
+                            message: reason ?? tr('음성 인식 다시', 'Re-transcribe'),
                             child: _TranscriptToolbarButton(
                               icon: Icons.replay,
-                              label: widget.isRerunning ? '실행 중' : '다시 전사',
+                              label: widget.isRerunning ? tr('실행 중', 'Running') : tr('다시 전사', 'Re-transcribe'),
                               loading: widget.isRerunning,
                               onPressed: disabled ? null : widget.onRerunStt,
                             ),
@@ -6348,7 +6389,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                       ),
                     const SizedBox(width: 4),
                     PopupMenuButton<String>(
-                      tooltip: '전사 보정',
+                      tooltip: tr('전사 보정', 'Transcript correction'),
                       icon: Icon(
                         Icons.spellcheck,
                         size: 16,
@@ -6356,23 +6397,23 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                       ),
                       padding: EdgeInsets.zero,
                       splashRadius: 18,
-                      itemBuilder: (ctx) => const [
+                      itemBuilder: (ctx) => [
                         PopupMenuItem(
                           value: 'add_term',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(
+                            leading: const Icon(
                               Icons.bookmark_add_outlined,
                               size: 18,
                             ),
                             title: Text(
-                              '단어집에 추가',
-                              style: TextStyle(fontSize: 13),
+                              tr('단어집에 추가', 'Add to glossary'),
+                              style: const TextStyle(fontSize: 13),
                             ),
                             subtitle: Text(
-                              '새 용어/별칭 등록',
-                              style: TextStyle(fontSize: 10),
+                              tr('새 용어/별칭 등록', 'Register new term/alias'),
+                              style: const TextStyle(fontSize: 10),
                             ),
                           ),
                         ),
@@ -6381,14 +6422,14 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.find_replace, size: 18),
+                            leading: const Icon(Icons.find_replace, size: 18),
                             title: Text(
-                              '전사본 단어 치환',
-                              style: TextStyle(fontSize: 13),
+                              tr('전사본 단어 치환', 'Replace word in transcript'),
+                              style: const TextStyle(fontSize: 13),
                             ),
                             subtitle: Text(
-                              '이 회의 전체에 일괄 적용',
-                              style: TextStyle(fontSize: 10),
+                              tr('이 회의 전체에 일괄 적용', 'Apply across this entire meeting'),
+                              style: const TextStyle(fontSize: 10),
                             ),
                           ),
                         ),
@@ -6397,14 +6438,14 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.auto_fix_high, size: 18),
+                            leading: const Icon(Icons.auto_fix_high, size: 18),
                             title: Text(
-                              '단어집 별칭 재교정',
-                              style: TextStyle(fontSize: 13),
+                              tr('단어집 별칭 재교정', 'Re-correct with glossary aliases'),
+                              style: const TextStyle(fontSize: 13),
                             ),
                             subtitle: Text(
-                              '등록된 별칭으로 전사본 후처리',
-                              style: TextStyle(fontSize: 10),
+                              tr('등록된 별칭으로 전사본 후처리', 'Post-process transcript using registered aliases'),
+                              style: const TextStyle(fontSize: 10),
                             ),
                           ),
                         ),
@@ -6444,7 +6485,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                 widget.segments.isEmpty
                     ? Center(
                         child: Text(
-                          '녹취된 내용이 없습니다.',
+                          tr('녹취된 내용이 없습니다.', 'No transcribed content.'),
                           style: TextStyle(color: Colors.grey.shade500),
                         ),
                       )
@@ -6598,7 +6639,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
 
     setState(() {
       _flashSegmentIdx = target;
-      _navHint = '${_secToStr(sec)} 시점으로 이동';
+      _navHint = tr('${_secToStr(sec)} 시점으로 이동', 'Jump to ${_secToStr(sec)}');
     });
     _flashTimer?.cancel();
     _flashTimer = Timer(const Duration(milliseconds: 1500), () {
@@ -6639,7 +6680,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                 Icon(Icons.search_off, size: 32, color: Colors.grey.shade300),
                 const SizedBox(height: 8),
                 Text(
-                  '"$_searchQuery" 검색 결과 없음',
+                  tr('"$_searchQuery" 검색 결과 없음', 'No results for "$_searchQuery"'),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
                 ),
               ],
@@ -6677,8 +6718,8 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               final speakerLetter = String.fromCharCode(65 + (sid % 26));
               final customName = hasDiar ? _speakerNames[speakerLetter] : null;
               final defaultLabel = hasDiar
-                  ? '화자 $speakerLetter'
-                  : '참여자 ${sid + 1}';
+                  ? tr('화자 $speakerLetter', 'Speaker $speakerLetter')
+                  : tr('참여자 ${sid + 1}', 'Participant ${sid + 1}');
               final displayLabel = customName?.isNotEmpty == true
                   ? customName!
                   : defaultLabel;
@@ -6757,7 +6798,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           duration: const Duration(seconds: 2),
-                          content: const Text('오디오 파일이 없거나 자동 삭제되어 재생할 수 없습니다'),
+                          content: Text(tr('오디오 파일이 없거나 자동 삭제되어 재생할 수 없습니다', 'The audio file is missing or was auto-deleted, so it cannot be played')),
                           backgroundColor: Colors.blueGrey.shade600,
                         ),
                       );
@@ -6829,7 +6870,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                                 if (hasBookmark) ...[
                                   const SizedBox(width: 2),
                                   MacosTooltip(
-                                    message: '사용자 북마크 시점',
+                                    message: tr('사용자 북마크 시점', 'User bookmark point'),
                                     child: Icon(
                                       Icons.bookmark_rounded,
                                       size: 11,
@@ -6884,7 +6925,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                                     onDoubleTap: () =>
                                         _startEditing(originalIdx),
                                     child: MacosTooltip(
-                                      message: '더블클릭하여 수정',
+                                      message: tr('더블클릭하여 수정', 'Double-click to edit'),
                                       child: _buildHighlightedText(
                                         seg.text,
                                         baseStyle,
@@ -6929,7 +6970,7 @@ class _SummaryHistoryDialog extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '요약 이력',
+                    tr('요약 이력', 'Summary history'),
                     style: MacosTheme.of(
                       context,
                     ).typography.title2.copyWith(fontWeight: FontWeight.bold),
@@ -6955,7 +6996,7 @@ class _SummaryHistoryDialog extends ConsumerWidget {
                 child: versionsAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('이력 로드 오류: $e')),
+                  error: (e, _) => Center(child: Text(tr('이력 로드 오류: $e', 'History load error: $e'))),
                   data: (versions) => versions.isEmpty
                       ? Center(
                           child: Column(
@@ -6968,7 +7009,7 @@ class _SummaryHistoryDialog extends ConsumerWidget {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                '저장된 이력이 없습니다.\n다시 요약하면 이전 요약이 이력으로 저장됩니다.',
+                                tr('저장된 이력이 없습니다.\n다시 요약하면 이전 요약이 이력으로 저장됩니다.', 'No saved history.\nRe-summarizing saves the previous summary to history.'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 13,
@@ -7018,7 +7059,7 @@ class _SummaryHistoryDialog extends ConsumerWidget {
                               ),
                               title: Text(
                                 v.meetingTitle.isEmpty
-                                    ? '(제목 없음)'
+                                    ? tr('(제목 없음)', '(No title)')
                                     : v.meetingTitle,
                                 style: const TextStyle(
                                   fontSize: 13,
@@ -7035,22 +7076,22 @@ class _SummaryHistoryDialog extends ConsumerWidget {
                               children: [
                                 if (v.participants.isNotEmpty)
                                   _HistorySection(
-                                    label: '참석자',
+                                    label: tr('참석자', 'Participants'),
                                     items: [v.participants.join(', ')],
                                   ),
                                 if (v.keyDiscussions.isNotEmpty)
                                   _HistorySection(
-                                    label: '주요 논의',
+                                    label: tr('주요 논의', 'Key discussion'),
                                     items: v.keyDiscussions,
                                   ),
                                 if (v.decisions.isNotEmpty)
                                   _HistorySection(
-                                    label: '결정 사항',
+                                    label: tr('결정 사항', 'Decisions'),
                                     items: v.decisions,
                                   ),
                                 if (v.openQuestions.isNotEmpty)
                                   _HistorySection(
-                                    label: '미해결 이슈',
+                                    label: tr('미해결 이슈', 'Open issues'),
                                     items: v.openQuestions,
                                   ),
                               ],
@@ -7201,7 +7242,7 @@ class _NotesEditorState extends State<_NotesEditor> {
                       });
                     },
                     child: MacosTooltip(
-                      message: '드래그해서 메모창 크기 조정',
+                      message: tr('드래그해서 메모창 크기 조정', 'Drag to resize the notes box'),
                       child: Container(
                         height: 16,
                         decoration: BoxDecoration(
@@ -7234,7 +7275,7 @@ class _NotesEditorState extends State<_NotesEditor> {
                   _prev = _ctrl.text;
                   setState(() => _editing = false);
                 },
-                child: const Text('취소'),
+                child: Text(tr('취소', 'Cancel')),
               ),
               const SizedBox(width: 8),
               FilledButton(
@@ -7247,7 +7288,7 @@ class _NotesEditorState extends State<_NotesEditor> {
                   ),
                 ),
                 onPressed: _save,
-                child: const Text('저장'),
+                child: Text(tr('저장', 'Save')),
               ),
             ],
           ),
@@ -7266,7 +7307,7 @@ class _NotesEditorState extends State<_NotesEditor> {
         ),
         const SizedBox(width: 8),
         MacosTooltip(
-          message: '메모 수정',
+          message: tr('메모 수정', 'Edit notes'),
           child: MacosIconButton(
             icon: Icon(
               Icons.edit_outlined,
@@ -7362,7 +7403,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '용어 추출 결과',
+                          tr('용어 추출 결과', 'Term extraction results'),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -7370,7 +7411,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                           ),
                         ),
                         Text(
-                          '단어집에 추가할 용어를 선택하고 설명을 수정하세요 (${widget.extracted.length}개 발견)',
+                          tr('단어집에 추가할 용어를 선택하고 설명을 수정하세요 (${widget.extracted.length}개 발견)', 'Select terms to add to the glossary and edit their descriptions (${widget.extracted.length} found)'),
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.teal.shade600,
@@ -7427,7 +7468,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            labelText: '용어',
+                            labelText: tr('용어', 'Term'),
                             labelStyle: const TextStyle(fontSize: 11),
                           ),
                           enabled: _checked[i],
@@ -7450,7 +7491,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            labelText: '설명 (직접 수정 가능)',
+                            labelText: tr('설명 (직접 수정 가능)', 'Description (editable)'),
                             labelStyle: const TextStyle(fontSize: 11),
                           ),
                           enabled: _checked[i],
@@ -7468,13 +7509,13 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
               child: Row(
                 children: [
                   Text(
-                    '$selectedCount개 선택됨',
+                    tr('$selectedCount개 선택됨', '$selectedCount selected'),
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const Spacer(),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('취소'),
+                    child: Text(tr('취소', 'Cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
@@ -7497,7 +7538,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    '${selected.length}개 용어를 단어집에 추가했습니다.',
+                                    tr('${selected.length}개 용어를 단어집에 추가했습니다.', 'Added ${selected.length} terms to the glossary.'),
                                   ),
                                   backgroundColor: Colors.teal.shade600,
                                 ),
@@ -7514,7 +7555,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                             ),
                           )
                         : const Icon(Icons.save_outlined, size: 16),
-                    label: Text(_saving ? '저장 중...' : '단어집에 추가'),
+                    label: Text(_saving ? tr('저장 중...', 'Saving...') : tr('단어집에 추가', 'Add to glossary')),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.teal.shade600,
                     ),
@@ -7613,7 +7654,7 @@ class _SummaryEditDialogState extends State<_SummaryEditDialog> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '요약 편집',
+                    tr('요약 편집', 'Edit summary'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -7634,29 +7675,29 @@ class _SummaryEditDialogState extends State<_SummaryEditDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _field(label: '제목', controller: _titleCtrl, maxLines: 1),
+                    _field(label: tr('제목', 'Title'), controller: _titleCtrl, maxLines: 1),
                     _field(
-                      label: '참석자 (콤마 또는 줄바꿈 구분)',
+                      label: tr('참석자 (콤마 또는 줄바꿈 구분)', 'Participants (comma or line-separated)'),
                       controller: _participantsCtrl,
                       maxLines: 2,
                     ),
                     _field(
-                      label: '주요 논의 (한 줄에 하나씩)',
+                      label: tr('주요 논의 (한 줄에 하나씩)', 'Key discussion (one per line)'),
                       controller: _discussionsCtrl,
                       maxLines: 6,
                     ),
                     _field(
-                      label: '결정 사항 (한 줄에 하나씩)',
+                      label: tr('결정 사항 (한 줄에 하나씩)', 'Decisions (one per line)'),
                       controller: _decisionsCtrl,
                       maxLines: 5,
                     ),
                     _field(
-                      label: '미해결 이슈 (한 줄에 하나씩)',
+                      label: tr('미해결 이슈 (한 줄에 하나씩)', 'Open issues (one per line)'),
                       controller: _openQuestionsCtrl,
                       maxLines: 4,
                     ),
                     Text(
-                      '※ 액션 아이템은 본문의 체크박스 UI에서 수정하세요.',
+                      tr('※ 액션 아이템은 본문의 체크박스 UI에서 수정하세요.', '※ Edit action items in the checkbox UI in the body.'),
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade500,
@@ -7674,12 +7715,12 @@ class _SummaryEditDialogState extends State<_SummaryEditDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('취소'),
+                    child: Text(tr('취소', 'Cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     icon: const Icon(Icons.save, size: 16),
-                    label: const Text('저장 (이전 버전은 이력으로)'),
+                    label: Text(tr('저장 (이전 버전은 이력으로)', 'Save (previous version to history)')),
                     onPressed: () {
                       Navigator.pop(
                         context,
@@ -7737,8 +7778,8 @@ class _ActionItemQualityNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final parts = <String>[
-      if (ownerUnconfirmedCount > 0) '담당자 $ownerUnconfirmedCount개',
-      if (deadlineUnconfirmedCount > 0) '기한 $deadlineUnconfirmedCount개',
+      if (ownerUnconfirmedCount > 0) tr('담당자 $ownerUnconfirmedCount개', '$ownerUnconfirmedCount owner(s)'),
+      if (deadlineUnconfirmedCount > 0) tr('기한 $deadlineUnconfirmedCount개', '$deadlineUnconfirmedCount deadline(s)'),
     ];
     return Container(
       width: double.infinity,
@@ -7758,7 +7799,7 @@ class _ActionItemQualityNotice extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '확인 필요한 액션 정보: ${parts.join(', ')}',
+              tr('확인 필요한 액션 정보: ${parts.join(', ')}', 'Action info needing review: ${parts.join(', ')}'),
               style: TextStyle(
                 fontSize: 12,
                 height: 1.4,
@@ -7781,7 +7822,7 @@ class _ActionUnconfirmedChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MacosTooltip(
-      message: '전사본에서 명확히 확인되지 않은 정보입니다',
+      message: tr('전사본에서 명확히 확인되지 않은 정보입니다', 'This information is not clearly confirmed in the transcript'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
@@ -7879,11 +7920,11 @@ class _ActionItemRow extends StatelessWidget {
           ),
           if (item.ownerNeedsConfirmation) ...[
             const SizedBox(width: 6),
-            const _ActionUnconfirmedChip(label: '담당자 미확인'),
+            _ActionUnconfirmedChip(label: tr('담당자 미확인', 'Owner unconfirmed')),
           ],
           if (item.deadlineNeedsConfirmation) ...[
             const SizedBox(width: 6),
-            const _ActionUnconfirmedChip(label: '기한 미확인'),
+            _ActionUnconfirmedChip(label: tr('기한 미확인', 'Deadline unconfirmed')),
           ],
           if (onEvidence != null) ...[
             const SizedBox(width: 6),
@@ -7895,7 +7936,7 @@ class _ActionItemRow extends StatelessWidget {
               size: 14,
               color: Colors.grey.shade500,
             ),
-            tooltip: '수정',
+            tooltip: tr('수정', 'Edit'),
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
@@ -7907,7 +7948,7 @@ class _ActionItemRow extends StatelessWidget {
               size: 14,
               color: Colors.red.shade300,
             ),
-            tooltip: '삭제',
+            tooltip: tr('삭제', 'Delete'),
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
@@ -7956,7 +7997,7 @@ class _ActionItemEditDialogState extends State<_ActionItemEditDialog> {
     final isEdit = widget.existing != null;
     return MacosAlertDialog(
       appIcon: Icon(isEdit ? Icons.edit_outlined : Icons.add_task, size: 48),
-      title: Text(isEdit ? '액션 아이템 수정' : '액션 아이템 추가'),
+      title: Text(isEdit ? tr('액션 아이템 수정', 'Edit action item') : tr('액션 아이템 추가', 'Add action item')),
       message: SizedBox(
         width: 420,
         child: Column(
@@ -7966,29 +8007,29 @@ class _ActionItemEditDialogState extends State<_ActionItemEditDialog> {
               controller: _taskCtrl,
               autofocus: true,
               maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: '할 일 *',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: tr('할 일 *', 'Task *'),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _ownerCtrl,
-              decoration: const InputDecoration(
-                labelText: '담당자',
-                hintText: '예: 홍길동',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: tr('담당자', 'Owner'),
+                hintText: tr('예: 홍길동', 'e.g., John Doe'),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _deadlineCtrl,
-              decoration: const InputDecoration(
-                labelText: '마감',
-                hintText: '예: 2026-04-30, 이번 주 금요일',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: tr('마감', 'Deadline'),
+                hintText: tr('예: 2026-04-30, 이번 주 금요일', 'e.g., 2026-04-30, this Friday'),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
             ),
@@ -8002,7 +8043,7 @@ class _ActionItemEditDialogState extends State<_ActionItemEditDialog> {
           if (task.isEmpty) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(const SnackBar(content: Text('할 일을 입력해주세요.')));
+            ).showSnackBar(SnackBar(content: Text(tr('할 일을 입력해주세요.', 'Please enter a task.'))));
             return;
           }
           Navigator.pop(
@@ -8015,13 +8056,13 @@ class _ActionItemEditDialogState extends State<_ActionItemEditDialog> {
             ),
           );
         },
-        child: Text(isEdit ? '저장' : '추가'),
+        child: Text(isEdit ? tr('저장', 'Save') : tr('추가', 'Add')),
       ),
       secondaryButton: PushButton(
         controlSize: ControlSize.large,
         secondary: true,
         onPressed: () => Navigator.pop(context),
-        child: const Text('취소'),
+        child: Text(tr('취소', 'Cancel')),
       ),
     );
   }
@@ -8078,11 +8119,11 @@ class _NativeTaskNotice extends StatelessWidget {
         final active = state.activeLabel;
         final queued = state.queuedLabel;
         final text = [
-          if (active != null) '현재 작업: $active',
+          if (active != null) tr('현재 작업: $active', 'Current task: $active'),
           if (queued != null)
             state.queuedCount > 1
-                ? '대기 중: $queued 외 ${state.queuedCount - 1}개'
-                : '다음 작업 대기: $queued',
+                ? tr('대기 중: $queued 외 ${state.queuedCount - 1}개', 'Queued: $queued and ${state.queuedCount - 1} more')
+                : tr('다음 작업 대기: $queued', 'Next queued: $queued'),
         ].join(' · ');
 
         return Container(
@@ -8174,7 +8215,7 @@ class _AudioFileRevealState extends State<_AudioFileReveal> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('파일을 찾을 수 없습니다: ${widget.path}')));
+      ).showSnackBar(SnackBar(content: Text(tr('파일을 찾을 수 없습니다: ${widget.path}', 'File not found: ${widget.path}'))));
       return;
     }
     try {
@@ -8183,7 +8224,7 @@ class _AudioFileRevealState extends State<_AudioFileReveal> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Finder 열기 실패: $e')));
+      ).showSnackBar(SnackBar(content: Text(tr('Finder 열기 실패: $e', 'Failed to open Finder: $e'))));
     }
   }
 
@@ -8199,7 +8240,7 @@ class _AudioFileRevealState extends State<_AudioFileReveal> {
       child: GestureDetector(
         onTap: _reveal,
         child: MacosTooltip(
-          message: 'Finder에서 보기\n${widget.path}',
+          message: tr('Finder에서 보기\n${widget.path}', 'Show in Finder\n${widget.path}'),
           child: Row(
             children: [
               Icon(Icons.audio_file_outlined, size: 12, color: color),

@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_build_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/ffi/on_device_model_manager.dart';
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/calendar_service.dart';
 import '../../core/services/chunked_summarizer.dart';
@@ -178,7 +179,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       ref.read(nativeRecordingActiveProvider.notifier).state = true;
       _phase = _RecordingPhase.recording;
       _segments.addAll(mic.segments);
-      _statusMsg = '녹음 중 (30초마다 자동으로 텍스트 변환)';
+      _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
       _sttModelExists = true;
       _llmModelExists = true;
       // UI 경과 시간 갱신 타이머 재시작
@@ -189,7 +190,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       ref.read(nativeRecordingActiveProvider.notifier).state = true;
       _phase = _RecordingPhase.paused;
       _segments.addAll(mic.segments);
-      _statusMsg = '일시 정지됨 — "계속하기"로 재개하세요.';
+      _statusMsg = tr('일시 정지됨 — "계속하기"로 재개하세요.', 'Paused — press "Resume" to continue.');
       _sttModelExists = true;
       _llmModelExists = true;
     } else {
@@ -389,26 +390,26 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     final segments = _segments.length;
 
     if (duration < const Duration(seconds: 5)) {
-      return ('empty', '녹음 시간이 ${duration.inSeconds}초로 너무 짧습니다.');
+      return ('empty', tr('녹음 시간이 ${duration.inSeconds}초로 너무 짧습니다.', 'The recording is only ${duration.inSeconds}s — too short.'));
     }
-    if (bytes == 0) return ('empty', '마이크에서 오디오 데이터가 들어오지 않았습니다.');
+    if (bytes == 0) return ('empty', tr('마이크에서 오디오 데이터가 들어오지 않았습니다.', 'No audio data was received from the microphone.'));
     if (segments == 0 && duration >= const Duration(seconds: 12)) {
-      return ('empty', '음성 인식 결과가 생성되지 않았습니다.');
+      return ('empty', tr('음성 인식 결과가 생성되지 않았습니다.', 'No speech recognition results were produced.'));
     }
     if (chars < 20 &&
         duration >= const Duration(seconds: 20) &&
         _maxInputLevelDuringRecording < 0.10) {
-      return ('empty', '인식된 글자 수가 $chars자로 매우 적고, 녹음 중 입력 음량도 낮았습니다.');
+      return ('empty', tr('인식된 글자 수가 $chars자로 매우 적고, 녹음 중 입력 음량도 낮았습니다.', 'Only $chars characters were recognized, and the input level was low during recording.'));
     }
     if (duration >= const Duration(seconds: 30) && chars < 60) {
-      return ('low', '녹음 시간에 비해 인식된 발화가 적습니다.');
+      return ('low', tr('녹음 시간에 비해 인식된 발화가 적습니다.', 'Little speech was recognized relative to the recording length.'));
     }
     if (duration >= const Duration(seconds: 30) && segments <= 1) {
-      return ('low', '전사 세그먼트가 $segments개뿐이라 요약 품질이 낮을 수 있습니다.');
+      return ('low', tr('전사 세그먼트가 $segments개뿐이라 요약 품질이 낮을 수 있습니다.', 'Only $segments transcript segment(s) — summary quality may be low.'));
     }
     if (duration >= const Duration(seconds: 30) &&
         _maxInputLevelDuringRecording < 0.16) {
-      return ('low', '녹음 중 입력 음량이 낮아 일부 발화가 누락됐을 수 있습니다.');
+      return ('low', tr('녹음 중 입력 음량이 낮아 일부 발화가 누락됐을 수 있습니다.', 'The input level was low during recording, so some speech may be missing.'));
     }
     return ('ok', '');
   }
@@ -421,14 +422,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   String _emptyRecordingReason() {
     final quality = _recordingQualityStatus();
     if (quality.$2.isNotEmpty) return quality.$2;
-    return '녹음 품질을 확인하기 어렵습니다.';
+    return tr('녹음 품질을 확인하기 어렵습니다.', 'Unable to assess the recording quality.');
   }
 
   String _qualityStatusLabel(String status) => switch (status) {
-    'empty' => '거의 빈 녹음',
-    'low' => '요약 품질 낮을 수 있음',
-    'ok' => '정상',
-    _ => '확인 필요',
+    'empty' => tr('거의 빈 녹음', 'Nearly empty recording'),
+    'low' => tr('요약 품질 낮을 수 있음', 'Summary quality may be low'),
+    'ok' => tr('정상', 'Good'),
+    _ => tr('확인 필요', 'Needs review'),
   };
 
   Color _qualityStatusColor(String status) => switch (status) {
@@ -476,12 +477,20 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               SizedBox(
                 width: 440,
                 child: Text(
-                  '$reason\n\n'
-                  '녹음 시간: ${duration.inSeconds}초\n'
-                  '인식된 글자 수: $chars자\n'
-                  '전사 세그먼트: ${_segments.length}개\n'
-                  '최대 입력 레벨: ${(_maxInputLevelDuringRecording * 100).toStringAsFixed(0)}%\n\n'
-                  '마이크 위치나 입력 장치를 확인한 뒤 다시 녹음하는 것을 권장합니다.',
+                  tr(
+                    '$reason\n\n'
+                        '녹음 시간: ${duration.inSeconds}초\n'
+                        '인식된 글자 수: $chars자\n'
+                        '전사 세그먼트: ${_segments.length}개\n'
+                        '최대 입력 레벨: ${(_maxInputLevelDuringRecording * 100).toStringAsFixed(0)}%\n\n'
+                        '마이크 위치나 입력 장치를 확인한 뒤 다시 녹음하는 것을 권장합니다.',
+                    '$reason\n\n'
+                        'Duration: ${duration.inSeconds}s\n'
+                        'Recognized characters: $chars\n'
+                        'Transcript segments: ${_segments.length}\n'
+                        'Peak input level: ${(_maxInputLevelDuringRecording * 100).toStringAsFixed(0)}%\n\n'
+                        'We recommend checking the microphone position or input device and recording again.',
+                  ),
                   style: const TextStyle(fontSize: 13, height: 1.5),
                 ),
               ),
@@ -494,7 +503,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     secondary: true,
                     onPressed: () =>
                         Navigator.pop(ctx, _EmptyRecordingAction.keep),
-                    child: const Text('보관만 하기'),
+                    child: Text(tr('보관만 하기', 'Keep only')),
                   ),
                   const SizedBox(width: 8),
                   PushButton(
@@ -514,7 +523,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '삭제',
+                            tr('삭제', 'Delete'),
                             style: TextStyle(color: Colors.red.shade700),
                           ),
                         ],
@@ -528,9 +537,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       color: color,
                       onPressed: () =>
                           Navigator.pop(ctx, _EmptyRecordingAction.summarize),
-                      child: const Text(
-                        '그래도 요약하기',
-                        style: TextStyle(color: MacosColors.white),
+                      child: Text(
+                        tr('그래도 요약하기', 'Summarize anyway'),
+                        style: const TextStyle(color: MacosColors.white),
                       ),
                     ),
                   ],
@@ -574,7 +583,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     } else if (mounted) {
       final label = _qualityStatusLabel(_recordingQualityStatus().$1);
       setState(() {
-        _statusMsg = '$label 상태입니다. 마이크 상태를 확인한 뒤 요약 여부를 선택하세요.';
+        _statusMsg = tr('$label 상태입니다. 마이크 상태를 확인한 뒤 요약 여부를 선택하세요.', 'Status: $label. Check the microphone, then choose whether to summarize.');
       });
     }
   }
@@ -599,7 +608,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('빈 녹음 삭제 실패: $e'),
+            content: Text(tr('빈 녹음 삭제 실패: $e', 'Failed to delete empty recording: $e')),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -611,7 +620,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     ref.invalidate(meetingsProvider);
     setState(() {
       _phase = _RecordingPhase.idle;
-      _statusMsg = '빈 녹음을 삭제했습니다. 다시 녹음할 수 있습니다.';
+      _statusMsg = tr('빈 녹음을 삭제했습니다. 다시 녹음할 수 있습니다.', 'Empty recording deleted. You can record again.');
       _segments.clear();
       _pendingSpeakerLabels = const [];
       _audioSavePath = null;
@@ -651,7 +660,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             ),
             const SizedBox(width: 8),
             Text(
-              label.isEmpty ? '북마크 저장됨 — $time' : '북마크 저장됨 — $time · $label',
+              label.isEmpty
+                  ? tr('북마크 저장됨 — $time', 'Bookmark saved — $time')
+                  : tr('북마크 저장됨 — $time · $label', 'Bookmark saved — $time · $label'),
             ),
           ],
         ),
@@ -686,7 +697,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               size: 18,
             ),
             const SizedBox(width: 8),
-            Text(count == 1 ? '트레이 북마크 저장됨 — $time' : '트레이 북마크 $count개 저장됨'),
+            Text(count == 1
+                ? tr('트레이 북마크 저장됨 — $time', 'Tray bookmark saved — $time')
+                : tr('트레이 북마크 $count개 저장됨', '$count tray bookmarks saved')),
           ],
         ),
         backgroundColor: Colors.indigo.shade700,
@@ -757,7 +770,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   String _formatDurationKr(Duration duration) {
     final minutes = duration.inMinutes;
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes분 $seconds초';
+    return tr('$minutes분 $seconds초', '${minutes}m ${seconds}s');
   }
 
   String _formatDurationClock(Duration duration) {
@@ -769,7 +782,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   String? _nativeTaskBlockReason(String actionLabel) {
     final active = OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (active == null) return null;
-    return '현재 $active 작업 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.';
+    return tr('현재 $active 작업 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.', '$active is currently running. Please try $actionLabel again once it finishes.');
   }
 
   void _showNativeTaskBlocked(String actionLabel) {
@@ -802,10 +815,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   String? _trayBusyLabel() {
     return switch (_phase) {
-      _RecordingPhase.checkingModels => '모델 확인 중...',
-      _RecordingPhase.loadingModel => '녹음 준비 중...',
-      _RecordingPhase.processing => '녹음 정리 중...',
-      _RecordingPhase.summarizing => '요약 중...',
+      _RecordingPhase.checkingModels => tr('모델 확인 중...', 'Checking models...'),
+      _RecordingPhase.loadingModel => tr('녹음 준비 중...', 'Preparing recording...'),
+      _RecordingPhase.processing => tr('녹음 정리 중...', 'Finalizing recording...'),
+      _RecordingPhase.summarizing => tr('요약 중...', 'Summarizing...'),
       _ => null,
     };
   }
@@ -816,7 +829,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     setState(() {
       _cancelSummaryRequested = true;
-      _statusMsg = '요약 중지 중';
+      _statusMsg = tr('요약 중지 중', 'Stopping summary');
     });
     LlmService.instance.requestCancelActiveGeneration();
   }
@@ -848,12 +861,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     if (!_sttModelExists) {
       setState(() {
         _phase = _RecordingPhase.error;
-        _statusMsg = '음성 인식 모델 파일이 없습니다. 아래 안내를 따라 모델을 설치해주세요.';
+        _statusMsg = tr('음성 인식 모델 파일이 없습니다. 아래 안내를 따라 모델을 설치해주세요.', 'The speech recognition model file is missing. Follow the guide below to install it.');
       });
       if (showTrayFailureNotice) {
         await _showTrayRecordingStartFailureDialog(
-          title: '음성 인식 모델이 필요합니다',
-          message: '트레이에서 바로 녹음하려면 먼저 음성 인식 모델을 설치해주세요.',
+          title: tr('음성 인식 모델이 필요합니다', 'Speech recognition model required'),
+          message: tr('트레이에서 바로 녹음하려면 먼저 음성 인식 모델을 설치해주세요.', 'To record directly from the tray, please install the speech recognition model first.'),
         );
       }
       return;
@@ -861,7 +874,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     setState(() {
       _phase = _RecordingPhase.loadingModel;
-      _statusMsg = '음성 인식 모델 준비 중';
+      _statusMsg = tr('음성 인식 모델 준비 중', 'Preparing speech recognition model');
       _segments.clear();
       _transcriptManuallyEdited = false;
       _pendingSpeakerLabels = const [];
@@ -884,7 +897,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       final appSupport = await getApplicationSupportDirectory();
       final liveSttModelFile = _selectLiveSttModelFile();
       if (liveSttModelFile == null) {
-        throw Exception('설치된 음성 인식 모델이 없습니다.');
+        throw Exception(tr('설치된 음성 인식 모델이 없습니다.', 'No speech recognition model is installed.'));
       }
       final sttPath = '${appSupport.path}/models/$liveSttModelFile';
       _shouldRunFinalAccuratePass =
@@ -895,28 +908,32 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       if (mounted) {
         setState(() {
           _statusMsg = liveSttModelFile == AppConstants.sttModelFileFast
-              ? '빠른 음성 인식 준비 중'
-              : '정확 음성 인식 준비 중';
+              ? tr('빠른 음성 인식 준비 중', 'Preparing fast speech recognition')
+              : tr('정확 음성 인식 준비 중', 'Preparing accurate speech recognition');
         });
       }
 
       // 녹음 저장 폴더 + 파일 경로 결정
       final recordingsDirPath = AppSettings.instance.recordingsSavePath;
       if (recordingsDirPath.isEmpty) {
-        throw const _RecordingStartException(
-          title: '저장 폴더 선택이 필요합니다',
-          message: '회의 녹음을 시작하려면 먼저 녹음 파일을 저장할 폴더를 선택해주세요.',
+        throw _RecordingStartException(
+          title: tr('저장 폴더 선택이 필요합니다', 'Choose a save folder'),
+          message: tr('회의 녹음을 시작하려면 먼저 녹음 파일을 저장할 폴더를 선택해주세요.', 'To start recording, please choose a folder to save recording files first.'),
         );
       }
       final restoredAccess =
           await SecurityScopedBookmarkService.restoreRecordingsFolderAccess();
       if (!restoredAccess) {
         throw _RecordingStartException(
-          title: '저장 폴더 권한이 필요합니다',
-          message:
-              'macOS 보안 정책 때문에 저장 폴더 접근 권한을 다시 받아야 합니다.\n'
-              '설정에서 녹음 파일 저장 위치를 다시 선택한 뒤 녹음을 시작해주세요.\n\n'
-              '현재 폴더: $recordingsDirPath',
+          title: tr('저장 폴더 권한이 필요합니다', 'Save folder access required'),
+          message: tr(
+            'macOS 보안 정책 때문에 저장 폴더 접근 권한을 다시 받아야 합니다.\n'
+                '설정에서 녹음 파일 저장 위치를 다시 선택한 뒤 녹음을 시작해주세요.\n\n'
+                '현재 폴더: $recordingsDirPath',
+            'macOS security requires re-granting access to the save folder.\n'
+                'Re-select the recording save location in Settings, then start recording.\n\n'
+                'Current folder: $recordingsDirPath',
+          ),
         );
       }
       final recordingsDir = Directory(recordingsDirPath);
@@ -924,11 +941,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         await recordingsDir.create(recursive: true);
       } catch (_) {
         throw _RecordingStartException(
-          title: '저장 폴더에 접근할 수 없습니다',
-          message:
-              '선택한 저장 폴더에 녹음 파일을 만들 수 없습니다.\n'
-              '설정에서 다른 저장 폴더를 선택한 뒤 다시 시도해주세요.\n\n'
-              '현재 폴더: $recordingsDirPath',
+          title: tr('저장 폴더에 접근할 수 없습니다', 'Cannot access the save folder'),
+          message: tr(
+            '선택한 저장 폴더에 녹음 파일을 만들 수 없습니다.\n'
+                '설정에서 다른 저장 폴더를 선택한 뒤 다시 시도해주세요.\n\n'
+                '현재 폴더: $recordingsDirPath',
+            'Recording files cannot be created in the selected save folder.\n'
+                'Choose a different save folder in Settings and try again.\n\n'
+                'Current folder: $recordingsDirPath',
+          ),
         );
       }
       final ts = DateTime.now().millisecondsSinceEpoch;
@@ -961,8 +982,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       setState(() {
         _phase = _RecordingPhase.recording;
         _statusMsg = _shouldRunFinalAccuratePass
-            ? '녹음 중 (빠른 모델로 30초마다 초안 전사 · 요약 전 정확 전사)'
-            : '녹음 중 (30초마다 자동으로 텍스트 변환)';
+            ? tr('녹음 중 (빠른 모델로 30초마다 초안 전사 · 요약 전 정확 전사)', 'Recording (draft every 30s with the fast model · accurate transcription before summary)')
+            : tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
       });
     } on MicrophonePermissionDeniedException catch (e) {
       setState(() {
@@ -985,9 +1006,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       CrashLogService.instance.recordCaught(e, st, context: 'startRecording');
       final friendly = friendlyErrorMessage(
         e,
-        fallbackTitle: '녹음을 시작하지 못했습니다',
-        fallbackMessage: '잠시 후 다시 시도해주세요.',
-        nextStep: '마이크, 저장 폴더, AI 모델 설치 상태를 확인해주세요.',
+        fallbackTitle: tr('녹음을 시작하지 못했습니다', 'Could not start recording'),
+        fallbackMessage: tr('잠시 후 다시 시도해주세요.', 'Please try again in a moment.'),
+        nextStep: tr('마이크, 저장 폴더, AI 모델 설치 상태를 확인해주세요.', 'Check the microphone, save folder, and AI model installation.'),
       );
       setState(() {
         _phase = _RecordingPhase.error;
@@ -1020,7 +1041,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('확인'),
+          child: Text(tr('확인', 'OK')),
         ),
       ),
     );
@@ -1032,17 +1053,21 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       context: context,
       builder: (ctx) => MacosAlertDialog(
         appIcon: const Icon(Icons.mic_off, color: Colors.red, size: 48),
-        title: const Text('마이크 권한이 필요합니다'),
+        title: Text(tr('마이크 권한이 필요합니다', 'Microphone access required')),
         message: SizedBox(
           width: 420,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '회의 녹음을 위해 마이크 접근 권한이 필요합니다.\n'
-                '시스템 설정에서 "Local Minutes" 항목을 켜주세요.',
-                style: TextStyle(fontSize: 13, height: 1.5),
+              Text(
+                tr(
+                  '회의 녹음을 위해 마이크 접근 권한이 필요합니다.\n'
+                      '시스템 설정에서 "Local Minutes" 항목을 켜주세요.',
+                  'Microphone access is required to record meetings.\n'
+                      'Enable "Local Minutes" in System Settings.',
+                ),
+                style: const TextStyle(fontSize: 13, height: 1.5),
               ),
               const SizedBox(height: 12),
               Container(
@@ -1051,9 +1076,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  '경로: 시스템 설정 → 개인정보 보호 및 보안 → 마이크',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                child: Text(
+                  tr('경로: 시스템 설정 → 개인정보 보호 및 보안 → 마이크', 'Path: System Settings → Privacy & Security → Microphone'),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -1070,14 +1095,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             } catch (_) {}
             if (ctx.mounted) Navigator.pop(ctx);
           },
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.open_in_new, size: 14, color: MacosColors.white),
-                SizedBox(width: 4),
-                Text('시스템 설정 열기', style: TextStyle(color: MacosColors.white)),
+                const Icon(Icons.open_in_new, size: 14, color: MacosColors.white),
+                const SizedBox(width: 4),
+                Text(tr('시스템 설정 열기', 'Open System Settings'), style: const TextStyle(color: MacosColors.white)),
               ],
             ),
           ),
@@ -1086,7 +1111,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           controlSize: ControlSize.large,
           secondary: true,
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('나중에'),
+          child: Text(tr('나중에', 'Later')),
         ),
       ),
     );
@@ -1096,7 +1121,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     await MicrophoneService.instance.pauseRecording();
     setState(() {
       _phase = _RecordingPhase.paused;
-      _statusMsg = '일시 정지됨 — "계속하기"로 재개하세요.';
+      _statusMsg = tr('일시 정지됨 — "계속하기"로 재개하세요.', 'Paused — press "Resume" to continue.');
     });
   }
 
@@ -1104,7 +1129,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     await MicrophoneService.instance.resumeRecording();
     setState(() {
       _phase = _RecordingPhase.recording;
-      _statusMsg = '녹음 중 (30초마다 자동으로 텍스트 변환)';
+      _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
     });
   }
 
@@ -1113,7 +1138,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     _checkpointTimer?.cancel();
     setState(() {
       _phase = _RecordingPhase.processing;
-      _statusMsg = '녹음 정리 중';
+      _statusMsg = tr('녹음 정리 중', 'Finalizing recording');
     });
     await MicrophoneService.instance.stopRecording();
     _recordingEndedAt = DateTime.now();
@@ -1137,7 +1162,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     setState(() {
       _phase = _RecordingPhase.stopped;
-      _statusMsg = '녹음 완료. 요약을 실행하세요.';
+      _statusMsg = tr('녹음 완료. 요약을 실행하세요.', 'Recording complete. Run the summary.');
     });
     ref.invalidate(meetingsProvider);
     await _maybeWarnEmptyRecordingAfterStop();
@@ -1249,7 +1274,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          '녹음 준비',
+                          tr('녹음 준비', 'Recording setup'),
                           textAlign: TextAlign.center,
                           style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
@@ -1286,8 +1311,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   initialValue: titleText,
                                   onChanged: (v) => titleText = v,
                                   decoration: prepDecoration(
-                                    '회의 제목',
-                                    hintText: '예: 제품 주간 회의',
+                                    tr('회의 제목', 'Meeting title'),
+                                    hintText: tr('예: 제품 주간 회의', 'e.g. Product weekly'),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -1297,27 +1322,27 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                       child: DropdownButtonFormField<int>(
                                         isExpanded: true,
                                         initialValue: speakerCount,
-                                        decoration: prepDecoration('말할 사람 수'),
-                                        items: const [
+                                        decoration: prepDecoration(tr('말할 사람 수', 'Number of speakers')),
+                                        items: [
                                           DropdownMenuItem(
                                             value: 2,
-                                            child: Text('2명'),
+                                            child: Text(tr('2명', '2 people')),
                                           ),
                                           DropdownMenuItem(
                                             value: 3,
-                                            child: Text('3명'),
+                                            child: Text(tr('3명', '3 people')),
                                           ),
                                           DropdownMenuItem(
                                             value: 4,
-                                            child: Text('4명'),
+                                            child: Text(tr('4명', '4 people')),
                                           ),
                                           DropdownMenuItem(
                                             value: 5,
-                                            child: Text('5명'),
+                                            child: Text(tr('5명', '5 people')),
                                           ),
                                           DropdownMenuItem(
                                             value: 6,
-                                            child: Text('6명'),
+                                            child: Text(tr('6명', '6 people')),
                                           ),
                                         ],
                                         onChanged: (v) {
@@ -1334,12 +1359,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                       child: DropdownButtonFormField<String?>(
                                         isExpanded: true,
                                         initialValue: templateId,
-                                        decoration: prepDecoration('회의 유형'),
+                                        decoration: prepDecoration(tr('회의 유형', 'Meeting type')),
                                         items: [
-                                          const DropdownMenuItem<String?>(
+                                          DropdownMenuItem<String?>(
                                             value: null,
                                             child: Text(
-                                              '설정값 사용',
+                                              tr('설정값 사용', 'Use default setting'),
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
@@ -1352,17 +1377,17 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                          const DropdownMenuItem<String?>(
+                                          DropdownMenuItem<String?>(
                                             value: SummaryTemplates.customId1,
                                             child: Text(
-                                              '커스텀1',
+                                              tr('커스텀1', 'Custom 1'),
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const DropdownMenuItem<String?>(
+                                          DropdownMenuItem<String?>(
                                             value: SummaryTemplates.customId2,
                                             child: Text(
-                                              '커스텀2',
+                                              tr('커스텀2', 'Custom 2'),
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
@@ -1385,21 +1410,28 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   maxLines: 4,
                                   minLines: 2,
                                   decoration: prepDecoration(
-                                    '어젠다 (선택)',
-                                    hintText:
-                                        '한 줄에 하나씩 입력하면 요약이 어젠다별로 정리됩니다.\n'
-                                        '예:\n'
-                                        '- 신규 피처 일정\n'
-                                        '- 결제 모듈 리뷰',
-                                    helperText:
-                                        '비워두면 일반 요약. 입력하면 항목별 결정·액션이 정리됩니다.',
+                                    tr('어젠다 (선택)', 'Agenda (optional)'),
+                                    hintText: tr(
+                                      '한 줄에 하나씩 입력하면 요약이 어젠다별로 정리됩니다.\n'
+                                          '예:\n'
+                                          '- 신규 피처 일정\n'
+                                          '- 결제 모듈 리뷰',
+                                      'Enter one item per line and the summary will be organized by agenda.\n'
+                                          'e.g.:\n'
+                                          '- New feature schedule\n'
+                                          '- Payment module review',
+                                    ),
+                                    helperText: tr(
+                                      '비워두면 일반 요약. 입력하면 항목별 결정·액션이 정리됩니다.',
+                                      'Leave empty for a general summary. Fill in to organize decisions and actions per item.',
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String>(
                                   isExpanded: true,
                                   initialValue: sttLanguage,
-                                  decoration: prepDecoration('음성 인식 언어'),
+                                  decoration: prepDecoration(tr('음성 인식 언어', 'Recognition language')),
                                   items: [
                                     for (final code
                                         in AppSettings.supportedSttLanguages)
@@ -1431,11 +1463,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String?>(
                                   initialValue: selectedDeviceId,
-                                  decoration: prepDecoration('마이크'),
+                                  decoration: prepDecoration(tr('마이크', 'Microphone')),
                                   items: [
-                                    const DropdownMenuItem<String?>(
+                                    DropdownMenuItem<String?>(
                                       value: null,
-                                      child: Text('시스템 기본 마이크'),
+                                      child: Text(tr('시스템 기본 마이크', 'System default microphone')),
                                     ),
                                     for (final device in _inputDevices)
                                       DropdownMenuItem<String?>(
@@ -1458,8 +1490,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                 ),
                                 const SizedBox(height: 12),
                                 _PrepToggleRow(
-                                  title: '발화자 라벨 사용',
-                                  subtitle: '발화 흐름을 A/B/C로 구분합니다.',
+                                  title: tr('발화자 라벨 사용', 'Use speaker labels'),
+                                  subtitle: tr('발화 흐름을 A/B/C로 구분합니다.', 'Distinguishes the speaking flow as A/B/C.'),
                                   value: diarizationEnabled,
                                   onChanged: (v) {
                                     setLocalState(() => diarizationEnabled = v);
@@ -1467,29 +1499,29 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                 ),
                                 if (!AppSettings.instance.micGuideShown) ...[
                                   const Divider(height: 24),
-                                  const Text(
-                                    '녹음 품질 체크',
-                                    style: TextStyle(
+                                  Text(
+                                    tr('녹음 품질 체크', 'Recording quality check'),
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  const _PrepGuideRow(
+                                  _PrepGuideRow(
                                     icon: Icons.center_focus_strong_rounded,
-                                    text: '기기 또는 마이크를 말하는 사람들의 중앙에 두세요.',
+                                    text: tr('기기 또는 마이크를 말하는 사람들의 중앙에 두세요.', 'Place the device or microphone in the center of the speakers.'),
                                   ),
-                                  const _PrepGuideRow(
+                                  _PrepGuideRow(
                                     icon: Icons.volume_down_rounded,
-                                    text: '에어컨, 선풍기, 키보드 소음은 가능한 한 멀리 두세요.',
+                                    text: tr('에어컨, 선풍기, 키보드 소음은 가능한 한 멀리 두세요.', 'Keep AC, fan, and keyboard noise as far away as possible.'),
                                   ),
-                                  const _PrepGuideRow(
+                                  _PrepGuideRow(
                                     icon: Icons.record_voice_over_outlined,
-                                    text: '여러 명이 참석하면 겹쳐 말하는 시간을 줄이면 좋습니다.',
+                                    text: tr('여러 명이 참석하면 겹쳐 말하는 시간을 줄이면 좋습니다.', 'With several attendees, reducing overlapping speech helps.'),
                                   ),
                                 ],
                                 const SizedBox(height: 6),
                                 Text(
-                                  '7명 이상 회의는 현재 가장 가까운 값인 6명을 선택하세요.',
+                                  tr('7명 이상 회의는 현재 가장 가까운 값인 6명을 선택하세요.', 'For meetings with 7+ people, choose 6 — the closest available value.'),
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: scheme.onSurfaceVariant,
@@ -1510,7 +1542,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   await stopMicTest?.call();
                                   if (ctx.mounted) Navigator.of(ctx).pop(null);
                                 },
-                                child: const Text('취소'),
+                                child: Text(tr('취소', 'Cancel')),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -1543,7 +1575,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                     ),
                                   );
                                 },
-                                child: const Text('녹음 시작'),
+                                child: Text(tr('녹음 시작', 'Start recording')),
                               ),
                             ),
                           ],
@@ -1584,8 +1616,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _ => 'Gemma 4 E2B',
     };
     String tipOf(String id) => switch (id) {
-      'qwen25_7b' => 'Qwen 2.5 7B Instruct Q4_K_M (~4.7GB)\n한국어·구조화 출력 강함',
-      _ => 'Gemma 4 E2B Q8_0 (~3GB)\n빠름, 기본 품질',
+      'qwen25_7b' => tr('Qwen 2.5 7B Instruct Q4_K_M (~4.7GB)\n한국어·구조화 출력 강함', 'Qwen 2.5 7B Instruct Q4_K_M (~4.7GB)\nStrong Korean & structured output'),
+      _ => tr('Gemma 4 E2B Q8_0 (~3GB)\n빠름, 기본 품질', 'Gemma 4 E2B Q8_0 (~3GB)\nFast, baseline quality'),
     };
 
     if (!mounted) return null;
@@ -1595,7 +1627,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         builder: (ctx, setD) {
           return MacosAlertDialog(
             appIcon: const Icon(Icons.auto_awesome, size: 48),
-            title: const Text('요약 모델 선택'),
+            title: Text(tr('요약 모델 선택', 'Choose summary model')),
             message: SizedBox(
               width: 420,
               child: Column(
@@ -1603,7 +1635,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '마우스를 올리면 모델 설명이 보입니다.',
+                    tr('마우스를 올리면 모델 설명이 보입니다.', 'Hover to see the model description.'),
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 12),
@@ -1630,13 +1662,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             primaryButton: PushButton(
               controlSize: ControlSize.large,
               onPressed: () => Navigator.of(ctx).pop(selected),
-              child: const Text('요약 실행'),
+              child: Text(tr('요약 실행', 'Run summary')),
             ),
             secondaryButton: PushButton(
               controlSize: ControlSize.large,
               secondary: true,
               onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('취소'),
+              child: Text(tr('취소', 'Cancel')),
             ),
           );
         },
@@ -1708,7 +1740,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => MacosAlertDialog(
           appIcon: const Icon(Icons.timer_outlined, size: 48),
-          title: const Text('예상 처리 시간'),
+          title: Text(tr('예상 처리 시간', 'Estimated processing time')),
           message: SizedBox(
             width: 460,
             child: Column(
@@ -1716,35 +1748,35 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '회의 길이 ${_formatDurationKr(audio)} 기준의 대략적인 예상입니다. 기기 성능과 모델에 따라 달라질 수 있습니다.',
+                  tr('회의 길이 ${_formatDurationKr(audio)} 기준의 대략적인 예상입니다. 기기 성능과 모델에 따라 달라질 수 있습니다.', 'A rough estimate based on a ${_formatDurationKr(audio)} meeting. Actual time varies by device and model.'),
                   style: const TextStyle(fontSize: 13, height: 1.5),
                 ),
                 const SizedBox(height: 14),
                 if (finalSttEstimate > Duration.zero)
                   _EstimateRow(
-                    label: '정확 음성 인식',
+                    label: tr('정확 음성 인식', 'Accurate recognition'),
                     value: _formatDurationKr(finalSttEstimate),
                   ),
                 if (useDiarization)
                   _EstimateRow(
-                    label: '발화자 라벨',
+                    label: tr('발화자 라벨', 'Speaker labels'),
                     value: _formatDurationKr(diarizationEstimate),
                   ),
                 _EstimateRow(
-                  label: '요약 생성',
+                  label: tr('요약 생성', 'Summary generation'),
                   value: _formatDurationKr(summaryEstimate),
                 ),
                 const Divider(height: 22),
                 _EstimateRow(
-                  label: '총 예상',
-                  value: '약 ${_formatDurationKr(totalFor(useDiarization))}',
+                  label: tr('총 예상', 'Total estimate'),
+                  value: tr('약 ${_formatDurationKr(totalFor(useDiarization))}', 'about ${_formatDurationKr(totalFor(useDiarization))}'),
                   emphasis: true,
                 ),
                 const SizedBox(height: 12),
                 _PrepToggleRow(
                   value: useDiarization,
-                  title: '발화자 라벨 사용',
-                  subtitle: '끄면 더 빠르게 요약하지만, 발화 흐름 정보는 줄어듭니다.',
+                  title: tr('발화자 라벨 사용', 'Use speaker labels'),
+                  subtitle: tr('끄면 더 빠르게 요약하지만, 발화 흐름 정보는 줄어듭니다.', 'Turning this off summarizes faster but reduces speaking-flow detail.'),
                   onChanged: (v) {
                     setLocalState(() => useDiarization = v);
                   },
@@ -1758,13 +1790,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               await AppSettings.instance.setDiarizationEnabled(useDiarization);
               if (ctx.mounted) Navigator.of(ctx).pop(true);
             },
-            child: const Text('시작'),
+            child: Text(tr('시작', 'Start')),
           ),
           secondaryButton: PushButton(
             controlSize: ControlSize.large,
             secondary: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
         ),
       ),
@@ -1785,19 +1817,19 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           await _discardEmptyRecordingDraft();
         } else if (mounted) {
           setState(() {
-            _statusMsg = '변환된 내용이 없습니다. 마이크 상태를 확인한 뒤 다시 녹음해 주세요.';
+            _statusMsg = tr('변환된 내용이 없습니다. 마이크 상태를 확인한 뒤 다시 녹음해 주세요.', 'No transcribed content. Check the microphone and record again.');
           });
         }
       } else {
         setState(() {
-          _statusMsg = '변환된 내용이 없습니다. 먼저 녹음해 주세요.';
+          _statusMsg = tr('변환된 내용이 없습니다. 먼저 녹음해 주세요.', 'No transcribed content. Please record first.');
         });
       }
       return;
     }
     if (_phase != _RecordingPhase.summarizing &&
-        _nativeTaskBlockReason('요약') != null) {
-      _showNativeTaskBlocked('요약');
+        _nativeTaskBlockReason(tr('요약', 'summary')) != null) {
+      _showNativeTaskBlocked(tr('요약', 'summary'));
       return;
     }
 
@@ -1811,7 +1843,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       if (action != _EmptyRecordingAction.summarize) {
         if (mounted) {
           setState(() {
-            _statusMsg = '요약하지 않고 보관했습니다. 필요하면 다시 요약할 수 있습니다.';
+            _statusMsg = tr('요약하지 않고 보관했습니다. 필요하면 다시 요약할 수 있습니다.', 'Kept without summarizing. You can summarize later if needed.');
           });
         }
         return;
@@ -1830,7 +1862,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     setState(() {
       _phase = _RecordingPhase.summarizing;
       _cancelSummaryRequested = false;
-      _statusMsg = '전사 저장 중';
+      _statusMsg = tr('전사 저장 중', 'Saving transcript');
       _summaryProgress = 0.0;
       _summaryStartTime = DateTime.now();
       _lastFinalSttElapsedMs = 0;
@@ -1854,7 +1886,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         final totalStr = _formatDurationKr(_currentSummaryElapsed());
         setState(() {
           _phase = _RecordingPhase.stopped;
-          _statusMsg = '요약 중지됨 · 총 소요 $totalStr';
+          _statusMsg = tr('요약 중지됨 · 총 소요 $totalStr', 'Summary stopped · total $totalStr');
           _cancelSummaryRequested = false;
         });
       }
@@ -1871,7 +1903,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         final totalStr = _formatDurationKr(_currentSummaryElapsed());
         setState(() {
           _phase = _RecordingPhase.stopped;
-          _statusMsg = '요약 중지됨 · 총 소요 $totalStr';
+          _statusMsg = tr('요약 중지됨 · 총 소요 $totalStr', 'Summary stopped · total $totalStr');
           _cancelSummaryRequested = false;
         });
       }
@@ -1903,14 +1935,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _summaryTicker?.cancel();
       final friendly = friendlyErrorText(
         e,
-        fallbackTitle: '전사 저장에 실패했습니다',
-        fallbackMessage: '회의 텍스트를 저장하지 못했습니다.',
-        nextStep: '저장 폴더와 디스크 여유 공간을 확인한 뒤 다시 시도해주세요.',
+        fallbackTitle: tr('전사 저장에 실패했습니다', 'Failed to save transcript'),
+        fallbackMessage: tr('회의 텍스트를 저장하지 못했습니다.', 'Could not save the meeting text.'),
+        nextStep: tr('저장 폴더와 디스크 여유 공간을 확인한 뒤 다시 시도해주세요.', 'Check the save folder and free disk space, then try again.'),
       );
       if (mounted) {
         setState(() {
           _phase = _RecordingPhase.error;
-          _statusMsg = '전사 저장 실패 · 총 소요 $totalStr\n$friendly';
+          _statusMsg = tr('전사 저장 실패 · 총 소요 $totalStr\n$friendly', 'Transcript save failed · total $totalStr\n$friendly');
         });
       }
       return;
@@ -1918,7 +1950,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     // ── 2단계: LLM 요약 ─────────────────────────────────────
     try {
-      setState(() => _statusMsg = '요약 모델 준비 중');
+      setState(() => _statusMsg = tr('요약 모델 준비 중', 'Preparing summary model'));
       final appSupport = await getApplicationSupportDirectory();
       final llmPath =
           '${appSupport.path}/models/${AppSettings.llmModelFileFor(llmId)}';
@@ -1930,7 +1962,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         nBatch: 512,
       );
       if (_cancelSummaryRequested) throw const SummaryCancelledException();
-      if (mounted) setState(() => _statusMsg = '회의 요약 생성 중');
+      if (mounted) setState(() => _statusMsg = tr('회의 요약 생성 중', 'Generating meeting summary'));
 
       final dateStr =
           '${recStart.year}-'
@@ -2016,7 +2048,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       if (AppSettings.instance.summarySpeedMode !=
           AppSettings.summaryModeFast) {
         try {
-          if (mounted) setState(() => _statusMsg = '태그 정리 중');
+          if (mounted) setState(() => _statusMsg = tr('태그 정리 중', 'Organizing tags'));
           final tags = await TagExtractor.extractFromSummary(
             summary,
             notes: notesText,
@@ -2042,13 +2074,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         _summaryTicker?.cancel();
         setState(() {
           _phase = _RecordingPhase.done;
-          _statusMsg = '저장 완료 · 총 소요 $totalStr · meetingId: $meetingId';
+          _statusMsg = tr('저장 완료 · 총 소요 $totalStr · meetingId: $meetingId', 'Saved · total $totalStr · meetingId: $meetingId');
           _failedSummaryMeetingId = null;
           _cancelSummaryRequested = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('요약 완료 · 총 소요 $totalStr'),
+            content: Text(tr('요약 완료 · 총 소요 $totalStr', 'Summary complete · total $totalStr')),
             backgroundColor: Colors.green.shade700,
           ),
         );
@@ -2068,9 +2100,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _summaryTicker?.cancel();
       final friendly = friendlyErrorText(
         e,
-        fallbackTitle: '요약을 만들지 못했습니다',
-        fallbackMessage: 'AI 요약 생성 중 문제가 발생했습니다.',
-        nextStep: '전사는 이미 저장되었습니다. 다시 요약하거나 회의록을 열어 내용을 확인할 수 있습니다.',
+        fallbackTitle: tr('요약을 만들지 못했습니다', 'Could not create summary'),
+        fallbackMessage: tr('AI 요약 생성 중 문제가 발생했습니다.', 'A problem occurred while generating the AI summary.'),
+        nextStep: tr('전사는 이미 저장되었습니다. 다시 요약하거나 회의록을 열어 내용을 확인할 수 있습니다.', 'The transcript is already saved. You can re-run the summary or open the meeting to review it.'),
       );
       if (mounted) {
         setState(() {
@@ -2078,8 +2110,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               ? _RecordingPhase.stopped
               : _RecordingPhase.error;
           _statusMsg = e is SummaryCancelledException
-              ? '요약 중지됨 · 총 소요 $totalStr\n전사는 이미 저장되었습니다. 다시 요약할 수 있습니다.'
-              : '요약 오류 · 총 소요 $totalStr\n$friendly';
+              ? tr('요약 중지됨 · 총 소요 $totalStr\n전사는 이미 저장되었습니다. 다시 요약할 수 있습니다.', 'Summary stopped · total $totalStr\nThe transcript is already saved. You can summarize again.')
+              : tr('요약 오류 · 총 소요 $totalStr\n$friendly', 'Summary error · total $totalStr\n$friendly');
           _failedSummaryMeetingId = meetingId;
           _cancelSummaryRequested = false;
         });
@@ -2113,7 +2145,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     try {
       if (mounted) {
         setState(() {
-          _statusMsg = '정확 전사 준비 중';
+          _statusMsg = tr('정확 전사 준비 중', 'Preparing accurate transcription');
           _summaryProgress = 0.0;
         });
       }
@@ -2129,7 +2161,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           if (!mounted || totalMs <= 0 || _cancelSummaryRequested) return;
           final progress = (processedMs / totalMs).clamp(0.0, 1.0);
           setState(() {
-            _statusMsg = '정확 전사 중 ${(progress * 100).toStringAsFixed(0)}%';
+            _statusMsg = tr('정확 전사 중 ${(progress * 100).toStringAsFixed(0)}%', 'Accurate transcription ${(progress * 100).toStringAsFixed(0)}%');
             _summaryProgress = progress * 0.25;
           });
         },
@@ -2152,7 +2184,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           _segments
             ..clear()
             ..addAll(finalSegments);
-          _statusMsg = '정확 전사 완료. 전사 저장 중';
+          _statusMsg = tr('정확 전사 완료. 전사 저장 중', 'Accurate transcription complete. Saving transcript');
           _summaryProgress = 0.25;
         });
       }
@@ -2165,13 +2197,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       );
       final friendly = friendlyErrorMessage(
         e,
-        fallbackTitle: '정확 전사에 실패했습니다',
-        fallbackMessage: '정확도 높은 음성 인식을 완료하지 못했습니다.',
-        nextStep: '실시간 전사본으로 요약을 계속합니다.',
+        fallbackTitle: tr('정확 전사에 실패했습니다', 'Accurate transcription failed'),
+        fallbackMessage: tr('정확도 높은 음성 인식을 완료하지 못했습니다.', 'Could not complete high-accuracy speech recognition.'),
+        nextStep: tr('실시간 전사본으로 요약을 계속합니다.', 'Continuing the summary with the live transcript.'),
       );
       if (mounted) {
         setState(() {
-          _statusMsg = '정확 전사 실패 — 실시간 전사본으로 요약을 계속합니다.';
+          _statusMsg = tr('정확 전사 실패 — 실시간 전사본으로 요약을 계속합니다.', 'Accurate transcription failed — continuing the summary with the live transcript.');
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2202,7 +2234,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       final diarSw = Stopwatch()..start();
       if (mounted) {
         setState(() {
-          _statusMsg = '발화자 라벨 분석 중';
+          _statusMsg = tr('발화자 라벨 분석 중', 'Analyzing speaker labels');
           _summaryProgress = _summaryProgress < 0.27 ? 0.27 : _summaryProgress;
         });
       }
@@ -2217,8 +2249,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           final completed = clamped >= 99.5;
           setState(() {
             _statusMsg = completed
-                ? '발화자 라벨 분석 완료. 요약을 준비하고 있습니다.'
-                : '발화자 라벨 분석 중';
+                ? tr('발화자 라벨 분석 완료. 요약을 준비하고 있습니다.', 'Speaker label analysis complete. Preparing the summary.')
+                : tr('발화자 라벨 분석 중', 'Analyzing speaker labels');
             _summaryProgress = completed
                 ? 0.3
                 : (_summaryProgress < 0.27 ? 0.27 : _summaryProgress);
@@ -2248,12 +2280,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       );
       if (mounted) {
         setState(() {
-          _statusMsg = '발화자 구분에 실패했습니다. 라벨 없이 요약을 계속합니다.';
+          _statusMsg = tr('발화자 구분에 실패했습니다. 라벨 없이 요약을 계속합니다.', 'Speaker separation failed. Continuing the summary without labels.');
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              friendlyDiarizationFailureMessage(nextStep: '회의 요약은 계속 진행합니다.'),
+              friendlyDiarizationFailureMessage(nextStep: tr('회의 요약은 계속 진행합니다.', 'The meeting summary will continue.')),
             ),
             backgroundColor: Colors.orange.shade700,
             duration: const Duration(seconds: 6),
@@ -2402,9 +2434,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     required String agenda,
   }) async {
     final descLines = <String>[];
-    if (agenda.trim().isNotEmpty) descLines.add('어젠다:\n$agenda');
-    if (notes.trim().isNotEmpty) descLines.add('메모:\n$notes');
-    descLines.add('— Local Minutes에서 자동 등록');
+    if (agenda.trim().isNotEmpty) descLines.add(tr('어젠다:\n$agenda', 'Agenda:\n$agenda'));
+    if (notes.trim().isNotEmpty) descLines.add(tr('메모:\n$notes', 'Notes:\n$notes'));
+    descLines.add(tr('— Local Minutes에서 자동 등록', '— Added automatically by Local Minutes'));
     final description = descLines.join('\n\n');
 
     final err = await CalendarService.instance.addEventToCalendar(
@@ -2418,7 +2450,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 2),
-          content: const Text('macOS 캘린더에 회의가 등록되었습니다'),
+          content: Text(tr('macOS 캘린더에 회의가 등록되었습니다', 'The meeting was added to the macOS Calendar')),
           backgroundColor: Colors.indigo.shade600,
         ),
       );
@@ -2426,7 +2458,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 4),
-          content: Text('캘린더 등록 실패 · $err'),
+          content: Text(tr('캘린더 등록 실패 · $err', 'Calendar registration failed · $err')),
           backgroundColor: Colors.orange.shade700,
         ),
       );
@@ -2512,7 +2544,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     Icon(Icons.pause, size: 18, color: Colors.orange.shade700),
                     const SizedBox(width: 6),
                     Text(
-                      '일시 정지  ${_elapsedStr()}',
+                      tr('일시 정지  ${_elapsedStr()}', 'Pause  ${_elapsedStr()}'),
                       style: TextStyle(color: Colors.orange.shade700),
                     ),
                   ],
@@ -2523,7 +2555,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           const SizedBox(width: 8),
           // ⭐ 북마크 (현재 시점 마킹) — Cmd+B 단축키와 연동
           MacosTooltip(
-            message: '핵심 순간 북마크 (⌘B)\n현재 시점을 표시해 요약에서 우선 처리합니다',
+            message: tr('핵심 순간 북마크 (⌘B)\n현재 시점을 표시해 요약에서 우선 처리합니다', 'Bookmark key moment (⌘B)\nMarks this point to prioritize it in the summary'),
             child: PushButton(
               controlSize: ControlSize.large,
               secondary: true,
@@ -2540,7 +2572,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '북마크 ${_bookmarks.isEmpty ? "" : "${_bookmarks.length}"}',
+                      tr('북마크 ${_bookmarks.isEmpty ? "" : "${_bookmarks.length}"}', 'Bookmark ${_bookmarks.isEmpty ? "" : "${_bookmarks.length}"}'),
                       style: TextStyle(color: Colors.amber.shade800),
                     ),
                   ],
@@ -2555,15 +2587,18 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               controlSize: ControlSize.large,
               color: MacosColors.systemRedColor,
               onPressed: _stopRecording,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.stop, size: 18, color: MacosColors.white),
-                    SizedBox(width: 6),
-                    Text('녹음 중지', style: TextStyle(color: MacosColors.white)),
+                    const Icon(Icons.stop, size: 18, color: MacosColors.white),
+                    const SizedBox(width: 6),
+                    Text(
+                      tr('녹음 중지', 'Stop'),
+                      style: const TextStyle(color: MacosColors.white),
+                    ),
                   ],
                 ),
               ),
@@ -2583,15 +2618,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               controlSize: ControlSize.large,
               color: MacosColors.systemGreenColor,
               onPressed: _resumeRecording,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.play_arrow, size: 18, color: MacosColors.white),
-                    SizedBox(width: 6),
-                    Text('계속하기', style: TextStyle(color: MacosColors.white)),
+                    const Icon(Icons.play_arrow, size: 18, color: MacosColors.white),
+                    const SizedBox(width: 6),
+                    Text(tr('계속하기', 'Resume'), style: const TextStyle(color: MacosColors.white)),
                   ],
                 ),
               ),
@@ -2612,7 +2647,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                   children: [
                     Icon(Icons.stop, size: 18, color: Colors.red.shade600),
                     const SizedBox(width: 6),
-                    Text('녹음 중지', style: TextStyle(color: Colors.red.shade600)),
+                    Text(tr('녹음 중지', 'Stop'), style: TextStyle(color: Colors.red.shade600)),
                   ],
                 ),
               ),
@@ -2626,10 +2661,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         _phase == _RecordingPhase.loadingModel ||
         _phase == _RecordingPhase.processing) {
       final label = switch (_phase) {
-        _RecordingPhase.checkingModels => '모델 확인 중...',
-        _RecordingPhase.loadingModel => '모델 로드 중',
-        _RecordingPhase.processing => '처리 중',
-        _ => '처리 중',
+        _RecordingPhase.checkingModels => tr('모델 확인 중...', 'Checking models...'),
+        _RecordingPhase.loadingModel => tr('모델 로드 중', 'Loading model'),
+        _RecordingPhase.processing => tr('처리 중', 'Processing'),
+        _ => tr('처리 중', 'Processing'),
       };
       return Container(
         height: 34,
@@ -2692,27 +2727,32 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               color: Colors.orange,
               size: 48,
             ),
-            title: const Text('녹음 내용이 삭제됩니다'),
-            message: const Text(
-              '아직 요약을 실행하지 않았습니다.\n'
-              '새 녹음을 시작하면 현재 녹취 내용이 모두 삭제됩니다.\n\n'
-              '계속하시겠습니까?',
+            title: Text(tr('녹음 내용이 삭제됩니다', 'The recording will be deleted')),
+            message: Text(
+              tr(
+                '아직 요약을 실행하지 않았습니다.\n'
+                    '새 녹음을 시작하면 현재 녹취 내용이 모두 삭제됩니다.\n\n'
+                    '계속하시겠습니까?',
+                'You haven\'t run a summary yet.\n'
+                    'Starting a new recording will delete all current transcript content.\n\n'
+                    'Do you want to continue?',
+              ),
               textAlign: TextAlign.center,
             ),
             primaryButton: PushButton(
               controlSize: ControlSize.large,
               color: MacosColors.systemRedColor,
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text(
-                '삭제하고 새 녹음',
-                style: TextStyle(color: MacosColors.white),
+              child: Text(
+                tr('삭제하고 새 녹음', 'Delete & record anew'),
+                style: const TextStyle(color: MacosColors.white),
               ),
             ),
             secondaryButton: PushButton(
               controlSize: ControlSize.large,
               secondary: true,
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소'),
+              child: Text(tr('취소', 'Cancel')),
             ),
           ),
         );
@@ -2732,10 +2772,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         final nativeActive = snapshot.data?.activeLabel;
         final recordingBlock = nativeActive == null
             ? null
-            : '현재 $nativeActive 작업 중입니다. 완료 후 녹음을 시작해주세요.';
+            : tr('현재 $nativeActive 작업 중입니다. 완료 후 녹음을 시작해주세요.', '$nativeActive is currently running. Please start recording once it finishes.');
         final summaryBlock = nativeActive == null
             ? null
-            : '현재 $nativeActive 작업 중입니다. 완료 후 요약을 다시 시도해주세요.';
+            : tr('현재 $nativeActive 작업 중입니다. 완료 후 요약을 다시 시도해주세요.', '$nativeActive is currently running. Please try the summary again once it finishes.');
         final canStartNow = canStartRecording && recordingBlock == null;
         final canSummaryNow =
             _phase != _RecordingPhase.summarizing &&
@@ -2754,21 +2794,21 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         controlSize: ControlSize.large,
                         color: scheme.primary,
                         onPressed: summaryBlock == null ? _runSummary : null,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.refresh,
                                 size: 18,
                                 color: MacosColors.white,
                               ),
-                              SizedBox(width: 6),
+                              const SizedBox(width: 6),
                               Text(
-                                '요약 다시 시도',
-                                style: TextStyle(color: MacosColors.white),
+                                tr('요약 다시 시도', 'Retry summary'),
+                                style: const TextStyle(color: MacosColors.white),
                               ),
                             ],
                           ),
@@ -2782,15 +2822,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       controlSize: ControlSize.large,
                       secondary: true,
                       onPressed: _openFailedMeeting,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.folder_open, size: 18),
-                            SizedBox(width: 6),
-                            Text('회의록 열기'),
+                            const Icon(Icons.folder_open, size: 18),
+                            const SizedBox(width: 6),
+                            Text(tr('회의록 열기', 'Open meeting')),
                           ],
                         ),
                       ),
@@ -2831,12 +2871,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                             const SizedBox(width: 6),
                             Text(
                               isSummarizing
-                                  ? '요약 중'
+                                  ? tr('요약 중', 'Summarizing')
                                   : _phase == _RecordingPhase.loadingModel
-                                  ? '모델 로드 중'
+                                  ? tr('모델 로드 중', 'Loading model')
                                   : _phase == _RecordingPhase.processing
-                                  ? '처리 중'
-                                  : (showSummaryBtn ? '새 녹음 시작' : '녹음 시작'),
+                                  ? tr('처리 중', 'Processing')
+                                  : (showSummaryBtn ? tr('새 녹음 시작', 'New recording') : tr('녹음 시작', 'Start recording')),
                               style: const TextStyle(color: MacosColors.white),
                             ),
                           ],
@@ -2877,8 +2917,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                               const SizedBox(width: 6),
                               Text(
                                 _phase == _RecordingPhase.summarizing
-                                    ? '요약 중'
-                                    : '${_llmDisplayName(AppSettings.instance.selectedLlmModel)} 요약',
+                                    ? tr('요약 중', 'Summarizing')
+                                    : tr('${_llmDisplayName(AppSettings.instance.selectedLlmModel)} 요약', '${_llmDisplayName(AppSettings.instance.selectedLlmModel)} summary'),
                                 style: const TextStyle(
                                   color: MacosColors.white,
                                 ),
@@ -2900,26 +2940,26 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   // ── 요약 진행 카드 ───────────────────────────────────────────
   String _summaryProcessingTitle() {
-    if (_statusMsg.contains('전사')) {
-      return '정확한 전사본을 준비하고 있습니다';
+    if (_statusMatch(_statusMsg, const ['전사', 'transcri'])) {
+      return tr('정확한 전사본을 준비하고 있습니다', 'Preparing an accurate transcript');
     }
-    if (_statusMsg.contains('발화자 라벨')) {
-      return '발화자를 구분하고 있습니다';
+    if (_statusMatch(_statusMsg, const ['발화자', 'speaker'])) {
+      return tr('발화자를 구분하고 있습니다', 'Identifying speakers');
     }
-    if (_statusMsg.contains('로드')) {
-      return '요약 모델을 준비하고 있습니다';
+    if (_statusMatch(_statusMsg, const ['로드', '준비', 'load', 'prepar'])) {
+      return tr('요약 모델을 준비하고 있습니다', 'Preparing the summary model');
     }
-    return '${_llmDisplayName(AppSettings.instance.selectedLlmModel)}가 회의 내용을 분석하고 있습니다';
+    return tr('${_llmDisplayName(AppSettings.instance.selectedLlmModel)}가 회의 내용을 분석하고 있습니다', '${_llmDisplayName(AppSettings.instance.selectedLlmModel)} is analyzing the meeting');
   }
 
   String _summaryProcessingDescription() {
-    if (_statusMsg.contains('발화자 라벨')) {
-      return '말한 구간을 분석 중입니다.\n긴 녹음은 시간이 더 걸릴 수 있습니다.';
+    if (_statusMatch(_statusMsg, const ['발화자', 'speaker'])) {
+      return tr('말한 구간을 분석 중입니다.\n긴 녹음은 시간이 더 걸릴 수 있습니다.', 'Analyzing spoken segments.\nLonger recordings may take more time.');
     }
-    if (_statusMsg.contains('전사')) {
-      return '전사본을 정리하고 있습니다.\n잠시만 기다려 주세요.';
+    if (_statusMatch(_statusMsg, const ['전사', 'transcri'])) {
+      return tr('전사본을 정리하고 있습니다.\n잠시만 기다려 주세요.', 'Organizing the transcript.\nPlease wait a moment.');
     }
-    return '요약과 액션아이템을 정리하고 있습니다.\n잠시만 기다려 주세요.';
+    return tr('요약과 액션아이템을 정리하고 있습니다.\n잠시만 기다려 주세요.', 'Organizing the summary and action items.\nPlease wait a moment.');
   }
 
   Widget _buildSummarizingCard() {
@@ -2977,7 +3017,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               _SummaryStepIndicator(statusMsg: _statusMsg),
               const SizedBox(height: 8),
               Text(
-                _statusMsg.isEmpty ? '처리 준비 중' : _statusMsg,
+                _statusMsg.isEmpty ? tr('처리 준비 중', 'Preparing') : _statusMsg,
                 style: TextStyle(
                   fontSize: 11,
                   color: scheme.onSurfaceVariant,
@@ -3004,7 +3044,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${(_summaryProgress * 100).toStringAsFixed(0)}% · 경과 $elapsedStr',
+                tr('${(_summaryProgress * 100).toStringAsFixed(0)}% · 경과 $elapsedStr', '${(_summaryProgress * 100).toStringAsFixed(0)}% · elapsed $elapsedStr'),
                 style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
@@ -3013,7 +3053,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     ? null
                     : _requestCancelSummary,
                 icon: const Icon(Icons.stop_circle_outlined, size: 16),
-                label: Text(_cancelSummaryRequested ? '중지 중' : '중지'),
+                label: Text(_cancelSummaryRequested ? tr('중지 중', 'Stopping') : tr('중지', 'Stop')),
                 style: OutlinedButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   foregroundColor: Colors.red.shade400,
@@ -3067,7 +3107,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '메모',
+                  tr('메모', 'Notes'),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -3088,7 +3128,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '입력됨',
+                      tr('입력됨', 'Filled'),
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.amber.shade900,
@@ -3147,8 +3187,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                         expands: true,
                         style: const TextStyle(fontSize: 13, height: 1.5),
                         decoration: InputDecoration(
-                          hintText:
-                              '회의 중 주요 내용을 자유롭게 메모하세요.\n요약 생성 시 함께 반영됩니다.',
+                          hintText: tr(
+                            '회의 중 주요 내용을 자유롭게 메모하세요.\n요약 생성 시 함께 반영됩니다.',
+                            'Jot down key points during the meeting.\nThey are included when the summary is generated.',
+                          ),
                           hintStyle: TextStyle(
                             fontSize: 12,
                             color: Colors.amber.shade400,
@@ -3184,7 +3226,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       });
                     },
                     child: MacosTooltip(
-                      message: '드래그해서 메모창 크기 조정',
+                      message: tr('드래그해서 메모창 크기 조정', 'Drag to resize the notes panel'),
                       child: Container(
                         height: 18,
                         decoration: BoxDecoration(
@@ -3227,13 +3269,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             Icon(Icons.people_outline, size: 14, color: Colors.grey.shade600),
             const SizedBox(width: 6),
             Text(
-              '참석자 (선택)',
+              tr('참석자 (선택)', 'Attendees (optional)'),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             if (_participants.isNotEmpty) ...[
               const SizedBox(width: 6),
               Text(
-                '${_participants.length}명',
+                tr('${_participants.length}명', '${_participants.length} people'),
                 style: TextStyle(
                   fontSize: 11,
                   color: Theme.of(context).colorScheme.primary,
@@ -3268,7 +3310,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                   controller: _participantInputCtrl,
                   style: const TextStyle(fontSize: 12),
                   decoration: InputDecoration(
-                    hintText: '이름 입력 후 Enter',
+                    hintText: tr('이름 입력 후 Enter', 'Type a name, then Enter'),
                     hintStyle: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade400,
@@ -3309,9 +3351,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     final effectiveId = _summaryTemplateId ?? globalId;
     final isUsingGlobal = _summaryTemplateId == null;
     final effectiveName = effectiveId == SummaryTemplates.customId1
-        ? '커스텀1'
+        ? tr('커스텀1', 'Custom 1')
         : effectiveId == SummaryTemplates.customId2
-        ? '커스텀2'
+        ? tr('커스텀2', 'Custom 2')
         : SummaryTemplates.byId(effectiveId).name;
 
     return Row(
@@ -3319,7 +3361,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         Icon(Icons.auto_awesome, size: 14, color: Colors.grey.shade600),
         const SizedBox(width: 6),
         Text(
-          '회의 유형',
+          tr('회의 유형', 'Meeting type'),
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(width: 8),
@@ -3334,7 +3376,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               DropdownMenuItem<String?>(
                 value: null,
                 child: Text(
-                  '설정값 사용 (현재: $effectiveName)',
+                  tr('설정값 사용 (현재: $effectiveName)', 'Use default (current: $effectiveName)'),
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -3343,13 +3385,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                   value: t.id,
                   child: Text(t.name, style: const TextStyle(fontSize: 12)),
                 ),
-              const DropdownMenuItem<String?>(
+              DropdownMenuItem<String?>(
                 value: SummaryTemplates.customId1,
-                child: Text('커스텀1', style: TextStyle(fontSize: 12)),
+                child: Text(tr('커스텀1', 'Custom 1'), style: const TextStyle(fontSize: 12)),
               ),
-              const DropdownMenuItem<String?>(
+              DropdownMenuItem<String?>(
                 value: SummaryTemplates.customId2,
-                child: Text('커스텀2', style: TextStyle(fontSize: 12)),
+                child: Text(tr('커스텀2', 'Custom 2'), style: const TextStyle(fontSize: 12)),
               ),
             ],
             onChanged: (v) => setState(() => _summaryTemplateId = v),
@@ -3367,7 +3409,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                '오버라이드',
+                tr('오버라이드', 'Override'),
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
@@ -3387,7 +3429,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         Icon(Icons.mic, size: 14, color: Colors.grey.shade600),
         const SizedBox(width: 6),
         Text(
-          '마이크',
+          tr('마이크', 'Microphone'),
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(width: 8),
@@ -3418,7 +3460,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       if (isBluetooth) ...[
                         const SizedBox(width: 4),
                         Text(
-                          '(불안정)',
+                          tr('(불안정)', '(unstable)'),
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.orange.shade600,
@@ -3439,7 +3481,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           ),
         ),
         MacosTooltip(
-          message: '목록 새로고침',
+          message: tr('목록 새로고침', 'Refresh list'),
           child: MacosIconButton(
             icon: Icon(Icons.refresh, size: 14, color: Colors.grey.shade500),
             backgroundColor: Colors.transparent,
@@ -3541,7 +3583,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
               ),
               const SizedBox(width: 8),
               Text(
-                'AI 모델 설치 필요',
+                tr('AI 모델 설치 필요', 'AI model installation required'),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: warning,
@@ -3552,7 +3594,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           ),
           const SizedBox(height: 8),
           Text(
-            '아래 모델 파일을 다운로드하여\n$_modelDir\n폴더에 넣어주세요.',
+            tr('아래 모델 파일을 다운로드하여\n$_modelDir\n폴더에 넣어주세요.', 'Download the model files below and place them in the folder:\n$_modelDir'),
             style: TextStyle(
               fontSize: 12,
               color: scheme.onSurfaceVariant,
@@ -3562,14 +3604,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           const SizedBox(height: 10),
           // STT 모델
           _ModelFileRow(
-            label: '① Whisper Large V3 Turbo (음성 인식 · 실시간 초안 · 약 900 MB)',
+            label: tr('① Whisper Large V3 Turbo (음성 인식 · 실시간 초안 · 약 900 MB)', '① Whisper Large V3 Turbo (recognition · live draft · ~900 MB)'),
             filename: AppConstants.sttModelFileFast,
             url: AppConstants.sttDownloadUrlFast,
             exists: _sttFastExists,
           ),
           const SizedBox(height: 6),
           _ModelFileRow(
-            label: '② Whisper Large V3 Q5_0 (음성 인식 · 최종 정확 전사 · 약 1.1 GB)',
+            label: tr('② Whisper Large V3 Q5_0 (음성 인식 · 최종 정확 전사 · 약 1.1 GB)', '② Whisper Large V3 Q5_0 (recognition · final accurate transcription · ~1.1 GB)'),
             filename: AppConstants.sttModelFileAccurate,
             url: AppConstants.sttDownloadUrlAccurate,
             exists: _sttAccurateExists,
@@ -3577,7 +3619,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           const SizedBox(height: 6),
           // LLM 모델 (현재 선택된 것만 안내 — 상세 관리는 설정 화면)
           _ModelFileRow(
-            label: '③ 요약 모델 — 3종 중 선택 설치',
+            label: tr('③ 요약 모델 — 3종 중 선택 설치', '③ Summary model — install one of three'),
             filename: AppSettings.instance.currentLlmModelFile,
             url: AppSettings.instance.currentLlmDownloadUrl,
             exists: _llmModelExists,
@@ -3588,7 +3630,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             child: OutlinedButton.icon(
               onPressed: _checkModels,
               icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('다운로드 완료 후 여기를 눌러 확인'),
+              label: Text(tr('다운로드 완료 후 여기를 눌러 확인', 'After downloading, tap here to verify')),
               style: OutlinedButton.styleFrom(
                 foregroundColor: warning,
                 side: BorderSide(color: warning.withValues(alpha: 0.35)),
@@ -3665,21 +3707,21 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           _phase == _RecordingPhase.paused) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('녹음을 중지한 뒤 요약을 실행할 수 있습니다.'),
+            content: Text(tr('녹음을 중지한 뒤 요약을 실행할 수 있습니다.', 'Stop recording before running the summary.')),
             backgroundColor: Colors.orange.shade700,
           ),
         );
       } else if (_phase == _RecordingPhase.summarizing) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('이미 요약을 생성하고 있습니다.'),
+            content: Text(tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.')),
             backgroundColor: Colors.orange.shade700,
           ),
         );
       } else if (_segments.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('요약할 전사 내용이 없습니다. 먼저 녹음해 주세요.'),
+            content: Text(tr('요약할 전사 내용이 없습니다. 먼저 녹음해 주세요.', 'No transcript to summarize. Please record first.')),
             backgroundColor: Colors.orange.shade700,
           ),
         );
@@ -3711,7 +3753,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             children: [
               // ── 제목 헤더 ────────────────────────────────────────────
               Text(
-                '새 녹음',
+                tr('새 녹음', 'New recording'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -3750,7 +3792,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     child: TextField(
                       controller: _titleSuffixController,
                       decoration: InputDecoration(
-                        hintText: '추가 제목 (선택)',
+                        hintText: tr('추가 제목 (선택)', 'Title (optional)'),
                         border: const OutlineInputBorder(
                           borderRadius: BorderRadius.horizontal(
                             right: Radius.circular(4),
@@ -3812,7 +3854,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     ),
                   Expanded(
                     child: Text(
-                      _isProcessingWindow ? '텍스트로 변환 중...' : _statusMsg,
+                      _isProcessingWindow ? tr('텍스트로 변환 중...', 'Converting to text...') : _statusMsg,
                       style: TextStyle(
                         fontSize: 11,
                         color: _phase == _RecordingPhase.error
@@ -3864,7 +3906,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   const Icon(Icons.transcribe, size: 14),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '실시간 녹취 내용',
+                                    tr('실시간 녹취 내용', 'Live transcript'),
                                     style: Theme.of(context)
                                         .textTheme
                                         .labelLarge
@@ -3873,7 +3915,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   if (_segments.isNotEmpty) ...[
                                     const Spacer(),
                                     Text(
-                                      '${_segments.length}개',
+                                      tr('${_segments.length}개', '${_segments.length}'),
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: Theme.of(
@@ -3890,8 +3932,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                     ? Center(
                                         child: Text(
                                           isRecording
-                                              ? '말씀해 주세요. 곧 텍스트로 변환됩니다.'
-                                              : '녹음을 시작하면 내용이 여기에 표시됩니다',
+                                              ? tr('말씀해 주세요. 곧 텍스트로 변환됩니다.', 'Start speaking — text will appear shortly.')
+                                              : tr('녹음을 시작하면 내용이 여기에 표시됩니다', 'Content appears here once you start recording'),
                                           style: TextStyle(
                                             fontSize: 13,
                                             color: Theme.of(
@@ -3968,7 +4010,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                                         onDoubleTap: () =>
                                                             _startEditingSeg(i),
                                                         child: MacosTooltip(
-                                                          message: '더블클릭하여 수정',
+                                                          message: tr('더블클릭하여 수정', 'Double-click to edit'),
                                                           child: SelectableText(
                                                             seg.text,
                                                             style:
@@ -3999,8 +4041,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    '피크 메모리: 음성 인식 중 ~2 GB → 요약 시작 시 ~7–9 GB\n'
-                    'VAD: RMS 에너지 기반 (무음 구간 자동 제외)',
+                    tr(
+                      '피크 메모리: 음성 인식 중 ~2 GB → 요약 시작 시 ~7–9 GB\n'
+                          'VAD: RMS 에너지 기반 (무음 구간 자동 제외)',
+                      'Peak memory: ~2 GB during recognition → ~7–9 GB when summarizing\n'
+                          'VAD: RMS-energy based (silence automatically excluded)',
+                    ),
                     style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
                     textAlign: TextAlign.center,
                   ),
@@ -4021,11 +4067,15 @@ class _SummaryStepIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final steps = [
-      ('전사 확인', '전사'),
-      ('발화자 라벨', '발화자 라벨'),
-      ('요약 생성', '요약'),
-      ('결과 저장', 'Isar DB 저장'),
+    // 각 단계는 한국어/영어 상태 문자열 모두에서 인식되도록 키워드 목록을 갖는다.
+    final steps = <(String, List<String>)>[
+      (tr('전사 확인', 'Check transcript'), const ['전사', 'transcri']),
+      (tr('발화자 라벨', 'Speaker labels'), const ['발화자', 'speaker']),
+      (
+        tr('요약 생성', 'Generate summary'),
+        const ['요약', '로드', '분석', '생성', '준비', 'summ', 'load', 'analyz', 'generat', 'prepar'],
+      ),
+      (tr('결과 저장', 'Save result'), const ['저장', 'sav']),
     ];
 
     return Row(
@@ -4033,12 +4083,7 @@ class _SummaryStepIndicator extends StatelessWidget {
       children: steps.asMap().entries.map((entry) {
         final idx = entry.key;
         final step = entry.value;
-        final isActive =
-            statusMsg.contains(step.$2) ||
-            (idx == 2 && statusMsg.contains('로드')) ||
-            (idx == 2 && statusMsg.contains('분석')) ||
-            (idx == 2 && statusMsg.contains('생성')) ||
-            (idx == 3 && statusMsg.contains('저장'));
+        final isActive = _statusMatch(statusMsg, step.$2);
 
         return Row(
           children: [
@@ -4113,11 +4158,11 @@ class _NativeTaskNotice extends StatelessWidget {
         final active = state.activeLabel;
         final queued = state.queuedLabel;
         final text = [
-          if (active != null) '현재 작업: $active',
+          if (active != null) tr('현재 작업: $active', 'Current: $active'),
           if (queued != null)
             state.queuedCount > 1
-                ? '대기 중: $queued 외 ${state.queuedCount - 1}개'
-                : '다음 작업 대기: $queued',
+                ? tr('대기 중: $queued 외 ${state.queuedCount - 1}개', 'Queued: $queued and ${state.queuedCount - 1} more')
+                : tr('다음 작업 대기: $queued', 'Next up: $queued'),
         ].join(' · ');
         final scheme = Theme.of(context).colorScheme;
 
@@ -4197,7 +4242,7 @@ class _ModelFileRow extends StatelessWidget {
               await Process.run('open', [uri.toString()]);
             },
             icon: const Icon(Icons.open_in_browser, size: 14),
-            label: const Text('다운로드', style: TextStyle(fontSize: 12)),
+            label: Text(tr('다운로드', 'Download'), style: const TextStyle(fontSize: 12)),
             style: TextButton.styleFrom(
               foregroundColor: Colors.orange.shade700,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -4208,7 +4253,7 @@ class _ModelFileRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 4),
             child: Text(
-              '설치됨',
+              tr('설치됨', 'Installed'),
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.green.shade600,
@@ -4330,34 +4375,34 @@ class _VoicePulseCardState extends State<_VoicePulseCard>
   ({String label, Color color, IconData icon}) _statusOf(double l) {
     if (!widget.isReceiving) {
       return (
-        label: '마이크 신호가 없습니다',
+        label: tr('마이크 신호가 없습니다', 'No microphone signal'),
         color: Colors.red.shade600,
         icon: Icons.mic_off_rounded,
       );
     }
     if (l > 0.95) {
       return (
-        label: '음량이 너무 큽니다',
+        label: tr('음량이 너무 큽니다', 'Volume is too high'),
         color: Colors.red.shade600,
         icon: Icons.warning_amber_rounded,
       );
     }
     if (l < 0.06) {
       return (
-        label: '음성을 감지하지 못하고 있어요',
+        label: tr('음성을 감지하지 못하고 있어요', 'Not detecting any voice'),
         color: Colors.grey.shade600,
         icon: Icons.hearing_rounded,
       );
     }
     if (l < 0.15) {
       return (
-        label: '말씀하시면 마이크가 따라갑니다',
+        label: tr('말씀하시면 마이크가 따라갑니다', 'The mic follows when you speak'),
         color: Colors.orange.shade700,
         icon: Icons.mic_rounded,
       );
     }
     return (
-      label: '잘 들리고 있어요',
+      label: tr('잘 들리고 있어요', 'Audio is clear'),
       color: const Color(0xFF007AFF),
       icon: Icons.mic_rounded,
     );
@@ -4434,11 +4479,11 @@ class _VoicePulseCardState extends State<_VoicePulseCard>
   }
 
   String _hint(double l, bool receiving) {
-    if (!receiving) return '시스템 설정에서 마이크 권한과 입력 장치를 확인해주세요';
-    if (l > 0.95) return '마이크와 거리를 두거나 입력 음량을 낮춰주세요';
-    if (l < 0.06) return '마이크에 더 가까이 말하거나 음량을 높여주세요';
-    if (l < 0.15) return '조금 더 가까이 말하면 인식 정확도가 올라갑니다';
-    return '회의 중 평소 톤으로 자연스럽게 말씀하세요';
+    if (!receiving) return tr('시스템 설정에서 마이크 권한과 입력 장치를 확인해주세요', 'Check microphone permission and input device in System Settings');
+    if (l > 0.95) return tr('마이크와 거리를 두거나 입력 음량을 낮춰주세요', 'Move away from the mic or lower the input volume');
+    if (l < 0.06) return tr('마이크에 더 가까이 말하거나 음량을 높여주세요', 'Speak closer to the mic or raise the volume');
+    if (l < 0.15) return tr('조금 더 가까이 말하면 인식 정확도가 올라갑니다', 'Speaking a bit closer improves recognition accuracy');
+    return tr('회의 중 평소 톤으로 자연스럽게 말씀하세요', 'Speak naturally in your usual tone during the meeting');
   }
 }
 
@@ -4621,11 +4666,11 @@ class _CalendarSuggestionPanelState extends State<_CalendarSuggestionPanel> {
     final diff = start.difference(now);
     if (diff.isNegative) {
       final mins = (-diff.inMinutes);
-      if (mins == 0) return '진행 중';
-      return '$mins분 전 시작';
+      if (mins == 0) return tr('진행 중', 'In progress');
+      return tr('$mins분 전 시작', 'Started $mins min ago');
     }
-    if (diff.inMinutes < 60) return '${diff.inMinutes}분 후';
-    return '${diff.inHours}시간 ${diff.inMinutes % 60}분 후';
+    if (diff.inMinutes < 60) return tr('${diff.inMinutes}분 후', 'in ${diff.inMinutes} min');
+    return tr('${diff.inHours}시간 ${diff.inMinutes % 60}분 후', 'in ${diff.inHours}h ${diff.inMinutes % 60}m');
   }
 
   @override
@@ -4651,7 +4696,7 @@ class _CalendarSuggestionPanelState extends State<_CalendarSuggestionPanel> {
               Icon(Icons.event_outlined, size: 14, color: scheme.primary),
               const SizedBox(width: 6),
               Text(
-                '다가오는 캘린더 회의',
+                tr('다가오는 캘린더 회의', 'Upcoming calendar meetings'),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -4660,7 +4705,7 @@ class _CalendarSuggestionPanelState extends State<_CalendarSuggestionPanel> {
               ),
               const SizedBox(width: 6),
               Text(
-                '· 클릭하면 제목/어젠다 자동 채움',
+                tr('· 클릭하면 제목/어젠다 자동 채움', '· Click to auto-fill title/agenda'),
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
               ),
             ],
@@ -4814,8 +4859,8 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       final recorder = AudioRecorder();
       _recorder = recorder;
       if (!await recorder.hasPermission()) {
-        throw const MicrophonePermissionDeniedException(
-          '마이크 권한이 꺼져 있습니다. 시스템 설정에서 마이크 권한을 켜주세요.',
+        throw MicrophonePermissionDeniedException(
+          tr('마이크 권한이 꺼져 있습니다. 시스템 설정에서 마이크 권한을 켜주세요.', 'Microphone access is off. Enable it in System Settings.'),
         );
       }
       final stream = await recorder.startStream(
@@ -4835,7 +4880,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
         },
         onError: (Object e) {
           if (!mounted) return;
-          setState(() => _error = '마이크 테스트 오류: $e');
+          setState(() => _error = tr('마이크 테스트 오류: $e', 'Mic test error: $e'));
         },
       );
     } catch (e) {
@@ -4844,7 +4889,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       setState(
         () => _error = e is MicrophonePermissionDeniedException
             ? e.message
-            : '마이크 입력을 확인하지 못했습니다. 입력 장치와 권한을 확인해주세요.',
+            : tr('마이크 입력을 확인하지 못했습니다. 입력 장치와 권한을 확인해주세요.', 'Could not verify microphone input. Check the input device and permissions.'),
       );
     } finally {
       if (mounted) setState(() => _starting = false);
@@ -4886,7 +4931,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
   ({String label, String hint, Color color, IconData icon}) _status() {
     if (_error != null) {
       return (
-        label: '확인 필요',
+        label: tr('확인 필요', 'Needs review'),
         hint: _error!,
         color: Colors.red.shade700,
         icon: Icons.mic_off_rounded,
@@ -4894,31 +4939,31 @@ class _MicTestPanelState extends State<_MicTestPanel> {
     }
     if (_starting) {
       return (
-        label: '테스트 준비 중',
-        hint: '선택한 마이크 입력을 확인하고 있습니다.',
+        label: tr('테스트 준비 중', 'Preparing test'),
+        hint: tr('선택한 마이크 입력을 확인하고 있습니다.', 'Checking the selected microphone input.'),
         color: Colors.grey.shade600,
         icon: Icons.hourglass_empty_rounded,
       );
     }
     if (_level >= 0.18) {
       return (
-        label: '입력이 잘 들어오고 있어요',
-        hint: '이 상태로 녹음하면 음성 인식 품질이 좋아집니다.',
+        label: tr('입력이 잘 들어오고 있어요', 'Input is coming in clearly'),
+        hint: tr('이 상태로 녹음하면 음성 인식 품질이 좋아집니다.', 'Recording in this state gives good recognition quality.'),
         color: Colors.green.shade700,
         icon: Icons.check_circle_outline_rounded,
       );
     }
     if (_level >= 0.06) {
       return (
-        label: '조금 작게 들립니다',
-        hint: '마이크를 말하는 사람 가까이에 두면 더 좋습니다.',
+        label: tr('조금 작게 들립니다', 'Sounds a bit quiet'),
+        hint: tr('마이크를 말하는 사람 가까이에 두면 더 좋습니다.', 'Placing the mic closer to the speaker helps.'),
         color: Colors.orange.shade700,
         icon: Icons.warning_amber_rounded,
       );
     }
     return (
-      label: '너무 조용합니다',
-      hint: '3초 정도 말해보세요. 계속 낮으면 입력 장치나 권한을 확인해주세요.',
+      label: tr('너무 조용합니다', 'Too quiet'),
+      hint: tr('3초 정도 말해보세요. 계속 낮으면 입력 장치나 권한을 확인해주세요.', 'Try speaking for ~3 seconds. If it stays low, check the input device or permissions.'),
       color: Colors.red.shade700,
       icon: Icons.hearing_disabled_outlined,
     );
@@ -4952,7 +4997,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
                 ),
               ),
               IconButton(
-                tooltip: '마이크 테스트 다시 시작',
+                tooltip: tr('마이크 테스트 다시 시작', 'Restart mic test'),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
@@ -5002,10 +5047,10 @@ class _LowInputWarningBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = noSignal ? '마이크 신호가 없습니다' : '음성이 거의 감지되지 않습니다';
+    final title = noSignal ? tr('마이크 신호가 없습니다', 'No microphone signal') : tr('음성이 거의 감지되지 않습니다', 'Almost no voice detected');
     final body = noSignal
-        ? '입력 장치가 올바른지, 시스템 설정에서 마이크 권한이 켜져 있는지 확인하세요.'
-        : '마이크를 말하는 사람 가까이에 두거나 입력 음량을 올려주세요.';
+        ? tr('입력 장치가 올바른지, 시스템 설정에서 마이크 권한이 켜져 있는지 확인하세요.', 'Check that the input device is correct and microphone access is enabled in System Settings.')
+        : tr('마이크를 말하는 사람 가까이에 두거나 입력 음량을 올려주세요.', 'Place the mic closer to the speaker or raise the input volume.');
     final scheme = Theme.of(context).colorScheme;
     final warning = Colors.orange.shade700;
 
@@ -5049,7 +5094,7 @@ class _LowInputWarningBanner extends StatelessWidget {
             ),
           ),
           MacosTooltip(
-            message: '닫기',
+            message: tr('닫기', 'Close'),
             child: MacosIconButton(
               icon: Icon(Icons.close, size: 16, color: warning),
               backgroundColor: Colors.transparent,
@@ -5192,4 +5237,14 @@ class _PrepToggleRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 처리 상태 메시지가 주어진 키워드 중 하나라도 포함하는지 (대소문자 무시).
+/// 상태 문자열이 한국어/영어 어느 쪽이든 단계 표시가 동작하도록 한다.
+bool _statusMatch(String status, List<String> needles) {
+  final s = status.toLowerCase();
+  for (final n in needles) {
+    if (s.contains(n.toLowerCase())) return true;
+  }
+  return false;
 }

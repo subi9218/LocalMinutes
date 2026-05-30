@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_ui/macos_ui.dart';
 
+import '../../core/l10n/app_tr.dart';
 import '../../core/services/isar_service.dart';
 import '../../core/services/meeting_comparison.dart';
 import '../../core/services/meeting_series_progress.dart';
@@ -44,7 +45,7 @@ class SeriesDashboardView extends ConsumerWidget {
                   data: (groups) {
                     final group = _findGroup(groups, groupId);
                     return Text(
-                      group?.name ?? '시리즈',
+                      group?.name ?? tr('시리즈', 'Series'),
                       style: titleStyle,
                       overflow: TextOverflow.ellipsis,
                     );
@@ -54,7 +55,7 @@ class SeriesDashboardView extends ConsumerWidget {
                 ),
               ),
               MacosTooltip(
-                message: '회의 비교',
+                message: tr('회의 비교', 'Compare meetings'),
                 child: MacosIconButton(
                   icon: const Icon(Icons.compare_arrows, size: 18),
                   backgroundColor: Colors.transparent,
@@ -69,7 +70,7 @@ class SeriesDashboardView extends ConsumerWidget {
               ),
               const SizedBox(width: 4),
               MacosTooltip(
-                message: '닫기',
+                message: tr('닫기', 'Close'),
                 child: MacosIconButton(
                   icon: const Icon(Icons.close, size: 18),
                   onPressed: () =>
@@ -88,12 +89,13 @@ class SeriesDashboardView extends ConsumerWidget {
           Expanded(
             child: reportAsync.when(
               loading: () => const Center(child: ProgressCircle()),
-              error: (e, _) => Center(child: Text('진행 분석 오류: $e')),
+              error: (e, _) =>
+                  Center(child: Text(tr('진행 분석 오류: $e', 'Progress analysis error: $e'))),
               data: (report) {
                 if (report.isEmpty) {
                   return Center(
                     child: Text(
-                      '이 시리즈에 회의가 아직 없습니다.',
+                      tr('이 시리즈에 회의가 아직 없습니다.', 'No meetings in this series yet.'),
                       style: TextStyle(color: Colors.grey.shade600),
                     ),
                   );
@@ -155,17 +157,21 @@ class _MetaRow extends StatelessWidget {
       children: [
         _MetaChip(
           icon: Icons.event_repeat,
-          label: '회의 ${report.meetingCount}회',
+          label: tr('회의 ${report.meetingCount}회',
+              '${report.meetingCount} meetings'),
         ),
         if (report.averageIntervalDays != null)
           _MetaChip(
             icon: Icons.schedule,
-            label: '평균 주기 ${report.averageIntervalDays}일',
+            label: tr('평균 주기 ${report.averageIntervalDays}일',
+                'Avg interval ${report.averageIntervalDays}d'),
           ),
         if (daysAgo != null)
           _MetaChip(
             icon: Icons.history,
-            label: daysAgo == 0 ? '오늘 회의' : '마지막 $daysAgo일 전',
+            label: daysAgo == 0
+                ? tr('오늘 회의', 'Today')
+                : tr('마지막 $daysAgo일 전', '$daysAgo days ago'),
           ),
       ],
     );
@@ -213,10 +219,10 @@ class _PendingActionsCard extends StatelessWidget {
     final items = report.pendingActionItems;
     return _SectionShell(
       icon: Icons.check_circle_outline,
-      title: '누적 미완료 액션',
-      countLabel: '${items.length}건',
+      title: tr('누적 미완료 액션', 'Open actions'),
+      countLabel: tr('${items.length}건', '${items.length}'),
       empty: items.isEmpty,
-      emptyText: '미완료 액션이 없습니다.',
+      emptyText: tr('미완료 액션이 없습니다.', 'No open actions.'),
       child: Column(
         children: [
           for (final p in items)
@@ -265,12 +271,16 @@ class _ActionRow extends StatelessWidget {
                     children: [
                       _MiniMeta(
                         icon: Icons.person_outline,
-                        text: ai.owner.isEmpty ? '(미언급)' : ai.owner,
+                        text: ai.owner.isEmpty
+                            ? tr('(미언급)', '(unspecified)')
+                            : ai.owner,
                         warn: ownerVague,
                       ),
                       _MiniMeta(
                         icon: Icons.calendar_today_outlined,
-                        text: ai.deadline.isEmpty ? '(미언급)' : ai.deadline,
+                        text: ai.deadline.isEmpty
+                            ? tr('(미언급)', '(unspecified)')
+                            : ai.deadline,
                         warn: deadlineVague,
                       ),
                       _MiniMeta(
@@ -333,10 +343,11 @@ class _RecurringIssuesCard extends StatelessWidget {
     final issues = report.recurringIssues;
     return _SectionShell(
       icon: Icons.flag_outlined,
-      title: '반복 등장 미해결 이슈',
-      countLabel: '${issues.length}건',
+      title: tr('반복 등장 미해결 이슈', 'Recurring open issues'),
+      countLabel: tr('${issues.length}건', '${issues.length}'),
       empty: issues.isEmpty,
-      emptyText: '여러 회에 반복 등장한 이슈가 없습니다.',
+      emptyText:
+          tr('여러 회에 반복 등장한 이슈가 없습니다.', 'No issues recurring across meetings.'),
       child: Column(
         children: [
           for (final i in issues)
@@ -370,7 +381,7 @@ class _IssueRow extends StatelessWidget {
                   border: Border.all(color: Colors.orange.shade200),
                 ),
                 child: Text(
-                  '${issue.count}회 등장',
+                  tr('${issue.count}회 등장', '${issue.count}x'),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -419,10 +430,10 @@ class _RecentDecisionsCard extends StatelessWidget {
     final decisions = report.recentDecisions;
     return _SectionShell(
       icon: Icons.gavel_outlined,
-      title: '최근 결정 사항',
-      countLabel: '${decisions.length}건',
+      title: tr('최근 결정 사항', 'Recent decisions'),
+      countLabel: tr('${decisions.length}건', '${decisions.length}'),
       empty: decisions.isEmpty,
-      emptyText: '결정 사항이 아직 없습니다.',
+      emptyText: tr('결정 사항이 아직 없습니다.', 'No decisions yet.'),
       child: Column(
         children: [
           for (final d in decisions)
@@ -549,10 +560,11 @@ class _ActionTimelineCard extends StatelessWidget {
     final tracked = report.actionTimeline;
     return _SectionShell(
       icon: Icons.timeline,
-      title: '액션 회차별 변화',
-      countLabel: '${tracked.length}건',
+      title: tr('액션 회차별 변화', 'Action changes over time'),
+      countLabel: tr('${tracked.length}건', '${tracked.length}'),
       empty: tracked.isEmpty,
-      emptyText: '회차에 걸쳐 추적할 액션이 없습니다.',
+      emptyText:
+          tr('회차에 걸쳐 추적할 액션이 없습니다.', 'No actions to track across meetings.'),
       child: Column(
         children: [
           for (final t in tracked)
@@ -612,18 +624,22 @@ class _TrackedActionRow extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      '${tracked.appearances.length}회 등장',
+                      tr('${tracked.appearances.length}회 등장',
+                          '${tracked.appearances.length}x'),
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade600,
                       ),
                     ),
                     if (tracked.hasOwnerChange)
-                      _ChangeBadge(icon: Icons.person_outline, label: '담당자 변경'),
+                      _ChangeBadge(
+                        icon: Icons.person_outline,
+                        label: tr('담당자 변경', 'Owner changed'),
+                      ),
                     if (tracked.hasDeadlineChange)
                       _ChangeBadge(
                         icon: Icons.calendar_today_outlined,
-                        label: '마감 변경',
+                        label: tr('마감 변경', 'Deadline changed'),
                       ),
                     Text(
                       '· ${_dateOnly(tracked.firstAppearance.meetingDate)} → ${_dateOnly(last.meetingDate)}',
@@ -650,9 +666,15 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      TrackedActionStatus.resolved => ('완료', Colors.green.shade700),
-      TrackedActionStatus.dropped => ('이후 미등장', Colors.amber.shade700),
-      TrackedActionStatus.ongoing => ('진행 중', Colors.indigo.shade600),
+      TrackedActionStatus.resolved => (tr('완료', 'Done'), Colors.green.shade700),
+      TrackedActionStatus.dropped => (
+        tr('이후 미등장', 'No longer mentioned'),
+        Colors.amber.shade700,
+      ),
+      TrackedActionStatus.ongoing => (
+        tr('진행 중', 'Ongoing'),
+        Colors.indigo.shade600,
+      ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -816,11 +838,15 @@ class _CompareSheetState extends State<_CompareSheet> {
                 return const Center(child: ProgressCircle());
               }
               if (snap.hasError) {
-                return Center(child: Text('오류: ${snap.error}'));
+                return Center(
+                    child: Text(tr('오류: ${snap.error}', 'Error: ${snap.error}')));
               }
               final meetings = snap.data ?? const <Meeting>[];
               if (meetings.length < 2) {
-                return _emptyState(context, '비교하려면 시리즈에 회의가 2회 이상 있어야 합니다.');
+                return _emptyState(
+                    context,
+                    tr('비교하려면 시리즈에 회의가 2회 이상 있어야 합니다.',
+                        'A series needs at least 2 meetings to compare.'));
               }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -834,13 +860,13 @@ class _CompareSheetState extends State<_CompareSheet> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '회의 비교',
+                        tr('회의 비교', 'Compare meetings'),
                         style: MacosTheme.of(context).typography.title2
                             .copyWith(fontWeight: FontWeight.w700),
                       ),
                       const Spacer(),
                       MacosTooltip(
-                        message: '닫기',
+                        message: tr('닫기', 'Close'),
                         child: MacosIconButton(
                           icon: const Icon(Icons.close, size: 18),
                           backgroundColor: Colors.transparent,
@@ -861,7 +887,7 @@ class _CompareSheetState extends State<_CompareSheet> {
                     children: [
                       Expanded(
                         child: _CompareDropdown(
-                          label: '이전 회의',
+                          label: tr('이전 회의', 'Earlier meeting'),
                           meetings: meetings,
                           selected: _earlier,
                           formatLabel: _meetingLabel,
@@ -873,7 +899,7 @@ class _CompareSheetState extends State<_CompareSheet> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _CompareDropdown(
-                          label: '이후 회의',
+                          label: tr('이후 회의', 'Later meeting'),
                           meetings: meetings,
                           selected: _later,
                           formatLabel: _meetingLabel,
@@ -885,7 +911,10 @@ class _CompareSheetState extends State<_CompareSheet> {
                   const Divider(height: 24),
                   Expanded(
                     child: _reportFuture == null
-                        ? _emptyState(context, '두 회의를 선택하면 비교 결과가 표시됩니다.')
+                        ? _emptyState(
+                            context,
+                            tr('두 회의를 선택하면 비교 결과가 표시됩니다.',
+                                'Select two meetings to see the comparison.'))
                         : FutureBuilder<MeetingComparisonReport>(
                             future: _reportFuture,
                             builder: (context, rs) {
@@ -893,13 +922,16 @@ class _CompareSheetState extends State<_CompareSheet> {
                                 return const Center(child: ProgressCircle());
                               }
                               if (rs.hasError) {
-                                return Center(child: Text('오류: ${rs.error}'));
+                                return Center(
+                                    child: Text(tr('오류: ${rs.error}',
+                                        'Error: ${rs.error}')));
                               }
                               final r = rs.data!;
                               if (!r.hasContent) {
                                 return _emptyState(
                                   context,
-                                  '두 회의 모두 요약이 비어 있습니다.',
+                                  tr('두 회의 모두 요약이 비어 있습니다.',
+                                      'Both meetings have empty summaries.'),
                                 );
                               }
                               return SingleChildScrollView(
@@ -907,13 +939,13 @@ class _CompareSheetState extends State<_CompareSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     _CompareSection(
-                                      title: '결정 사항',
+                                      title: tr('결정 사항', 'Decisions'),
                                       icon: Icons.gavel_rounded,
                                       diff: r.decisions,
                                     ),
                                     const SizedBox(height: 10),
                                     _CompareSection(
-                                      title: '미해결 이슈',
+                                      title: tr('미해결 이슈', 'Open issues'),
                                       icon: Icons.help_outline,
                                       diff: r.openQuestions,
                                     ),
@@ -921,7 +953,7 @@ class _CompareSheetState extends State<_CompareSheet> {
                                     _CompareActionsSection(diff: r.actions),
                                     const SizedBox(height: 10),
                                     _CompareSection(
-                                      title: '주요 논의',
+                                      title: tr('주요 논의', 'Key discussions'),
                                       icon: Icons.forum_outlined,
                                       diff: r.keyDiscussions,
                                     ),
@@ -1072,21 +1104,21 @@ class _CompareSection extends StatelessWidget {
                 marker: '+',
                 color: Colors.green.shade700,
                 text: s,
-                meta: '새로 등장',
+                meta: tr('새로 등장', 'Newly added'),
               ),
             for (final s in diff.removed)
               _DiffRow(
                 marker: '−',
                 color: Colors.red.shade600,
                 text: s,
-                meta: '이후 회의에서 사라짐',
+                meta: tr('이후 회의에서 사라짐', 'Dropped in later meeting'),
               ),
             for (final s in diff.shared)
               _DiffRow(
                 marker: '·',
                 color: Colors.grey.shade500,
                 text: s.text,
-                meta: '양쪽 회의에 등장',
+                meta: tr('양쪽 회의에 등장', 'In both meetings'),
               ),
           ],
         ),
@@ -1117,9 +1149,10 @@ class _CompareActionsSection extends StatelessWidget {
                   color: MacosTheme.of(context).primaryColor,
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  '액션 아이템',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                Text(
+                  tr('액션 아이템', 'Action items'),
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 const Spacer(),
                 _CountChip(
@@ -1144,7 +1177,9 @@ class _CompareActionsSection extends StatelessWidget {
                 marker: '+',
                 color: Colors.green.shade700,
                 text: a.task,
-                meta: a.owner.isEmpty ? '새 액션' : '새 액션 · ${a.owner}',
+                meta: a.owner.isEmpty
+                    ? tr('새 액션', 'New action')
+                    : tr('새 액션 · ${a.owner}', 'New action · ${a.owner}'),
               ),
             for (final s in diff.shared)
               _DiffRow(
@@ -1168,7 +1203,10 @@ class _CompareActionsSection extends StatelessWidget {
                 marker: '−',
                 color: Colors.red.shade600,
                 text: a.task,
-                meta: a.completed ? '완료된 액션 · 이후 회의에서 미등장' : '이후 회의에서 미등장',
+                meta: a.completed
+                    ? tr('완료된 액션 · 이후 회의에서 미등장',
+                        'Completed action · not in later meeting')
+                    : tr('이후 회의에서 미등장', 'Not in later meeting'),
               ),
           ],
         ),
@@ -1179,16 +1217,18 @@ class _CompareActionsSection extends StatelessWidget {
   static String _sharedActionMeta(SharedAction s) {
     final parts = <String>[];
     parts.add(switch (s.status) {
-      ActionTransition.completed => '완료됨 ✓',
-      ActionTransition.reopened => '재오픈',
-      ActionTransition.stillCompleted => '계속 완료 상태',
-      ActionTransition.stillOpen => '진행 중',
+      ActionTransition.completed => tr('완료됨 ✓', 'Completed ✓'),
+      ActionTransition.reopened => tr('재오픈', 'Reopened'),
+      ActionTransition.stillCompleted => tr('계속 완료 상태', 'Still completed'),
+      ActionTransition.stillOpen => tr('진행 중', 'Ongoing'),
     });
     if (s.ownerChanged) {
-      parts.add('담당자 ${s.earlier.owner} → ${s.later.owner}');
+      parts.add(tr('담당자 ${s.earlier.owner} → ${s.later.owner}',
+          'Owner ${s.earlier.owner} → ${s.later.owner}'));
     }
     if (s.deadlineChanged) {
-      parts.add('마감 ${s.earlier.deadline} → ${s.later.deadline}');
+      parts.add(tr('마감 ${s.earlier.deadline} → ${s.later.deadline}',
+          'Deadline ${s.earlier.deadline} → ${s.later.deadline}'));
     }
     return parts.join(' · ');
   }
