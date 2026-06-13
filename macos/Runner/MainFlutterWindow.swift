@@ -6,7 +6,10 @@ class MainFlutterWindow: NSWindow {
   // Flutter ↔ native 사이 채널: themeMode 동기화용.
   private var appearanceChannel: FlutterMethodChannel?
   private var bookmarkChannel: FlutterMethodChannel?
+  private var systemAudioChannel: FlutterMethodChannel?
   private var activeSecurityScopedURLs: [String: URL] = [:]
+  // 온라인 회의용 시스템 오디오 캡처 (macOS 14.2+). 미지원 OS에서는 nil 유지.
+  private var systemAudioRecorder: AnyObject?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -153,6 +156,63 @@ class MainFlutterWindow: NSWindow {
       }
     }
     self.bookmarkChannel = bookmarkChannel
+
+    // ── Platform channel: app/system_audio ───────────────────────
+    // 온라인 회의(시스템 출력) 오디오 캡처. macOS 14.2+ 에서만 동작.
+    let systemAudioChannel = FlutterMethodChannel(
+      name: "app/system_audio",
+      binaryMessenger: messenger
+    )
+    systemAudioChannel.setMethodCallHandler { [weak self] (call, result) in
+      guard let self = self else {
+        result(FlutterError(code: "unavailable", message: "Window is gone", details: nil))
+        return
+      }
+      switch call.method {
+      case "isSupported":
+        if #available(macOS 14.2, *) {
+          result(true)
+        } else {
+          result(false)
+        }
+
+      case "start":
+        guard #available(macOS 14.2, *) else {
+          result(FlutterError(code: "unsupported", message: "Requires macOS 14.2+", details: nil))
+          return
+        }
+        guard
+          let args = call.arguments as? [String: Any],
+          let path = args["path"] as? String,
+          !path.isEmpty
+        else {
+          result(FlutterError(code: "bad_args", message: "Missing path", details: nil))
+          return
+        }
+        let recorder: SystemAudioRecorder
+        if let existing = self.systemAudioRecorder as? SystemAudioRecorder {
+          recorder = existing
+        } else {
+          recorder = SystemAudioRecorder()
+          self.systemAudioRecorder = recorder
+        }
+        if let error = recorder.start(outputPath: path) {
+          result(FlutterError(code: "start_failed", message: error, details: nil))
+        } else {
+          result(true)
+        }
+
+      case "stop":
+        if #available(macOS 14.2, *) {
+          (self.systemAudioRecorder as? SystemAudioRecorder)?.stop()
+        }
+        result(nil)
+
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    self.systemAudioChannel = systemAudioChannel
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
