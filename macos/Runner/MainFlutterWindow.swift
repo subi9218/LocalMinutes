@@ -202,6 +202,16 @@ class MainFlutterWindow: NSWindow {
           result(true)
         }
 
+      case "drainPcm":
+        // 누적된 16kHz 모노 int16 PCM을 가져가 비운다 (실시간 전사 믹스용).
+        if #available(macOS 14.2, *),
+           let rec = self.systemAudioRecorder as? SystemAudioRecorder {
+          let data = rec.drainPcm()
+          result(FlutterStandardTypedData(bytes: data))
+        } else {
+          result(FlutterStandardTypedData(bytes: Data()))
+        }
+
       case "stop":
         if #available(macOS 14.2, *) {
           (self.systemAudioRecorder as? SystemAudioRecorder)?.stop()

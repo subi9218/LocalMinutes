@@ -20,7 +20,31 @@ final class SystemAudioRecorder {
   private var isRecording = false
   private let ioQueue = DispatchQueue(label: "com.subi9218.localminutes.systemaudio")
 
+  // ── 실시간 전사용 16kHz 모노 int16 PCM 변환/버퍼 (B 마일스톤) ──────────
+  // IOProc에서 탭 포맷 → 16kHz 모노 int16로 변환해 누적하고, Dart가 drainPcm으로
+  // 주기적으로 가져가 마이크 윈도우와 실시간 믹스한다.
+  private var converter: AVAudioConverter?
+  private var inFormat: AVAudioFormat?
+  private let outFormat = AVAudioFormat(
+    commonFormat: .pcmFormatInt16,
+    sampleRate: 16000,
+    channels: 1,
+    interleaved: true
+  )
+  private var pcmLock = os_unfair_lock()
+  private var pcmBuffer = Data()
+  private let maxPcmBytes = 16000 * 2 * 60 // 60초 분량 상한
+
   var recording: Bool { isRecording }
+
+  /// 누적된 16kHz 모노 int16 PCM을 반환하고 버퍼를 비운다.
+  func drainPcm() -> Data {
+    os_unfair_lock_lock(&pcmLock)
+    let out = pcmBuffer
+    pcmBuffer = Data()
+    os_unfair_lock_unlock(&pcmLock)
+    return out
+  }
 
   /// 시스템 오디오 캡처 시작. 성공 시 nil, 실패 시 에러 메시지 반환.
   func start(outputPath: String) -> String? {
@@ -50,6 +74,16 @@ final class SystemAudioRecorder {
       cleanup()
       return "탭 포맷 조회 실패 (status \(status))"
     }
+
+    // ── 2-1) 실시간 전사용 변환기 준비 (탭 포맷 → 16kHz 모노 int16) ────────
+    if let inFmt = AVAudioFormat(streamDescription: &streamFormat),
+       let outFmt = outFormat {
+      inFormat = inFmt
+      converter = AVAudioConverter(from: inFmt, to: outFmt)
+    }
+    os_unfair_lock_lock(&pcmLock)
+    pcmBuffer = Data()
+    os_unfair_lock_unlock(&pcmLock)
 
     // ── 3) 사설 aggregate device 생성 (탭 + 기본 출력 장치를 클럭으로) ─────
     let aggregateUID = UUID().uuidString
@@ -137,6 +171,9 @@ final class SystemAudioRecorder {
       let frames = firstBuffer.mDataByteSize / bytesPerFrame
       if frames == 0 { return }
       _ = ExtAudioFileWriteAsync(extFile, frames, inInputData)
+
+      // 실시간 전사용: 탭 PCM → 16kHz 모노 int16로 변환해 누적
+      self.appendConvertedPcm(inInputData)
     }
     guard status == noErr, ioProcID != nil else {
       cleanup()
@@ -151,6 +188,53 @@ final class SystemAudioRecorder {
 
     isRecording = true
     return nil
+  }
+
+  /// 탭 입력 버퍼를 16kHz 모노 int16로 변환해 pcmBuffer에 누적한다.
+  /// IOProc(실시간 스레드)에서 호출되므로 가볍게 유지한다.
+  private func appendConvertedPcm(_ inInputData: UnsafePointer<AudioBufferList>) {
+    guard let converter, let inFormat, let outFormat else { return }
+    guard
+      let inBuffer = AVAudioPCMBuffer(
+        pcmFormat: inFormat,
+        bufferListNoCopy: inInputData,
+        deallocator: nil
+      ),
+      inBuffer.frameLength > 0
+    else { return }
+
+    let ratio = outFormat.sampleRate / inFormat.sampleRate
+    let outCap = AVAudioFrameCount(Double(inBuffer.frameLength) * ratio) + 16
+    guard
+      let outBuffer = AVAudioPCMBuffer(
+        pcmFormat: outFormat, frameCapacity: outCap
+      )
+    else { return }
+
+    var fed = false
+    var convErr: NSError?
+    converter.convert(to: outBuffer, error: &convErr) { _, outStatus in
+      if fed {
+        outStatus.pointee = .noDataNow
+        return nil
+      }
+      fed = true
+      outStatus.pointee = .haveData
+      return inBuffer
+    }
+    if convErr != nil { return }
+    let n = Int(outBuffer.frameLength)
+    if n == 0 { return }
+    guard let ch = outBuffer.int16ChannelData else { return }
+    let byteCount = n * 2
+    let data = Data(bytes: ch[0], count: byteCount)
+
+    os_unfair_lock_lock(&pcmLock)
+    pcmBuffer.append(data)
+    if pcmBuffer.count > maxPcmBytes {
+      pcmBuffer.removeFirst(pcmBuffer.count - maxPcmBytes)
+    }
+    os_unfair_lock_unlock(&pcmLock)
   }
 
   /// 캡처 중지 및 자원 정리.
@@ -176,6 +260,11 @@ final class SystemAudioRecorder {
       ExtAudioFileDispose(extFile)
     }
     extFile = nil
+    converter = nil
+    inFormat = nil
+    os_unfair_lock_lock(&pcmLock)
+    pcmBuffer = Data()
+    os_unfair_lock_unlock(&pcmLock)
     isRecording = false
   }
 

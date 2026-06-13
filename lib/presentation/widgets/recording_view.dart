@@ -973,13 +973,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       final ts = DateTime.now().millisecondsSinceEpoch;
       _audioSavePath = '${recordingsDir.path}/meeting_$ts.wav';
 
-      await MicrophoneService.instance.startRecording(
-        sttPath,
-        audioSavePath: _audioSavePath,
-        device: _selectedDevice,
-      );
-
-      // 온라인 회의: 선택한 소스가 시스템 오디오를 포함하면 병렬로 캡처 시작.
+      // 온라인 회의: 선택한 소스가 시스템 오디오를 포함하면 마이크 시작 전에
+      // 시스템 캡처를 켜고, 실시간 중간 전사용 PCM 소스를 마이크 서비스에 연결한다.
       // 실패(미지원/권한 거부)해도 마이크 녹음은 계속한다(graceful).
       _recordingSource = _parseRecordingSource(
         AppSettings.instance.recordingSource,
@@ -1025,6 +1020,17 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           }
         }
       }
+
+      // 실시간 중간 전사 윈도우에 시스템 오디오를 합산할 소스 연결 (없으면 null).
+      MicrophoneService.instance.systemPcmSource = _systemAudioPath != null
+          ? SystemAudioService.instance.drainPcm
+          : null;
+
+      await MicrophoneService.instance.startRecording(
+        sttPath,
+        audioSavePath: _audioSavePath,
+        device: _selectedDevice,
+      );
 
       _recordingStartedAt = DateTime.now();
       _recordingEndedAt = null;

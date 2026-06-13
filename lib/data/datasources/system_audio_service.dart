@@ -42,6 +42,18 @@ class SystemAudioService {
     return _recording;
   }
 
+  /// 마지막 호출 이후 캡처된 시스템 오디오 PCM(16kHz 모노 int16 LE)을 가져오고
+  /// 네이티브 버퍼를 비운다. 실시간 전사 윈도우에 마이크와 믹스하기 위함.
+  Future<Uint8List> drainPcm() async {
+    if (!Platform.isMacOS || !_recording) return Uint8List(0);
+    try {
+      final data = await _channel.invokeMethod<Uint8List>('drainPcm');
+      return data ?? Uint8List(0);
+    } catch (_) {
+      return Uint8List(0);
+    }
+  }
+
   /// 캡처 중지 및 네이티브 자원 정리.
   Future<void> stop() async {
     if (!Platform.isMacOS) return;
