@@ -1,5 +1,6 @@
 import '../../data/datasources/llm_service.dart';
 import '../../domain/entities/meeting.dart' show Bookmark;
+import '../l10n/app_tr.dart';
 import '../utils/summary_parser.dart';
 
 class SummaryCancelledException implements Exception {
@@ -109,7 +110,7 @@ class ChunkedSummarizer {
 
     // ── 짧은 회의 → 기존 단일 패스 ─────────────────────────
     if (transcript.length <= tuning.singlePassThreshold) {
-      onProgress?.call('요약 생성 중... (0 토큰)', 0.0);
+      onProgress?.call(tr('요약 생성 중... (0 토큰)', 'Generating summary... (0 tokens)'), 0.0);
       final prompt = SummaryParser.buildPrompt(
         transcript,
         dateStr,
@@ -130,7 +131,7 @@ class ChunkedSummarizer {
           checkCancelled();
           onPreview?.call(partial);
           onProgress?.call(
-            '요약 생성 중... ($tokCount 토큰)',
+            tr('요약 생성 중... ($tokCount 토큰)', 'Generating summary... ($tokCount tokens)'),
             (tokCount / tuning.finalMaxTokens).clamp(0.0, 0.99),
           );
         },
@@ -145,7 +146,7 @@ class ChunkedSummarizer {
       checkCancelled();
       final base = i / chunks.length * 0.9;
       final span = 1.0 / chunks.length * 0.9;
-      onProgress?.call('구간 요약 ${i + 1}/${chunks.length} (0 토큰)', base);
+      onProgress?.call(tr('구간 요약 ${i + 1}/${chunks.length} (0 토큰)', 'Summarizing section ${i + 1}/${chunks.length} (0 tokens)'), base);
       final chunkPrompt = _buildChunkPrompt(
         chunks[i],
         i + 1,
@@ -165,7 +166,7 @@ class ChunkedSummarizer {
           onPreview?.call(text);
           final frac = (tokCount / tuning.partialMaxTokens).clamp(0.0, 1.0);
           onProgress?.call(
-            '구간 요약 ${i + 1}/${chunks.length} ($tokCount 토큰)',
+            tr('구간 요약 ${i + 1}/${chunks.length} ($tokCount 토큰)', 'Summarizing section ${i + 1}/${chunks.length} ($tokCount tokens)'),
             base + span * frac,
           );
         },
@@ -174,7 +175,7 @@ class ChunkedSummarizer {
     }
 
     checkCancelled();
-    onProgress?.call('구간 통합 중... (0 토큰)', 0.92);
+    onProgress?.call(tr('구간 통합 중... (0 토큰)', 'Merging sections... (0 tokens)'), 0.92);
 
     // 구간 요약들을 하나의 "전사본"으로 합쳐서 최종 JSON 요약
     final mergedText = StringBuffer();
@@ -206,7 +207,7 @@ class ChunkedSummarizer {
         checkCancelled();
         onPreview?.call(text);
         final frac = (tokCount / tuning.finalMaxTokens).clamp(0.0, 1.0);
-        onProgress?.call('최종 요약 중... ($tokCount 토큰)', 0.92 + 0.07 * frac);
+        onProgress?.call(tr('최종 요약 중... ($tokCount 토큰)', 'Finalizing summary... ($tokCount tokens)'), 0.92 + 0.07 * frac);
       },
     );
   }

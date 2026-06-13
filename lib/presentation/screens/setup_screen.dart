@@ -226,9 +226,28 @@ class _SetupScreenState extends State<SetupScreen> {
         target: steps[i],
         completeWhenReady: false,
       );
+      // _startDownload 성공 경로의 inter-step 윈도우 동안 사용자가 취소하면
+      // (_cancelBulk → _bulkActive=false) 다음 모델을 시작하지 않고 중단한다.
+      if (!mounted || !_bulkActive) return;
       if (!ok) {
-        if (mounted) setState(() => _bulkActive = false);
-        return; // 오류/취소 시 중단 (메시지는 _startDownload가 표시)
+        if (!mounted) return;
+        // 실패/취소 시 hero 카드에 에러를 노출한다.
+        // (개별 모델 카드의 에러 메시지는 '고급' 영역이 접혀 있어 안 보이므로,
+        //  기본 경로에서도 사용자가 실패 원인을 볼 수 있도록 _startError로 끌어올림.)
+        final dl = _dlFor(steps[i]);
+        final failed = dl.status == _Status.error;
+        setState(() {
+          _bulkActive = false;
+          if (failed) {
+            _startError = dl.errorMsg.isNotEmpty
+                ? dl.errorMsg
+                : tr(
+                    '모델을 받지 못했습니다. 네트워크와 저장 공간을 확인한 뒤 다시 시도해주세요.',
+                    'Could not download the model. Check your network and disk space, then try again.',
+                  );
+          }
+        });
+        return; // 오류/취소 시 중단
       }
     }
     if (!mounted) return;

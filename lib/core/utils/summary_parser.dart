@@ -31,6 +31,17 @@ class SummaryParser {
 
   // ── Gemma 출력 JSON 정규화 ────────────────────────────────────
   static String sanitizeJson(String s) {
+    // 기존 공개 동작 유지: 따옴표 없는 키 교정을 포함한 정식 정규화 결과를 반환.
+    // (내부 파싱은 _sanitizeJsonCandidates로 따옴표-키 교정 유무 양쪽을 시도한다)
+    return _sanitizeJsonCandidates(s).first;
+  }
+
+  /// 정규화 후보를 우선순위 순으로 반환한다.
+  /// [0] 따옴표 없는 키 교정까지 적용한 정식 후보
+  /// [1] 따옴표 없는 키 교정만 건너뛴 후보
+  ///     — 키 교정 정규식이 JSON 문자열 값 내부(`time: 3`, `http:` 등)를
+  ///       잘못 인용해 깨뜨리는 경우를 대비한 폴백.
+  static List<String> _sanitizeJsonCandidates(String s) {
     // Gemma 채팅 템플릿 잔재 제거 (</start_of_turn>, <end_of_turn> 등)
     s = s.replaceAll(RegExp(r'<[^>]+>'), '').trim();
 
@@ -74,12 +85,22 @@ class SummaryParser {
     s = s.replaceAll(RegExp(r'"?open_questions"?\s*:'), '"openQuestions":');
     s = s.replaceAll(RegExp(r'"?meeting_title"?\s*:'), '"meetingTitle":');
 
+    // 따옴표 없는 키 교정 직전 스냅샷 — 이 정규식이 문자열 값 내부를 오인용해
+    // 깨뜨리는 경우 이 후보로 재시도한다.
+    final beforeKeyFix = s;
+
     // 따옴표 없는 키 교정
-    s = s.replaceAllMapped(
+    final withKeyFix = s.replaceAllMapped(
       RegExp(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)'),
       (m) => '${m[1]}"${m[2]}"${m[3]}',
     );
 
+    // 두 후보 모두 동일한 마무리 단계(trailing comma 제거 + 잘린 JSON 복구) 적용
+    return [_finalizeJson(withKeyFix), _finalizeJson(beforeKeyFix)];
+  }
+
+  /// trailing comma 제거 + 잘린 JSON 중괄호/대괄호 복구.
+  static String _finalizeJson(String s) {
     // trailing comma 제거
     s = s.replaceAll(RegExp(r',\s*}'), '}');
     s = s.replaceAll(RegExp(r',\s*]'), ']');
@@ -111,9 +132,16 @@ class SummaryParser {
   }) {
     Map<String, dynamic>? m;
 
-    try {
-      m = jsonDecode(sanitizeJson(raw)) as Map<String, dynamic>;
-    } catch (_) {}
+    // 정규화 후보를 우선순위 순으로 시도한다.
+    //  1) 따옴표 없는 키 교정까지 적용한 정식 후보
+    //  2) 키 교정만 건너뛴 후보 (키 교정 정규식이 문자열 값 내부를 오인용해
+    //     깨뜨린 경우 — 예: 요약 값에 "time: 3"이나 "http:"가 포함된 경우)
+    for (final candidate in _sanitizeJsonCandidates(raw)) {
+      try {
+        m = jsonDecode(candidate) as Map<String, dynamic>;
+        break;
+      } catch (_) {}
+    }
 
     if (m == null) {
       try {
@@ -161,13 +189,24 @@ class SummaryParser {
       );
 
       // ── Evidence 배열 수집 (병렬 배열 + nested evidence 병합) ──
-      final keyDiscussionsList = _dedupeStrings(
-        asList(m['keyDiscussions'] ?? m['key_discussions'] ?? m['discussions']),
+      // main 배열과 evidence 배열을 함께 dedupe해 정렬이 어긋나지 않게 한다.
+      // (중간 항목이 제거돼도 뒤따르는 evidence가 밀리지 않음)
+      final (keyDiscussionsList, keyDiscussionsEvidence) =
+          _dedupeStringsWithEvidence(
+            asList(
+              m['keyDiscussions'] ?? m['key_discussions'] ?? m['discussions'],
+            ),
+            m['keyDiscussionsEvidence'] ?? m['key_discussions_evidence'],
+          );
+      final (decisionsList, decisionsEvidence) = _dedupeStringsWithEvidence(
+        asList(m['decisions']),
+        m['decisionsEvidence'] ?? m['decisions_evidence'],
       );
-      final decisionsList = _dedupeStrings(asList(m['decisions']));
-      final openQuestionsList = _dedupeStrings(
-        asList(m['openQuestions'] ?? m['open_questions'] ?? m['questions']),
-      );
+      final (openQuestionsList, openQuestionsEvidence) =
+          _dedupeStringsWithEvidence(
+            asList(m['openQuestions'] ?? m['open_questions'] ?? m['questions']),
+            m['openQuestionsEvidence'] ?? m['open_questions_evidence'],
+          );
 
       List<String> evList(dynamic v, int targetLen) {
         final l = v is List ? v.map((e) => e.toString()).toList() : <String>[];
@@ -191,19 +230,12 @@ class SummaryParser {
         }
       }
 
+      // keyDiscussions/decisions/openQuestions의 evidence는 위에서 main 배열과
+      // 함께 dedupe돼 이미 정렬·길이가 보장된 배열을 그대로 사용한다.
       final evidenceMap = <String, dynamic>{
-        'keyDiscussions': evList(
-          m['keyDiscussionsEvidence'] ?? m['key_discussions_evidence'],
-          keyDiscussionsList.length,
-        ),
-        'decisions': evList(
-          m['decisionsEvidence'] ?? m['decisions_evidence'],
-          decisionsList.length,
-        ),
-        'openQuestions': evList(
-          m['openQuestionsEvidence'] ?? m['open_questions_evidence'],
-          openQuestionsList.length,
-        ),
+        'keyDiscussions': keyDiscussionsEvidence,
+        'decisions': decisionsEvidence,
+        'openQuestions': openQuestionsEvidence,
         'actionItems': actionItemsEvidence,
       };
 
@@ -447,6 +479,36 @@ JSON:''';
       out.add(t);
     }
     return out;
+  }
+
+  /// main 배열과 그에 대응하는 evidence 배열을 (항목, 근거) 쌍으로 묶어
+  /// 항목 문자열 기준으로 함께 중복 제거한다.
+  ///
+  /// `_dedupeStrings`와 동일한 의미(첫 등장 유지, 빈 항목 스킵, `_roughlySame`로
+  /// 유사 항목 스킵)를 유지하되, 살아남은 항목의 evidence를 같이 들고 나간다.
+  /// 이렇게 해야 중간 항목이 dedupe로 제거돼도 evidence가 밀리지 않고 정렬을 유지한다.
+  /// (이전에는 main만 dedupe하고 evidence는 길이만 맞춰 잘라 정렬이 어긋났다.)
+  ///
+  /// [rawEvidence]는 LLM이 준 병렬 evidence 배열(List 가정). 항목보다 짧으면
+  /// 빈 문자열로 채워 1:1로 짝지은 뒤 함께 dedupe한다.
+  /// 반환되는 evidence 길이는 항상 deduped items 길이와 같다.
+  static (List<String>, List<String>) _dedupeStringsWithEvidence(
+    List<String> items,
+    dynamic rawEvidence,
+  ) {
+    final ev = rawEvidence is List
+        ? rawEvidence.map((e) => e.toString()).toList()
+        : <String>[];
+    final outItems = <String>[];
+    final outEvidence = <String>[];
+    for (int i = 0; i < items.length; i++) {
+      final t = items[i].trim();
+      if (t.isEmpty) continue;
+      if (outItems.any((kept) => _roughlySame(kept, t))) continue;
+      outItems.add(t);
+      outEvidence.add(i < ev.length ? ev[i] : '');
+    }
+    return (outItems, outEvidence);
   }
 
   static List<ActionItem> _dedupeActionItems(List<ActionItem> items) {

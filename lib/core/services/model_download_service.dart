@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
 
@@ -17,6 +18,9 @@ class ModelDownloadService {
   StreamSubscription<List<int>>? _subscription;
   IOSink? _sink;
   bool _cancelled = false;
+
+  /// 진행 중인 다운로드의 completer — cancel()에서 즉시 완료시키기 위함
+  Completer<void>? _activeCompleter;
 
   bool get isCancelled => _cancelled;
 
@@ -146,6 +150,30 @@ class ModelDownloadService {
       int lastReceived = 0;
 
       final completer = Completer<void>();
+      _activeCompleter = completer;
+
+      // 스톨 감시 — 본문 수신이 일정 시간(45초) 멈추면 중단시킨다.
+      // (connectionTimeout/idleTimeout은 본문 중간 정체를 끊지 못함)
+      var lastProgressAt = DateTime.now();
+      Timer? stallTimer;
+      stallTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (completer.isCompleted) {
+          stallTimer?.cancel();
+          return;
+        }
+        final stalledFor = DateTime.now().difference(lastProgressAt);
+        if (stalledFor >= const Duration(seconds: 45)) {
+          stallTimer?.cancel();
+          _subscription?.cancel();
+          if (!completer.isCompleted) {
+            completer.completeError(
+              const ModelDownloadException.networkError(
+                '다운로드가 멈춰 응답이 없습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.',
+              ),
+            );
+          }
+        }
+      });
 
       _subscription = response.listen(
         (chunk) {
@@ -159,6 +187,7 @@ class ModelDownloadService {
 
           sink!.add(chunk);
           received += chunk.length;
+          lastProgressAt = DateTime.now();
 
           // 500ms마다 진행률 콜백
           final now = DateTime.now();
@@ -179,7 +208,11 @@ class ModelDownloadService {
         cancelOnError: true,
       );
 
-      await completer.future;
+      try {
+        await completer.future;
+      } finally {
+        stallTimer.cancel();
+      }
 
       await sink.flush();
       await sink.close();
@@ -253,6 +286,7 @@ class ModelDownloadService {
     } finally {
       client.close(force: true);
       _subscription = null;
+      _activeCompleter = null;
     }
   }
 
@@ -288,12 +322,43 @@ class ModelDownloadService {
         }
       }
       await Directory(extractDir).create(recursive: true);
-      await extractFileToDisk(destZipPath, extractDir);
+      // ~1.2GB 압축 해제를 메인 아이솔레이트에서 동기로 풀면 UI가 멈추므로
+      // 백그라운드 아이솔레이트로 분리한다. extractFileToDisk는
+      // package:archive/archive_io.dart의 최상위 함수라 Isolate.run에서 호출 가능.
+      await Isolate.run(() => extractFileToDisk(destZipPath, extractDir));
       final extracted = FileSystemEntity.typeSync(markerPath);
       if (extracted == FileSystemEntityType.notFound) {
         throw ModelDownloadException.fileSystem(
           '가속팩 압축을 풀었지만 필요한 파일을 찾지 못했습니다.\n'
           '다운로드 파일이 손상되었을 수 있습니다. 다시 시도하세요.',
+        );
+      }
+
+      // archive 패키지는 개별 파일 쓰기 실패를 조용히 삼키므로, 마커가
+      // 존재해도 내용이 비었을 수 있다. 기본 무결성 검사로 부분/손상 해제를 잡는다.
+      var contentOk = false;
+      if (extracted == FileSystemEntityType.directory) {
+        await for (final entity
+            in Directory(markerPath).list(recursive: true)) {
+          if (entity is File && await entity.length() > 0) {
+            contentOk = true;
+            break;
+          }
+        }
+      } else {
+        contentOk = await File(markerPath).length() > 0;
+      }
+      if (!contentOk) {
+        // 부분 해제된 마커 제거 후 실패 처리
+        if (extracted == FileSystemEntityType.directory) {
+          await Directory(markerPath).delete(recursive: true).catchError(
+            (_) => Directory(markerPath),
+          );
+        } else {
+          await File(markerPath).delete().catchError((_) => File(markerPath));
+        }
+        throw const ModelDownloadException.fileSystem(
+          '가속팩 압축 해제가 불완전합니다. 파일이 손상되었을 수 있으니 다시 시도하세요.',
         );
       }
     } on ModelDownloadException {
@@ -312,6 +377,12 @@ class ModelDownloadService {
     _cancelled = true;
     _subscription?.cancel();
     _sink?.close().catchError((_) {});
+    // 구독을 취소하면 더 이상 청크 콜백이 오지 않으므로, 진행 중인
+    // download()의 `await completer.future`가 영원히 멈춘다. 직접 완료시켜
+    // finally 정리(client.close, .tmp 삭제)가 실행되게 한다.
+    if (_activeCompleter != null && !_activeCompleter!.isCompleted) {
+      _activeCompleter!.completeError(const ModelDownloadException.cancelled());
+    }
   }
 
   /// HuggingFace 리다이렉트 (최대 5회) 추적

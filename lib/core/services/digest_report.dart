@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../domain/entities/summary.dart';
 import '../../domain/repositories/meeting_repository.dart';
+import '../l10n/app_tr.dart';
 
 /// 주간/월간 다이제스트 (P2 업무 흐름 확장).
 ///
@@ -157,8 +158,8 @@ enum DigestPeriod {
   }
 
   String get label => switch (this) {
-    DigestPeriod.week => '이번 주',
-    DigestPeriod.month => '이번 달',
+    DigestPeriod.week => tr('이번 주', 'This week'),
+    DigestPeriod.month => tr('이번 달', 'This month'),
   };
 }
 

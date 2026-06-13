@@ -114,6 +114,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   int? _recoveryMeetingId;
   Timer? _checkpointTimer;
 
+  /// _startRecording 재진입 방지 플래그 (트레이 quick-start 등으로 인한
+  /// 준비 다이얼로그 중복 트리거 → 중복 회의 생성 방지).
+  bool _startInProgress = false;
+
   /// 회의 어젠다 (녹음 준비 다이얼로그에서 사용자가 입력)
   String _meetingAgenda = '';
 
@@ -349,6 +353,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   /// 현재 녹음 경과 시간(초)
   int _currentRecordingSec() {
+    // 일시 정지 시간을 뺀 실제 녹음 경과 시간 사용 (transcript 타임스탬프와 정렬).
+    final elapsedSec = MicrophoneService.instance.elapsed.inSeconds;
+    if (elapsedSec > 0) return elapsedSec;
+    // elapsed가 아직 시작 전이거나 0이면 기존 계산으로 폴백.
     if (_recordingStartedAt == null) return 0;
     return DateTime.now().difference(_recordingStartedAt!).inSeconds;
   }
@@ -836,6 +844,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   // ── 녹음 제어 ─────────────────────────────────────────────────
   Future<void> _startRecording({bool showTrayFailureNotice = false}) async {
+    // 재진입 방지: 준비 다이얼로그가 열려 있는 동안 트레이 quick-start 등으로
+    // 두 번째 _startRecording이 호출되면 중복 회의가 생성된다.
+    if (_startInProgress) return;
+    _startInProgress = true;
+    try {
     final prep = await _showRecordingPrepDialog();
     if (!mounted) return;
     if (prep == null) return;
@@ -975,6 +988,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       });
 
       // 1초마다 UI 갱신 (경과 시간)
+      _uiTimer?.cancel();
       _uiTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() {});
       });
@@ -1020,6 +1034,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           message: friendly.message,
         );
       }
+    }
+    } finally {
+      _startInProgress = false;
     }
   }
 
@@ -1140,12 +1157,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _phase = _RecordingPhase.processing;
       _statusMsg = tr('녹음 정리 중', 'Finalizing recording');
     });
+    // stopRecording은 최대 30초까지 걸릴 수 있다. 이 사이에 사용자가 화면을
+    // 벗어나면 위젯이 dispose되므로, 영속화(회의 status=done + 마지막
+    // 체크포인트)를 ref/setState보다 먼저 수행해 중간 이탈에도 회의가
+    // status=recording에 멈추지 않고 올바르게 마무리되도록 한다.
     await MicrophoneService.instance.stopRecording();
     _recordingEndedAt = DateTime.now();
-    ref.read(nativeRecordingActiveProvider.notifier).state = false;
-    if (mounted) setState(() => _inputLevel = 0);
 
-    // 마지막 체크포인트: status=transcribing으로 표기 (요약 전 단계)
+    // ── 영속화 (UI 갱신보다 먼저, 가드 이전에 반드시 완료) ──
+    // 마지막 체크포인트: status=done으로 표기 (요약 전 단계)
     if (_recoveryMeetingId != null) {
       try {
         final meetingRepo = MeetingRepositoryImpl(IsarService.instance.db);
@@ -1160,7 +1180,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     await _saveRecoveryCheckpoint();
 
+    // ── 여기서부터 UI/ref 갱신: 위젯이 dispose됐으면 안전하게 종료 ──
+    if (!mounted) return;
+    ref.read(nativeRecordingActiveProvider.notifier).state = false;
     setState(() {
+      _inputLevel = 0;
       _phase = _RecordingPhase.stopped;
       _statusMsg = tr('녹음 완료. 요약을 실행하세요.', 'Recording complete. Run the summary.');
     });

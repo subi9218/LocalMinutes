@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:async';
 import 'package:ffi/ffi.dart';
+import '../l10n/app_tr.dart';
 import '../services/crash_log_service.dart';
 import 'llama_ffi.dart';
 import 'whisper_ffi.dart';
@@ -170,7 +171,7 @@ class OnDeviceModelManager {
   /// STT 모델 로드 중이면 예외 → 먼저 unloadStt() 호출
   Future<void> loadLlm(String modelPath, {int nCtx = 4096, int nBatch = 512}) =>
       runExclusiveNativeTask(
-        'LLM 모델 로드',
+        tr('LLM 모델 로드', 'Loading summary model'),
         () => _loadLlmUnlocked(modelPath, nCtx: nCtx, nBatch: nBatch),
       );
 
@@ -214,7 +215,7 @@ class OnDeviceModelManager {
 
   /// LLM 해제 (순서: context → model → backend)
   Future<void> unloadLlm() =>
-      runExclusiveNativeTask('LLM 모델 해제', _unloadLlmUnlocked);
+      runExclusiveNativeTask(tr('LLM 모델 해제', 'Unloading summary model'), _unloadLlmUnlocked);
 
   Future<void> _unloadLlmUnlocked() async {
     if (!isLlmLoaded) return;
@@ -233,7 +234,7 @@ class OnDeviceModelManager {
   /// Whisper GGUF 모델 로드
   /// LLM 모델 로드 중이면 예외 → 먼저 unloadLlm() 호출
   Future<void> loadStt(String modelPath) =>
-      runExclusiveNativeTask('음성 인식 모델 로드', () => _loadSttUnlocked(modelPath));
+      runExclusiveNativeTask(tr('음성 인식 모델 로드', 'Loading speech recognition model'), () => _loadSttUnlocked(modelPath));
 
   Future<void> _loadSttUnlocked(String modelPath) async {
     if (isLlmLoaded) {
@@ -259,7 +260,7 @@ class OnDeviceModelManager {
 
   /// STT 해제 (메모리 반환 ~2 GB)
   Future<void> unloadStt() =>
-      runExclusiveNativeTask('음성 인식 모델 해제', _unloadSttUnlocked);
+      runExclusiveNativeTask(tr('음성 인식 모델 해제', 'Unloading speech recognition model'), _unloadSttUnlocked);
 
   Future<void> _unloadSttUnlocked() async {
     if (!isSttLoaded) return;

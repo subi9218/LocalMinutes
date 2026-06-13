@@ -57,6 +57,7 @@ class SecurityScopedBookmarkService {
   }
 
   static Future<void> saveRecordingsFolderSelection(String path) async {
+    final oldBookmark = AppSettings.instance.recordingsSaveBookmark;
     if (await isSandboxed()) {
       final bookmark = await createBookmarkForPath(path);
       if (bookmark == null || bookmark.isEmpty) {
@@ -66,6 +67,15 @@ class SecurityScopedBookmarkService {
       final accessing = await startAccessingBookmark(bookmark);
       if (!accessing) {
         throw const FileSystemException('선택한 폴더 접근 권한을 시작하지 못했습니다.');
+      }
+      // 새 폴더 접근이 확정된 뒤에만 이전 폴더의 보안 스코프를 해제한다.
+      // (중간에 실패하면 사용자가 접근 권한을 모두 잃지 않도록 순서를 보장)
+      if (oldBookmark.isNotEmpty && oldBookmark != bookmark) {
+        try {
+          await stopAccessingBookmark(oldBookmark);
+        } catch (_) {
+          // 이전 스코프 해제 실패는 폴더 선택을 막지 않는다(best-effort).
+        }
       }
     }
     await AppSettings.instance.setRecordingsSavePath(path);

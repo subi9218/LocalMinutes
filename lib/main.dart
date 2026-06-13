@@ -42,13 +42,27 @@ void main() async {
           await SecurityScopedBookmarkService.restoreRecordingsFolderAccess();
       final hasStoragePath =
           AppSettings.instance.recordingsSavePath.trim().isNotEmpty;
-      final storageReady = hasStoragePath && storageRestored;
+      var storageReady = hasStoragePath && storageRestored;
       // 사용자 폴더 준비 전엔 Isar를 열지 않음 (컨테이너 폴백 금지).
       // Apple App Sandbox 2.4.5(i): user data must live in a user-accessible
       // location, not the hidden app container.
+      // I7: init 실패(손상/잠금 DB 등)가 부팅을 죽이지 않도록 보호. 실패하면
+      // 저장 폴더 미준비로 간주해 저장 폴더 화면을 보여준다(창은 항상 렌더).
       if (storageReady) {
-        await IsarService.instance.init();
+        try {
+          await IsarService.instance.init();
+        } catch (e, st) {
+          CrashLogService.instance.recordCaught(e, st, context: 'isarInit');
+        }
+        if (!IsarService.instance.isOpen) {
+          storageReady = false;
+        }
       }
+      // I1: 저장 경로는 있는데 접근/열기에 실패한 '재연결 필요' 상태.
+      // 이 경우 기존 회의록을 잃지 않도록 같은 폴더 재선택을 안내한다.
+      final reconnectPath = (hasStoragePath && !storageReady)
+          ? AppSettings.instance.recordingsSavePath.trim()
+          : '';
       await EntitlementService.init(); // 무료/유료 게이트 (현재 hardcode pro)
       final modelsOk = await _checkModels();
       if (storageReady) {
@@ -59,6 +73,7 @@ void main() async {
           child: MeetingAssistantApp(
             modelsOk: modelsOk,
             storageReady: storageReady,
+            reconnectPath: reconnectPath,
           ),
         ),
       );
@@ -105,10 +120,16 @@ Future<void> _runAutoDelete() async {
 class MeetingAssistantApp extends ConsumerStatefulWidget {
   final bool modelsOk;
   final bool storageReady;
+
+  /// 저장 경로는 있으나 접근/열기에 실패해 재연결이 필요한 경우의 이전 폴더 경로.
+  /// 비어 있지 않으면 저장 폴더 화면에서 '같은 폴더 재선택' 안내를 표시한다(I1).
+  final String reconnectPath;
+
   const MeetingAssistantApp({
     super.key,
     required this.modelsOk,
     required this.storageReady,
+    this.reconnectPath = '',
   });
 
   @override
@@ -176,6 +197,11 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
   }
 
   Future<AppExitResponse> _onExitRequested() async {
+    // A1: 종료 확인 다이얼로그가 최소화/숨겨진 창 뒤에 떠 앱이 멈춘 것처럼
+    // 보이지 않도록, 먼저 창을 보이고 포커스한다.
+    if (!_isExiting) {
+      await _showAppWindow();
+    }
     if (!_isExiting && !await _confirmExitIfNeeded()) {
       return AppExitResponse.cancel;
     }
@@ -414,16 +440,26 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
   /// 되돌아간다. home: 스왑과 pushReplacement 양쪽에서 동일하게 쓰이도록 헬퍼로 둔다.
   Widget _buildStorageScreen() {
     return StorageSetupScreen(
+      // I1: 재연결 필요 시 이전 폴더 경로를 전달해 '같은 폴더 재선택' 안내 표시.
+      reconnectPath: widget.reconnectPath,
       onComplete: (path) {
         setState(() => _storageReady = true);
         unawaited(_syncTrayStartState());
       },
+      // 저장 폴더 설정 → 곧바로 모델 준비 화면으로 넘어가는 경로에서,
+      // 모델 준비 완료 시 루트 상태/트레이 동기화 (안 그러면 트레이 빠른 녹음이
+      // 첫 세션 내내 '모델 필요' 상태로 막힘).
+      onModelsComplete: () {
+        setState(() => _showHome = true);
+        unawaited(_syncTrayStartState());
+      },
       onBack: () {
         setState(() => _languageChosen = false);
+        // _GlobalShortcuts는 MacosApp builder에서 전 라우트를 감싸므로
+        // 여기서 다시 감싸지 않는다(S1).
         _navigatorKey.currentState?.pushReplacement(
           PageRouteBuilder<void>(
-            pageBuilder: (_, _, _) =>
-                _GlobalShortcuts(ref: ref, child: _buildLanguageScreen()),
+            pageBuilder: (_, _, _) => _buildLanguageScreen(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -508,10 +544,15 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
           ),
           // MacosApp 은 자동으로 ScaffoldMessenger 를 제공하지 않는다 (MaterialApp 과 차이).
           // SnackBar 호출이 죽지 않도록 root 에 ScaffoldMessenger 를 명시 추가.
-          child: ScaffoldMessenger(
-            child: Material(
-              type: MaterialType.transparency,
-              child: child ?? const SizedBox.shrink(),
+          // S1: _GlobalShortcuts 를 Navigator 위(builder)에 두어 모든 라우트
+          // (pushReplacement 로 전환된 화면 포함)에서 전역 단축키가 살아 있도록 한다.
+          child: _GlobalShortcuts(
+            ref: ref,
+            child: ScaffoldMessenger(
+              child: Material(
+                type: MaterialType.transparency,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );
@@ -520,16 +561,13 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
       //   - HomeScreen: MacosWindow(sidebar: ..., child: MacosScaffold(...))
       //   - StorageSetupScreen / SetupScreen: 자체 MacosWindow (사이드바 없음)
       // 화면 간 전환은 root MacosWindow 가 새로 만들어지지만 macos_ui 가 traffic light/chrome 을 일관되게 처리.
-      home: _GlobalShortcuts(
-        ref: ref,
-        child: !_languageChosen
-            ? _buildLanguageScreen()
-            : !_storageReady
-            ? _buildStorageScreen()
-            : _showHome
-            ? const HomeScreen()
-            : _buildSetupScreen(),
-      ),
+      home: !_languageChosen
+          ? _buildLanguageScreen()
+          : !_storageReady
+          ? _buildStorageScreen()
+          : _showHome
+          ? const HomeScreen()
+          : _buildSetupScreen(),
     );
   }
 }

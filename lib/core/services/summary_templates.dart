@@ -1,3 +1,4 @@
+import '../l10n/app_tr.dart';
 import 'app_settings.dart';
 
 /// 요약 프롬프트 템플릿 프리셋
@@ -33,10 +34,11 @@ class SummaryTemplates {
   /// 일괄 보강하기 전까지 customId1 으로 alias.
   static const String customId = customId1;
 
-  static const SummaryTemplate general = SummaryTemplate(
+  static SummaryTemplate get general => SummaryTemplate(
     id: 'general',
-    name: '일반 회의',
-    description: '범용 회의록. 논의·결정·액션을 고르게 정리합니다.',
+    name: tr('일반 회의', 'General meeting'),
+    description: tr('범용 회의록. 논의·결정·액션을 고르게 정리합니다.',
+        'All-purpose minutes. Balances discussions, decisions, and actions.'),
     instruction: '''
 아래 한국어 업무 회의 전사본을 "실무자가 바로 공유할 수 있는 회의록"으로 분석하세요. JSON만 출력하고 설명 문장은 쓰지 마세요.
 
@@ -59,10 +61,11 @@ class SummaryTemplates {
 ''',
   );
 
-  static const SummaryTemplate topicReport = SummaryTemplate(
+  static SummaryTemplate get topicReport => SummaryTemplate(
     id: 'topic_report',
-    name: '주제별 요약',
-    description: '주제별로 재배치된 보고용 회의록. 명사형 개조식, 환각 방지 가드 포함.',
+    name: tr('주제별 요약', 'Topic-based summary'),
+    description: tr('주제별로 재배치된 보고용 회의록. 명사형 개조식, 환각 방지 가드 포함.',
+        'Report-style minutes regrouped by topic. Concise noun-phrase style with anti-hallucination guards.'),
     instruction: '''
 # Role
 너는 IT 대기업의 수석 전략 기획자이자 전문 비서다. 난잡한 회의 전사본을 읽고,
@@ -103,10 +106,11 @@ class SummaryTemplates {
 ''',
   );
 
-  static const SummaryTemplate lecture = SummaryTemplate(
+  static SummaryTemplate get lecture => SummaryTemplate(
     id: 'lecture',
-    name: '강의/세미나',
-    description: '강의·세미나 전사본을 지식 정리 + 인사이트 + 액션으로 구조화합니다.',
+    name: tr('강의/세미나', 'Lecture / Seminar'),
+    description: tr('강의·세미나 전사본을 지식 정리 + 인사이트 + 액션으로 구조화합니다.',
+        'Structures lecture and seminar transcripts into knowledge, insights, and actions.'),
     instruction: '''
 # Role
 너는 지식 큐레이터이자 비즈니스 전략 분석가다. 방대한 양의 강의/세미나 전사본을 분석하여,
@@ -161,7 +165,7 @@ class SummaryTemplates {
 ''',
   );
 
-  static const List<SummaryTemplate> presets = [general, topicReport, lecture];
+  static List<SummaryTemplate> get presets => [general, topicReport, lecture];
 
   static SummaryTemplate byId(String id) {
     for (final t in presets) {
@@ -229,19 +233,24 @@ extension SummaryStyleModeX on SummaryStyleMode {
   };
 
   String get displayName => switch (this) {
-    SummaryStyleMode.standard => '기본',
-    SummaryStyleMode.detailed => '더 자세히',
-    SummaryStyleMode.concise => '더 간결하게',
-    SummaryStyleMode.actionFocused => '액션아이템 중심',
-    SummaryStyleMode.executive => '임원 보고용',
+    SummaryStyleMode.standard => tr('기본', 'Standard'),
+    SummaryStyleMode.detailed => tr('더 자세히', 'More detailed'),
+    SummaryStyleMode.concise => tr('더 간결하게', 'More concise'),
+    SummaryStyleMode.actionFocused => tr('액션아이템 중심', 'Action-focused'),
+    SummaryStyleMode.executive => tr('임원 보고용', 'Executive briefing'),
   };
 
   String get description => switch (this) {
-    SummaryStyleMode.standard => '회의 유형 기본 지침을 그대로 적용합니다.',
-    SummaryStyleMode.detailed => '맥락·대안·근거·우려까지 항목당 1~2문장 더 길게 작성합니다.',
-    SummaryStyleMode.concise => '한 줄 단위로 핵심만 남기고 부연 설명을 제거합니다.',
-    SummaryStyleMode.actionFocused => '결정사항·액션아이템·마감을 우선 추출하고, 논의 내용은 짧게.',
-    SummaryStyleMode.executive => '임원 보고 1페이지 — 핵심 결정/리스크/투자/일정 영향 중심.',
+    SummaryStyleMode.standard => tr('회의 유형 기본 지침을 그대로 적용합니다.',
+        'Applies the meeting type\'s default instructions as-is.'),
+    SummaryStyleMode.detailed => tr('맥락·대안·근거·우려까지 항목당 1~2문장 더 길게 작성합니다.',
+        'Writes 1-2 extra sentences per item, covering context, alternatives, rationale, and concerns.'),
+    SummaryStyleMode.concise => tr('한 줄 단위로 핵심만 남기고 부연 설명을 제거합니다.',
+        'Keeps only the essentials as one-liners and removes elaboration.'),
+    SummaryStyleMode.actionFocused => tr('결정사항·액션아이템·마감을 우선 추출하고, 논의 내용은 짧게.',
+        'Prioritizes decisions, action items, and deadlines; keeps discussion brief.'),
+    SummaryStyleMode.executive => tr('임원 보고 1페이지 — 핵심 결정/리스크/투자/일정 영향 중심.',
+        'One-page executive briefing — focused on key decisions, risks, investment, and schedule impact.'),
   };
 
   /// 회의 유형 instruction 뒤에 누적되는 추가 지침.

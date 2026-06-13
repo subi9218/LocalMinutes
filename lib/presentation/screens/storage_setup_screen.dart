@@ -24,10 +24,21 @@ class StorageSetupScreen extends StatefulWidget {
   /// 표시하지 않는다. (보통 언어 선택 화면으로 되돌아가는 데 사용.)
   final VoidCallback? onBack;
 
+  /// 이 화면에서 곧바로 모델 준비 화면(SetupScreen)으로 넘어가는 경우,
+  /// 모델 준비가 끝났을 때 루트 상태(_showHome)·트레이 동기화를 수행하기 위한 콜백.
+  /// 비워두면 모델 준비 완료 후 트레이 빠른 녹음 상태가 갱신되지 않는다.
+  final VoidCallback? onModelsComplete;
+
+  /// 비어 있지 않으면 '재연결 모드'. 이전에 쓰던 저장 폴더 경로를 표시하고,
+  /// 기존 회의록을 잃지 않으려면 같은 폴더를 다시 선택하라고 안내한다(I1).
+  final String reconnectPath;
+
   const StorageSetupScreen({
     super.key,
     required this.onComplete,
     this.onBack,
+    this.onModelsComplete,
+    this.reconnectPath = '',
   });
 
   @override
@@ -106,7 +117,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
   void _openNextScreen() {
     final next = AppSettings.instance.modelsSetupComplete
         ? const HomeScreen()
-        : SetupScreen(onComplete: () {});
+        : SetupScreen(onComplete: widget.onModelsComplete ?? () {});
     Navigator.of(
       context,
       rootNavigator: true,
@@ -239,6 +250,13 @@ class _StorageSetupScreenState extends State<StorageSetupScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (widget.reconnectPath.isNotEmpty) ...[
+                          _ReconnectBanner(
+                            path: widget.reconnectPath,
+                            color: color,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(steps.length, (index) {
@@ -444,6 +462,77 @@ class _PrivacyPoint extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 재연결 안내 배너 (I1): 이전 저장 폴더에 접근할 수 없을 때, 같은 폴더를
+/// 다시 선택하면 기존 회의록을 복구할 수 있음을 안내한다.
+class _ReconnectBanner extends StatelessWidget {
+  final String path;
+  final ColorScheme color;
+
+  const _ReconnectBanner({required this.path, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.amber.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  size: 18, color: Colors.amber.shade800),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  tr(
+                    '이전 저장 폴더에 접근할 수 없습니다',
+                    'Your previous storage folder is not accessible',
+                  ),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.amber.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            tr(
+              '기존 회의록을 복구하려면 아래 폴더를 다시 선택하세요. 다른 폴더를 선택하면 빈 상태로 시작되며 기존 데이터는 연결되지 않습니다.',
+              'To recover your existing meetings, re-select the same folder below. Choosing a different folder starts empty and will not link your existing data.',
+            ),
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              color: Colors.amber.shade900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: color.outlineVariant),
+            ),
+            child: Text(
+              path,
+              style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

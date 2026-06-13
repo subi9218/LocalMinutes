@@ -2731,7 +2731,7 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              tr('${_period.label}에는 회의가 없습니다.', 'No meetings in this ${_period.label.toLowerCase()}.'),
+                              tr('${_period.label}에는 회의가 없습니다.', 'No meetings ${_period.label.toLowerCase()}.'),
                               style: TextStyle(color: Colors.grey.shade600),
                             ),
                           ],

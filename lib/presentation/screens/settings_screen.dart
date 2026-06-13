@@ -20,6 +20,9 @@ import '../../core/services/model_download_service.dart';
 import '../../core/services/security_scoped_bookmark_service.dart';
 import '../../core/services/summary_templates.dart';
 import '../../core/services/user_error_message.dart';
+import '../../core/ffi/on_device_model_manager.dart';
+import '../../data/datasources/llm_service.dart';
+import '../../data/datasources/microphone_service.dart';
 import '../providers/settings_providers.dart';
 
 /// 설정 다이얼로그 열기 헬퍼
@@ -106,11 +109,13 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       _modelsMb = await _dirSizeMb('${appSupport.path}/models');
       _recordingsMb = await _dirSizeMb('${appSupport.path}/recordings');
 
-      // 커스텀 저장 경로가 있으면 해당 폴더도 계산
+      // 커스텀 저장 경로가 있으면 앱이 만든 산출물만 계산한다(E4).
+      // (사용자가 고른 폴더 전체가 아니라 meeting_*.wav + 'Local Minutes Data'만)
       final custom = _settings.recordingsSavePath;
       if (custom.isNotEmpty) {
-        final customMb = await _dirSizeMb(custom);
-        _recordingsMb = (_recordingsMb ?? 0) + customMb;
+        final appDataMb = await _dirSizeMb('$custom/Local Minutes Data');
+        final wavMb = await _wavFilesSizeMb(custom);
+        _recordingsMb = (_recordingsMb ?? 0) + appDataMb + wavMb;
       }
     } catch (_) {}
     if (mounted) setState(() => _loadingStorage = false);
@@ -122,6 +127,24 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     double total = 0;
     await for (final entity in dir.list(recursive: true)) {
       if (entity is File) {
+        total += await entity.length().catchError((_) => 0);
+      }
+    }
+    return total / (1024 * 1024);
+  }
+
+  /// 사용자 선택 폴더 최상위의 앱 녹음 파일(meeting_*.wav)만 합산한다(E4).
+  /// 사용자의 무관한 파일까지 저장 용량으로 계산하지 않기 위함.
+  Future<double> _wavFilesSizeMb(String path) async {
+    final dir = Directory(path);
+    if (!await dir.exists()) return 0;
+    double total = 0;
+    await for (final entity in dir.list()) {
+      if (entity is! File) continue;
+      final name = entity.uri.pathSegments.isEmpty
+          ? ''
+          : entity.uri.pathSegments.last;
+      if (name.startsWith('meeting_') && name.endsWith('.wav')) {
         total += await entity.length().catchError((_) => 0);
       }
     }
@@ -331,14 +354,59 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     });
   }
 
+  /// 진행 중인 작업(녹음/요약/네이티브 모델 작업) 라벨. 없으면 null.
+  String? _activeWorkLabel() {
+    final mic = MicrophoneService.instance;
+    if (mic.isRecording) return tr('녹음', 'recording');
+    if (mic.isPaused) return tr('일시 정지된 녹음', 'a paused recording');
+    final native = OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
+    if (native != null) return native;
+    if (LlmService.instance.isGenerationActive) {
+      return tr('요약 생성', 'summary generation');
+    }
+    return null;
+  }
+
   // ── 폴더 선택 ─────────────────────────────────────────────────────
   Future<void> _pickRecordingsFolder() async {
+    // I8: 녹음/요약 등 진행 중 작업이 있으면 폴더 변경을 막는다(라이브 파이프라인이
+    // 옛 폴더를 가리킨 채 DB가 새 폴더로 이전되는 것을 방지).
+    final busy = _activeWorkLabel();
+    if (busy != null) {
+      _showSnack(
+        tr(
+          '$busy 작업 중에는 저장 폴더를 변경할 수 없습니다. 작업이 끝난 뒤 다시 시도하세요.',
+          'Cannot change the storage folder while $busy is in progress. Try again after it finishes.',
+        ),
+        isError: true,
+      );
+      return;
+    }
+
     final path = await getDirectoryPath(confirmButtonText: tr('선택', 'Select'));
-    if (path != null) {
+    if (path == null) return;
+
+    // E1/I3: 실패 시 이전 경로/북마크로 롤백하고 사용자에게 알린다.
+    final oldPath = _settings.recordingsSavePath;
+    final oldBookmark = _settings.recordingsSaveBookmark;
+    try {
       await SecurityScopedBookmarkService.saveRecordingsFolderSelection(path);
       await IsarService.instance.relocateToUserSelectedDirectory();
       if (mounted) setState(() {});
       await _loadStorageInfo();
+    } catch (e) {
+      try {
+        await _settings.setRecordingsSavePath(oldPath);
+        await _settings.setRecordingsSaveBookmark(oldBookmark);
+      } catch (_) {}
+      if (!mounted) return;
+      _showSnack(
+        tr(
+          '저장 폴더를 변경하지 못했습니다. 이전 폴더를 유지합니다.',
+          'Could not change the storage folder. Keeping the previous folder.',
+        ),
+        isError: true,
+      );
     }
   }
 
