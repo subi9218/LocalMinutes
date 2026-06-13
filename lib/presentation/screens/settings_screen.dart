@@ -23,6 +23,7 @@ import '../../core/services/user_error_message.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../data/datasources/llm_service.dart';
 import '../../data/datasources/microphone_service.dart';
+import '../../data/datasources/system_audio_service.dart';
 import '../providers/settings_providers.dart';
 
 /// 설정 다이얼로그 열기 헬퍼
@@ -81,12 +82,17 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   int? _crashLogBytes;
   bool _loadingCrashLogInfo = true;
 
+  bool _systemAudioSupported = false;
+
   @override
   void initState() {
     super.initState();
     _loadStorageInfo();
     _checkModels();
     _loadCrashLogInfo();
+    SystemAudioService.instance.isSupported().then((v) {
+      if (mounted) setState(() => _systemAudioSupported = v);
+    });
   }
 
   @override
@@ -540,6 +546,42 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             },
           ),
         ),
+
+        // 녹음 소스 (온라인 회의 시스템 오디오 캡처) — 지원 OS에서만 표시
+        if (_systemAudioSupported) ...[
+          const Divider(height: 20),
+          _SettingRow(
+            title: tr('녹음 소스', 'Recording source'),
+            subtitle: tr(
+              '온라인 회의(Zoom 등) 상대 목소리를 함께 녹음하려면 시스템 오디오를 켜세요. 통화 녹음은 상대방 동의가 필요할 수 있습니다.',
+              'Turn on system audio to also record the other party in online meetings (e.g. Zoom). Recording calls may require consent.',
+            ),
+            trailing: DropdownButton<String>(
+              value: settings.recordingSource,
+              underline: const SizedBox(),
+              isDense: true,
+              items: [
+                DropdownMenuItem(
+                  value: 'mic',
+                  child: Text(tr('마이크만', 'Mic only')),
+                ),
+                DropdownMenuItem(
+                  value: 'both',
+                  child: Text(tr('마이크 + 시스템', 'Mic + system')),
+                ),
+                DropdownMenuItem(
+                  value: 'system',
+                  child: Text(tr('시스템 오디오만', 'System audio only')),
+                ),
+              ],
+              onChanged: (v) async {
+                if (v == null) return;
+                await settings.setRecordingSource(v);
+                setState(() {});
+              },
+            ),
+          ),
+        ],
 
         const Divider(height: 20),
 

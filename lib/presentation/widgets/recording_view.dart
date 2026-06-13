@@ -26,10 +26,12 @@ import '../../core/utils/summary_parser.dart';
 import '../../core/services/isar_service.dart';
 import 'package:record/record.dart'
     show AudioEncoder, AudioRecorder, InputDevice, RecordConfig;
+import '../../core/utils/wav_mixer.dart';
 import '../../data/datasources/diarization_service.dart';
 import '../../data/datasources/llm_service.dart';
 import '../../data/datasources/microphone_service.dart';
 import '../../data/datasources/stt_service.dart';
+import '../../data/datasources/system_audio_service.dart';
 import 'package:isar/isar.dart' show Isar;
 import '../../data/repositories/glossary_repository_impl.dart';
 import '../../data/repositories/meeting_repository_impl.dart';
@@ -106,6 +108,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   late TextEditingController _titleSuffixController; // 추가 제목
 
   String? _audioSavePath; // 녹음 WAV 저장 경로
+  // 온라인 회의: 시스템 오디오를 함께 캡처한 경우의 임시 WAV 경로. null이면 미사용.
+  String? _systemAudioPath;
+  RecordingSource _recordingSource = RecordingSource.mic;
   DateTime? _recordingStartedAt; // 실제 녹음 시작 시각
   DateTime? _recordingEndedAt; // 실제 녹음 종료 시각
 
@@ -974,6 +979,45 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         device: _selectedDevice,
       );
 
+      // 온라인 회의: 선택한 소스가 시스템 오디오를 포함하면 병렬로 캡처 시작.
+      // 실패(미지원/권한 거부)해도 마이크 녹음은 계속한다(graceful).
+      _recordingSource = _parseRecordingSource(
+        AppSettings.instance.recordingSource,
+      );
+      _systemAudioPath = null;
+      if (_recordingSource != RecordingSource.mic && _audioSavePath != null) {
+        final sysPath = _audioSavePath!.replaceFirst(
+          RegExp(r'\.wav$'),
+          '_system.wav',
+        );
+        try {
+          final ok = await SystemAudioService.instance.start(sysPath);
+          _systemAudioPath = ok ? sysPath : null;
+          if (!ok && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(tr(
+                  '시스템 오디오 캡처를 시작하지 못해 마이크만 녹음합니다.',
+                  'Could not start system audio capture; recording mic only.',
+                )),
+              ),
+            );
+          }
+        } catch (e) {
+          _systemAudioPath = null;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(tr(
+                  '시스템 오디오 권한이 필요합니다. 마이크만 녹음합니다. (설정 > 개인정보 보호)',
+                  'System audio permission is required; recording mic only. (Settings > Privacy)',
+                )),
+              ),
+            );
+          }
+        }
+      }
+
       _recordingStartedAt = DateTime.now();
       _recordingEndedAt = null;
       ref.read(nativeRecordingActiveProvider.notifier).state = true;
@@ -1164,6 +1208,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     await MicrophoneService.instance.stopRecording();
     _recordingEndedAt = DateTime.now();
 
+    // 온라인 회의: 시스템 오디오를 함께 캡처했다면 최종 오디오 파일을 믹스/대체한다.
+    // (전사·요약이 파일을 읽기 전에 수행 — 마이크 경로에 덮어쓰므로 downstream 변경 불필요)
+    await _finalizeSystemAudioIfNeeded();
+
     // ── 영속화 (UI 갱신보다 먼저, 가드 이전에 반드시 완료) ──
     // 마지막 체크포인트: status=done으로 표기 (요약 전 단계)
     if (_recoveryMeetingId != null) {
@@ -1190,6 +1238,51 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     });
     ref.invalidate(meetingsProvider);
     await _maybeWarnEmptyRecordingAfterStop();
+  }
+
+  RecordingSource _parseRecordingSource(String s) => switch (s) {
+    'system' => RecordingSource.systemAudio,
+    'both' => RecordingSource.micAndSystem,
+    _ => RecordingSource.mic,
+  };
+
+  /// 시스템 오디오 캡처를 종료하고, 선택 소스에 따라 최종 오디오 파일을 만든다.
+  /// - systemAudio: 시스템 WAV를 16kHz 모노로 변환해 마이크 경로에 덮어씀
+  /// - micAndSystem: 마이크 + 시스템을 믹스해 마이크 경로에 덮어씀
+  /// 시스템 파일이 없거나 믹스 실패 시 마이크 녹음을 그대로 사용한다(graceful).
+  Future<void> _finalizeSystemAudioIfNeeded() async {
+    final sysPath = _systemAudioPath;
+    if (sysPath == null) return;
+    _systemAudioPath = null;
+    try {
+      await SystemAudioService.instance.stop();
+      final micPath =
+          MicrophoneService.instance.savedAudioPath ?? _audioSavePath;
+      if (micPath == null) return;
+      if (!await File(sysPath).exists()) return; // 시스템 캡처 실패 → 마이크만
+
+      if (_recordingSource == RecordingSource.systemAudio) {
+        await WavMixer.mixFiles([sysPath], micPath);
+      } else {
+        final mixedTmp = '$micPath.mix.wav';
+        final ok = await WavMixer.mixFiles([micPath, sysPath], mixedTmp);
+        if (ok) {
+          await File(mixedTmp).rename(micPath);
+        } else {
+          await File(mixedTmp).delete().catchError((_) => File(mixedTmp));
+        }
+      }
+    } catch (e, st) {
+      CrashLogService.instance.recordCaught(
+        e,
+        st,
+        context: 'systemAudioFinalize',
+      );
+    } finally {
+      try {
+        await File(sysPath).delete();
+      } catch (_) {}
+    }
   }
 
   Future<_RecordingPrepResult?> _showRecordingPrepDialog() async {
@@ -5271,4 +5364,16 @@ bool _statusMatch(String status, List<String> needles) {
     if (s.contains(n.toLowerCase())) return true;
   }
   return false;
+}
+
+/// 녹음 오디오 소스. 온라인 회의(시스템 출력) 캡처 지원용.
+enum RecordingSource {
+  /// 마이크만 (대면 회의, 기본값)
+  mic,
+
+  /// 시스템 오디오만 (상대방 목소리만 듣고 기록)
+  systemAudio,
+
+  /// 마이크 + 시스템 오디오 믹스 (온라인 회의 권장)
+  micAndSystem,
 }

@@ -162,6 +162,18 @@ class AppSettings {
 
   bool get isEnglish => effectiveLanguageCode == 'en';
 
+  // ── 녹음 소스 (온라인 회의 시스템 오디오 캡처, 2.2.0) ─────────────
+  /// 'mic' = 마이크만, 'system' = 시스템 오디오만, 'both' = 마이크+시스템 믹스.
+  String get recordingSource => _prefs.getString('recordingSource') ?? 'mic';
+  Future<void> setRecordingSource(String v) =>
+      _prefs.setString('recordingSource', v);
+
+  /// 시스템 오디오(통화 녹음) 법적 고지를 한 번 보여줬는지.
+  bool get systemAudioConsentShown =>
+      _prefs.getBool('systemAudioConsentShown') ?? false;
+  Future<void> setSystemAudioConsentShown(bool v) =>
+      _prefs.setBool('systemAudioConsentShown', v);
+
   // ── 사이드바 레이아웃 ─────────────────────────────────────────────
   /// 회의 목록 사이드바 폭. macOS 사이드바처럼 사용자가 드래그로 조절 가능.
   double get sidebarWidth => _prefs.getDouble('sidebarWidth') ?? 320;
