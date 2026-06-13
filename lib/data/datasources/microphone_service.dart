@@ -58,6 +58,16 @@ class MicrophoneService {
   final _fullAudioBytes = BytesBuilder();
   String? _audioSavePath; // 저장 경로 (startRecording 시 지정)
 
+  // ── 시스템 오디오 실시간 믹스 (온라인 회의, B 마일스톤) ─────────────
+  // 설정 시, 주기적으로 시스템 오디오 PCM(16kHz 모노 int16)을 끌어와 STT
+  // 윈도우(_buffer)에 마이크와 합산한다. 최종 저장 WAV는 _fullAudioBytes(마이크)
+  // 기준이며 시스템 오디오와의 최종 믹스는 recording_view의 정지 후 처리가 담당
+  // (이중 합산 방지). 즉 이 경로는 '실시간 중간 전사'에만 시스템 오디오를 반영한다.
+  Future<Uint8List> Function()? systemPcmSource;
+  Timer? _systemDrainTimer;
+  final _systemQueue = BytesBuilder(copy: false);
+  Uint8List _sysLeftover = Uint8List(0);
+
   bool _recording = false;
   int _baseOffsetMs = 0; // 다음 윈도우 기준 타임스탬프 오프셋
   bool _processing = false; // 윈도우 처리 중 중복 방지
@@ -171,6 +181,22 @@ class MicrophoneService {
     _totalBytesReceived = 0;
     _audioSavePath = audioSavePath;
     _startTime = DateTime.now();
+    _systemQueue.clear();
+    _sysLeftover = Uint8List(0);
+
+    // 시스템 오디오 실시간 믹스: 설정된 경우 200ms마다 PCM을 끌어와 큐에 쌓는다.
+    _systemDrainTimer?.cancel();
+    if (systemPcmSource != null) {
+      _systemDrainTimer = Timer.periodic(const Duration(milliseconds: 200), (
+        _,
+      ) async {
+        if (!_recording || _paused) return;
+        try {
+          final pcm = await systemPcmSource!();
+          if (pcm.isNotEmpty) _systemQueue.add(pcm);
+        } catch (_) {}
+      });
+    }
 
     // PCM16 바이트 수신 → 버퍼 누적 → 30초마다 처리
     _sub = stream.listen(
@@ -239,6 +265,11 @@ class MicrophoneService {
 
     _windowTimer?.cancel();
     _windowTimer = null;
+
+    _systemDrainTimer?.cancel();
+    _systemDrainTimer = null;
+    _systemQueue.clear();
+    _sysLeftover = Uint8List(0);
 
     await _sub?.cancel();
     _sub = null;
@@ -309,8 +340,15 @@ class MicrophoneService {
     if (_paused) return; // 일시 정지 중: 바이트 무시 (WAV에도 포함 안 함)
 
     _totalBytesReceived += chunk.length;
-    _buffer.add(chunk);
-    _fullAudioBytes.add(chunk); // 전체 녹음 누적 (WAV 저장용)
+    _fullAudioBytes.add(chunk); // 전체 녹음 누적 (WAV 저장용, 마이크 기준)
+
+    // STT 윈도우용: 시스템 오디오가 있으면 마이크와 합산해 넣는다(실시간 중간 전사).
+    // 최종 저장 WAV는 마이크 기준이며 시스템과의 최종 믹스는 정지 후 처리가 담당.
+    if (_systemDrainTimer != null) {
+      _buffer.add(_mixSystemIntoChunk(chunk));
+    } else {
+      _buffer.add(chunk);
+    }
 
     // 실시간 레벨 미터 — 50ms 간격 디바운스
     if (onLevel != null) {
@@ -326,6 +364,51 @@ class MicrophoneService {
     if (_buffer.length >= _windowBytes && !_processing) {
       _processWindow();
     }
+  }
+
+  /// 마이크 청크에 큐에 쌓인 시스템 오디오 PCM을 샘플 단위로 합산한다.
+  /// 출력 길이는 마이크 청크와 동일(=윈도우 타이밍 보존). 시스템 분량이 더 많으면
+  /// 남는 부분은 leftover로 보관해 다음 청크에 이어 믹스한다.
+  Uint8List _mixSystemIntoChunk(Uint8List mic) {
+    final drained = _systemQueue.takeBytes();
+    Uint8List sys;
+    if (_sysLeftover.isEmpty) {
+      sys = drained;
+    } else if (drained.isEmpty) {
+      sys = _sysLeftover;
+    } else {
+      sys = Uint8List(_sysLeftover.length + drained.length)
+        ..setAll(0, _sysLeftover)
+        ..setAll(_sysLeftover.length, drained);
+    }
+    if (sys.isEmpty) {
+      _sysLeftover = Uint8List(0);
+      return mic;
+    }
+    final out = Uint8List.fromList(mic);
+    final md = ByteData.sublistView(out);
+    final sd = ByteData.sublistView(sys);
+    final n = (sys.length < mic.length ? sys.length : mic.length) ~/ 2;
+    for (var i = 0; i < n; i++) {
+      var v =
+          md.getInt16(i * 2, Endian.little) + sd.getInt16(i * 2, Endian.little);
+      if (v > 32767) {
+        v = 32767;
+      } else if (v < -32768) {
+        v = -32768;
+      }
+      md.setInt16(i * 2, v, Endian.little);
+    }
+    // 남은 시스템 바이트 보관 (마이크보다 많이 쌓인 경우). 과도하면 폐기(드리프트 방지).
+    final consumed = n * 2;
+    final remain = sys.length - consumed;
+    const maxLeftover = _sampleRate * 2 * 2; // 2초 분량 상한
+    if (remain > 0 && remain <= maxLeftover) {
+      _sysLeftover = Uint8List.sublistView(sys, consumed);
+    } else {
+      _sysLeftover = Uint8List(0);
+    }
+    return out;
   }
 
   /// PCM16 청크 → 0.0~1.0 레벨 (RMS 기반, 로그 스케일)
