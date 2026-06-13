@@ -111,6 +111,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   // 온라인 회의: 시스템 오디오를 함께 캡처한 경우의 임시 WAV 경로. null이면 미사용.
   String? _systemAudioPath;
   RecordingSource _recordingSource = RecordingSource.mic;
+  bool _systemAudioSupported = false; // macOS 14.2+ 시스템 오디오 캡처 지원 여부
   DateTime? _recordingStartedAt; // 실제 녹음 시작 시각
   DateTime? _recordingEndedAt; // 실제 녹음 종료 시각
 
@@ -180,6 +181,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     _titleSuffixController = TextEditingController();
     _setupMicCallbacks();
     _loadInputDevices();
+    SystemAudioService.instance.isSupported().then((v) {
+      if (mounted) setState(() => _systemAudioSupported = v);
+    });
 
     // ── 이미 녹음/일시정지 중이라면 상태 즉시 복원 ──────────────────
     // (사이드바에서 다른 회의를 봤다가 돌아올 때 위젯이 새로 생성됨)
@@ -981,42 +985,44 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       );
       _systemAudioPath = null;
       if (_recordingSource != RecordingSource.mic && _audioSavePath != null) {
-        final sysPath = _audioSavePath!.replaceFirst(
-          RegExp(r'\.wav$'),
-          '_system.wav',
-        );
-        try {
-          final ok = await SystemAudioService.instance.start(sysPath);
-          _systemAudioPath = ok ? sysPath : null;
-          CrashLogService.instance.info(
-            'system audio start ok=$ok path=$sysPath',
-            context: 'systemAudio',
+        // 첫 사용 시 통화/회의 녹음 법적 고지에 동의받는다. 거부하면 마이크만.
+        final consent = await _ensureSystemAudioConsent();
+        if (!consent) {
+          _recordingSource = RecordingSource.mic;
+        } else {
+          final sysPath = _audioSavePath!.replaceFirst(
+            RegExp(r'\.wav$'),
+            '_system.wav',
           );
-          if (!ok && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(tr(
+          try {
+            final ok = await SystemAudioService.instance.start(sysPath);
+            _systemAudioPath = ok ? sysPath : null;
+            CrashLogService.instance.info(
+              'system audio start ok=$ok path=$sysPath',
+              context: 'systemAudio',
+            );
+            if (!ok && mounted) {
+              _showSystemAudioFailSnack(
+                tr(
                   '시스템 오디오 캡처를 시작하지 못해 마이크만 녹음합니다.',
                   'Could not start system audio capture; recording mic only.',
-                )),
-              ),
+                ),
+              );
+            }
+          } catch (e) {
+            _systemAudioPath = null;
+            CrashLogService.instance.info(
+              'system audio start FAILED: $e',
+              context: 'systemAudio',
             );
-          }
-        } catch (e) {
-          _systemAudioPath = null;
-          CrashLogService.instance.info(
-            'system audio start FAILED: $e',
-            context: 'systemAudio',
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(tr(
-                  '시스템 오디오 권한이 필요합니다. 마이크만 녹음합니다. (설정 > 개인정보 보호)',
-                  'System audio permission is required; recording mic only. (Settings > Privacy)',
-                )),
-              ),
-            );
+            if (mounted) {
+              _showSystemAudioFailSnack(
+                tr(
+                  '시스템 오디오 권한이 필요합니다. 마이크만 녹음합니다.',
+                  'System audio permission is required; recording mic only.',
+                ),
+              );
+            }
           }
         }
       }
@@ -1260,6 +1266,59 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     _ => RecordingSource.mic,
   };
 
+  /// 시스템 오디오 녹음 첫 사용 시 통화/회의 녹음 법적 고지에 동의받는다.
+  /// 동의하면 true(이후 표시 안 함), 거부하면 false(마이크만 녹음).
+  Future<bool> _ensureSystemAudioConsent() async {
+    if (AppSettings.instance.systemAudioConsentShown) return true;
+    if (!mounted) return false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Text(tr('시스템 오디오 녹음 안내', 'System audio recording notice')),
+        content: Text(
+          tr(
+            '온라인 회의 상대방의 목소리(시스템 오디오)를 함께 녹음합니다. '
+                '통화·회의 녹음은 지역에 따라 상대방의 동의가 필요할 수 있습니다. '
+                '관련 법규를 준수하고 필요한 동의를 받은 뒤 사용하세요.',
+            'This also records the other party\'s audio (system output). '
+                'Recording calls/meetings may require their consent depending on your region. '
+                'Please comply with applicable laws and obtain any required consent.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(false),
+            child: Text(tr('마이크만', 'Mic only')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dctx).pop(true),
+            child: Text(tr('동의하고 계속', 'Agree & continue')),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await AppSettings.instance.setSystemAudioConsentShown(true);
+      return true;
+    }
+    return false;
+  }
+
+  /// 시스템 오디오 시작 실패 안내 + '설정 열기' 액션.
+  void _showSystemAudioFailSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+          label: tr('설정 열기', 'Open settings'),
+          onPressed: () => SystemAudioService.instance.openPrivacySettings(),
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
+
   /// 시스템 오디오 캡처를 종료하고, 선택 소스에 따라 최종 오디오 파일을 만든다.
   /// - systemAudio: 시스템 WAV를 16kHz 모노로 변환해 마이크 경로에 덮어씀
   /// - micAndSystem: 마이크 + 시스템을 믹스해 마이크 경로에 덮어씀
@@ -1321,6 +1380,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     var templateId = _summaryTemplateId;
     var diarizationEnabled = AppSettings.instance.diarizationEnabled;
     var sttLanguage = AppSettings.instance.sttLanguage;
+    var recordingSource = AppSettings.instance.recordingSource; // mic/system/both
     var titleText = _titleSuffixController.text.trim();
     var agendaText = '';
     var titleFieldVersion = 0;
@@ -1602,6 +1662,55 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                     height: 1.4,
                                   ),
                                 ),
+                                if (_systemAudioSupported) ...[
+                                  const SizedBox(height: 12),
+                                  DropdownButtonFormField<String>(
+                                    isExpanded: true,
+                                    initialValue: recordingSource,
+                                    decoration: prepDecoration(
+                                      tr('녹음 소스', 'Recording source'),
+                                    ),
+                                    items: [
+                                      DropdownMenuItem(
+                                        value: 'mic',
+                                        child: Text(tr('마이크만', 'Mic only')),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'both',
+                                        child: Text(
+                                          tr('마이크 + 시스템', 'Mic + system'),
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'system',
+                                        child: Text(
+                                          tr('시스템 오디오만', 'System audio only'),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (v) {
+                                      if (v != null) {
+                                        setLocalState(() => recordingSource = v);
+                                        unawaited(
+                                          AppSettings.instance
+                                              .setRecordingSource(v),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    tr(
+                                      '온라인 회의(Zoom 등) 상대 목소리까지 녹음하려면 시스템 오디오를 켜세요.',
+                                      'Turn on system audio to also record the other party in online meetings.',
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: scheme.onSurfaceVariant,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String?>(
                                   initialValue: selectedDeviceId,

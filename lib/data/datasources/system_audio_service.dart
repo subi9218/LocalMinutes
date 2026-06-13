@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// 온라인 회의(Zoom/Meet/Teams 등) 상대방 목소리를 포함한 **시스템 출력 오디오**를
 /// 캡처하기 위한 네이티브 브리지. macOS 14.2+ Core Audio 프로세스 탭을 사용한다.
@@ -52,6 +53,19 @@ class SystemAudioService {
     } catch (_) {
       return Uint8List(0);
     }
+  }
+
+  /// 시스템 설정 > 개인정보 보호 및 보안 패널을 연다.
+  /// 시스템 오디오 캡처 권한을 사용자가 직접 켤 수 있도록 안내할 때 사용.
+  Future<void> openPrivacySettings() async {
+    if (!Platform.isMacOS) return;
+    try {
+      await launchUrl(
+        Uri.parse(
+          'x-apple.systempreferences:com.apple.preference.security?Privacy',
+        ),
+      );
+    } catch (_) {}
   }
 
   /// 캡처 중지 및 네이티브 자원 정리.
