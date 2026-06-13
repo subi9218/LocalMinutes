@@ -993,6 +993,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         try {
           final ok = await SystemAudioService.instance.start(sysPath);
           _systemAudioPath = ok ? sysPath : null;
+          CrashLogService.instance.info(
+            'system audio start ok=$ok path=$sysPath',
+            context: 'systemAudio',
+          );
           if (!ok && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -1005,6 +1009,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           }
         } catch (e) {
           _systemAudioPath = null;
+          CrashLogService.instance.info(
+            'system audio start FAILED: $e',
+            context: 'systemAudio',
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -1258,8 +1266,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       await SystemAudioService.instance.stop();
       final micPath =
           MicrophoneService.instance.savedAudioPath ?? _audioSavePath;
+      final sysLen = await File(sysPath).exists()
+          ? await File(sysPath).length()
+          : -1;
+      CrashLogService.instance.info(
+        'system audio finalize: source=$_recordingSource sysBytes=$sysLen micPath=$micPath',
+        context: 'systemAudio',
+      );
       if (micPath == null) return;
-      if (!await File(sysPath).exists()) return; // 시스템 캡처 실패 → 마이크만
+      if (sysLen <= 0) return; // 시스템 캡처 실패/빈 파일 → 마이크만
 
       if (_recordingSource == RecordingSource.systemAudio) {
         await WavMixer.mixFiles([sysPath], micPath);
@@ -1272,6 +1287,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           await File(mixedTmp).delete().catchError((_) => File(mixedTmp));
         }
       }
+      CrashLogService.instance.info(
+        'system audio mix done → $micPath',
+        context: 'systemAudio',
+      );
     } catch (e, st) {
       CrashLogService.instance.recordCaught(
         e,
