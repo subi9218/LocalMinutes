@@ -297,3 +297,119 @@ final class SystemAudioRecorder {
     return resolved as String
   }
 }
+
+/// 임의의 오디오/비디오 파일(m4a, mp3, aac, mp4, mov, caf, aiff, wav 등)을
+/// 16kHz 모노 16-bit PCM WAV 로 변환한다. 온디바이스 STT 입력 규격에 맞춘다.
+///
+/// AVAssetReader 가 컨테이너/코덱 디코딩 + 리샘플 + 다운믹스를 모두 처리하므로
+/// FFmpeg 같은 외부 의존성 없이 macOS 기본 프레임워크만으로 광범위한 포맷을 지원한다.
+final class AudioFileConverter {
+  /// 변환 실행. 성공 시 nil, 실패 시 사용자에게 보여줄 에러 메시지를 반환한다.
+  static func convertToWav16kMono(inputPath: String, outputPath: String) -> String? {
+    let fm = FileManager.default
+    if !fm.fileExists(atPath: inputPath) {
+      return "입력 파일을 찾을 수 없습니다."
+    }
+    let inURL = URL(fileURLWithPath: inputPath)
+    let asset = AVURLAsset(url: inURL)
+    // 백그라운드 큐에서 호출되므로 세마포어로 비동기 로드를 동기 대기한다(메인 블록 없음).
+    var loadedTracks: [AVAssetTrack] = []
+    let sem = DispatchSemaphore(value: 0)
+    asset.loadTracks(withMediaType: .audio) { tracks, _ in
+      loadedTracks = tracks ?? []
+      sem.signal()
+    }
+    sem.wait()
+    guard let track = loadedTracks.first else {
+      return "오디오 트랙을 찾을 수 없습니다. (지원하지 않는 파일이거나 영상에 소리가 없습니다)"
+    }
+
+    let reader: AVAssetReader
+    do {
+      reader = try AVAssetReader(asset: asset)
+    } catch {
+      return "파일을 여는 데 실패했습니다: \(error.localizedDescription)"
+    }
+
+    // 출력 규격을 16kHz 모노 16-bit LPCM 으로 지정 → 리더가 디코딩/리샘플/다운믹스.
+    let settings: [String: Any] = [
+      AVFormatIDKey: kAudioFormatLinearPCM,
+      AVSampleRateKey: 16000.0,
+      AVNumberOfChannelsKey: 1,
+      AVLinearPCMBitDepthKey: 16,
+      AVLinearPCMIsFloatKey: false,
+      AVLinearPCMIsBigEndianKey: false,
+      AVLinearPCMIsNonInterleaved: false,
+    ]
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: settings)
+    output.alwaysCopiesSampleData = false
+    guard reader.canAdd(output) else {
+      return "오디오 디코딩 설정에 실패했습니다."
+    }
+    reader.add(output)
+
+    guard reader.startReading() else {
+      return "오디오 읽기를 시작하지 못했습니다: \(reader.error?.localizedDescription ?? "알 수 없는 오류")"
+    }
+
+    var pcm = Data()
+    while reader.status == .reading {
+      guard let sample = output.copyNextSampleBuffer() else { break }
+      if let block = CMSampleBufferGetDataBuffer(sample) {
+        let len = CMBlockBufferGetDataLength(block)
+        if len > 0 {
+          var tmp = [UInt8](repeating: 0, count: len)
+          let copied = CMBlockBufferCopyDataBytes(
+            block, atOffset: 0, dataLength: len, destination: &tmp
+          )
+          if copied == kCMBlockBufferNoErr {
+            pcm.append(contentsOf: tmp)
+          }
+        }
+      }
+      CMSampleBufferInvalidate(sample)
+    }
+
+    if reader.status == .failed {
+      return "오디오 변환에 실패했습니다: \(reader.error?.localizedDescription ?? "알 수 없는 오류")"
+    }
+    if pcm.isEmpty {
+      return "변환 결과가 비어 있습니다. (소리가 없는 파일일 수 있습니다)"
+    }
+
+    let wav = wavData(pcm: pcm, sampleRate: 16000, channels: 1, bitsPerSample: 16)
+    do {
+      try wav.write(to: URL(fileURLWithPath: outputPath), options: .atomic)
+    } catch {
+      return "변환된 파일 저장에 실패했습니다: \(error.localizedDescription)"
+    }
+    return nil
+  }
+
+  /// 16-bit PCM 바이트 앞에 44바이트 WAV 헤더를 붙여 반환.
+  private static func wavData(
+    pcm: Data, sampleRate: Int, channels: Int, bitsPerSample: Int
+  ) -> Data {
+    var d = Data()
+    let byteRate = sampleRate * channels * bitsPerSample / 8
+    let blockAlign = channels * bitsPerSample / 8
+    let dataLen = pcm.count
+    func u32(_ v: Int) -> Data { var x = UInt32(v).littleEndian; return Data(bytes: &x, count: 4) }
+    func u16(_ v: Int) -> Data { var x = UInt16(v).littleEndian; return Data(bytes: &x, count: 2) }
+    d.append("RIFF".data(using: .ascii)!)
+    d.append(u32(36 + dataLen))
+    d.append("WAVE".data(using: .ascii)!)
+    d.append("fmt ".data(using: .ascii)!)
+    d.append(u32(16))                 // fmt chunk 크기 (PCM)
+    d.append(u16(1))                  // 오디오 포맷 = PCM
+    d.append(u16(channels))
+    d.append(u32(sampleRate))
+    d.append(u32(byteRate))
+    d.append(u16(blockAlign))
+    d.append(u16(bitsPerSample))
+    d.append("data".data(using: .ascii)!)
+    d.append(u32(dataLen))
+    d.append(pcm)
+    return d
+  }
+}

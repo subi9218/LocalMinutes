@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:path_provider/path_provider.dart';
@@ -9,12 +10,14 @@ import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/digest_report.dart';
 import '../../core/services/meeting_keyword_search.dart';
+import '../../core/services/processing_status_service.dart';
 import '../../core/services/recovery_service.dart';
 import '../../core/services/series_overview.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/services/isar_service.dart';
 import '../../core/services/meeting_series_detector.dart';
 import '../../core/services/search_service.dart';
+import '../../data/datasources/audio_convert_service.dart';
 import '../../data/datasources/microphone_service.dart';
 import '../../data/datasources/llm_service.dart';
 import '../../data/repositories/meeting_repository_impl.dart';
@@ -53,10 +56,26 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
   // ── WAV 파일 불러오기 ────────────────────────────────────────────
   /// 기존 WAV 파일을 선택해 새 Meeting 레코드로 등록.
   /// 전사·요약은 생성되지 않으므로 상세 화면에서 "다시 전사"로 실행.
-  Future<void> _importWavFile() async {
+  Future<void> _importAudioFile() async {
+    // 방어적 게이팅: 버튼 비활성화와 별개로, 진행 중 작업이 있으면 막는다.
+    if (ProcessingStatus.instance.isBusy) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(tr('진행 중인 작업이 끝난 뒤 파일을 불러올 수 있습니다.',
+                'You can import a file after the current task finishes.')),
+            backgroundColor: Colors.orange.shade700,
+          ),
+        );
+      }
+      return;
+    }
     final picked = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'WAV', extensions: ['wav']),
+      acceptedTypeGroups: [
+        XTypeGroup(
+          label: tr('오디오/영상', 'Audio/Video'),
+          extensions: AudioConvertService.pickerExtensions,
+        ),
       ],
       confirmButtonText: tr('불러오기', 'Import'),
     );
@@ -72,23 +91,90 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       return;
     }
 
-    // 파일명에서 타이틀 추출 (확장자 제거)
+    // 파일명에서 타이틀 추출 (마지막 확장자 제거)
     final basename = picked.name;
-    final title = basename.replaceAll(
-      RegExp(r'\.wav$', caseSensitive: false),
-      '',
-    );
+    final title = basename.replaceAll(RegExp(r'\.[^.]+$'), '');
+    final ext = basename.contains('.')
+        ? basename.split('.').last.toLowerCase()
+        : '';
+    final isWav = AudioConvertService.wavExtensions.contains(ext);
 
     // 파일 stat으로 녹음 시점 추정 (없으면 현재 시각)
     final stat = await file.stat();
     final createdAt = stat.modified;
 
+    // WAV가 아니면 16kHz 모노 WAV로 변환(앱 지원 폴더에 저장 → 재실행 후에도 접근 가능).
+    String audioPath = picked.path;
+    int durationSeconds = 0;
+    if (!isWav) {
+      final appSupport = await getApplicationSupportDirectory();
+      final importDir = Directory('${appSupport.path}/imported');
+      if (!await importDir.exists()) {
+        await importDir.create(recursive: true);
+      }
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final safe = title.replaceAll(RegExp(r'[^A-Za-z0-9가-힣 _-]'), '_').trim();
+      final outPath =
+          '${importDir.path}/${safe.isEmpty ? 'audio' : safe}-$ts.wav';
+
+      // 변환 진행 모달 (대개 수 초)
+      if (mounted) {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _ImportConvertingDialog(ext: ext.toUpperCase()),
+        );
+      }
+      try {
+        await AudioConvertService.instance.toWav16kMono(
+          inputPath: picked.path,
+          outputPath: outPath,
+        );
+        audioPath = outPath;
+        final outLen = await File(outPath).length();
+        // 16kHz mono 16-bit: bytes = 44(header) + seconds*16000*2
+        durationSeconds = ((outLen - 44) / 2 / 16000).round();
+        if (durationSeconds < 0) durationSeconds = 0;
+      } on PlatformException catch (e) {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(tr(
+                '파일 변환 실패: ${e.message ?? ext.toUpperCase()}',
+                'Conversion failed: ${e.message ?? ext.toUpperCase()}',
+              )),
+              backgroundColor: Colors.red.shade700,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      } catch (e) {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(tr('파일 변환 중 오류가 발생했습니다.',
+                  'An error occurred during conversion.')),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
+        return;
+      }
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+
     final meeting = Meeting()
       ..title = tr('[불러옴] $title', '[Imported] $title')
       ..createdAt = createdAt
-      ..endedAt = createdAt
+      // durationSeconds는 endedAt-createdAt 계산값 → 변환으로 길이를 알면 반영.
+      ..endedAt = durationSeconds > 0
+          ? createdAt.add(Duration(seconds: durationSeconds))
+          : createdAt
       ..status = MeetingStatus.done
-      ..audioFilePath = picked.path
+      ..audioFilePath = audioPath
       ..transcriptPreview = tr(
         '(전사본 없음 — 상세 화면에서 "다시 전사" 실행)',
         '(No transcript — run "Re-transcribe" in the detail view)',
@@ -103,8 +189,8 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(tr(
-          'WAV 불러옴 — 상세 화면에서 "다시 전사"를 눌러 전사하세요.',
-          'WAV imported — tap "Re-transcribe" in the detail view to transcribe.',
+          '${isWav ? 'WAV' : '${ext.toUpperCase()}(변환됨)'} 불러옴 — 상세 화면에서 "다시 전사"를 눌러 전사하세요.',
+          '${isWav ? 'WAV' : '${ext.toUpperCase()} (converted)'} imported — tap "Re-transcribe" in the detail view to transcribe.',
         )),
         backgroundColor: Colors.green.shade700,
         duration: const Duration(seconds: 4),
@@ -630,41 +716,67 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
             ),
 
           // ── 새 녹음 / WAV 불러오기 ──────────────────────────
+          // 전사/요약이 진행 중이면(다른 회의 포함) 두 버튼 모두 비활성화한다.
+          // (작업이 안 끝났는데 새 작업을 시작하면 '화면이 안 돌아오는' 문제 유발)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: isRecording
-                        ? null
-                        : () {
-                            ref.read(isRecordingActiveProvider.notifier).state =
-                                true;
-                            ref.read(selectedMeetingIdProvider.notifier).state =
-                                null;
-                          },
-                    icon: const Icon(Icons.fiber_manual_record, size: 16),
-                    label: Text(tr('새 녹음', 'New recording')),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(7),
+            child: ValueListenableBuilder<ProcessingJob?>(
+              valueListenable: ProcessingStatus.instance.active,
+              builder: (context, job, _) {
+                final processing = job != null;
+                // isSummarizing: 녹음 직후 요약 진행 신호(recording_view).
+                // processing: 상세 화면의 다시 전사/재요약(ProcessingStatus).
+                final blocked = isRecording || isSummarizing || processing;
+                final newRecTip = processing
+                    ? (job.kind == 'transcribe'
+                        ? tr('전사가 끝난 뒤 녹음할 수 있습니다', 'You can record after transcription finishes')
+                        : tr('요약이 끝난 뒤 녹음할 수 있습니다', 'You can record after summarization finishes'))
+                    : '';
+                final importTip = processing
+                    ? (job.kind == 'transcribe'
+                        ? tr('전사가 끝난 뒤 파일을 불러올 수 있습니다', 'You can import after transcription finishes')
+                        : tr('요약이 끝난 뒤 파일을 불러올 수 있습니다', 'You can import after summarization finishes'))
+                    : tr('기존 오디오 파일을 불러와 새 회의로 추가', 'Import an existing audio file as a new meeting');
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Tooltip(
+                        message: newRecTip,
+                        child: FilledButton.icon(
+                          onPressed: blocked
+                              ? null
+                              : () {
+                                  ref
+                                      .read(isRecordingActiveProvider.notifier)
+                                      .state = true;
+                                  ref
+                                      .read(selectedMeetingIdProvider.notifier)
+                                      .state = null;
+                                },
+                          icon: const Icon(Icons.fiber_manual_record, size: 16),
+                          label: Text(tr('새 녹음', 'New recording')),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red.shade600,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
                       ),
-                      visualDensity: VisualDensity.compact,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Tooltip(
-                  message: tr('기존 WAV 파일을 불러와 새 회의로 추가', 'Import an existing WAV file as a new meeting'),
-                  child: IconButton.outlined(
-                    onPressed: isRecording ? null : _importWavFile,
-                    icon: const Icon(Icons.file_upload_outlined, size: 16),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              ],
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: importTip,
+                      child: IconButton.outlined(
+                        onPressed: blocked ? null : _importAudioFile,
+                        icon: const Icon(Icons.file_upload_outlined, size: 16),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
@@ -3224,6 +3336,45 @@ class _OverviewChip extends StatelessWidget {
         const SizedBox(width: 3),
         Text(text, style: TextStyle(fontSize: 11, color: c)),
       ],
+    );
+  }
+}
+
+/// 업로드 파일을 WAV로 변환하는 동안 표시하는 모달.
+class _ImportConvertingDialog extends StatelessWidget {
+  final String ext;
+  const _ImportConvertingDialog({required this.ext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: MacosTheme.of(context).canvasColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(strokeWidth: 2.6),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              tr('$ext 파일을 변환하는 중...', 'Converting $ext file...'),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              tr('16kHz 모노 WAV로 변환합니다. 잠시만 기다려 주세요.',
+                  'Converting to 16kHz mono WAV. Please wait.'),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

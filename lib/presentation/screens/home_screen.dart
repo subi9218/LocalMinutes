@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
+import '../../core/services/processing_status_service.dart';
 import '../../core/services/recovery_service.dart';
 import '../../data/datasources/microphone_service.dart';
 import '../../domain/entities/meeting.dart';
@@ -39,6 +40,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // 작업(전사/요약) 완료 시 — 작업 화면이 이미 dispose됐더라도 — 결과가
+    // 보이도록 상주 화면인 HomeScreen이 대신 관련 provider를 새로고침한다.
+    ProcessingStatus.instance.completionTick.addListener(_onJobCompleted);
     _sidebarWidth = AppSettings.instance.sidebarWidth
         .clamp(_minSidebarWidth, _maxSidebarWidth)
         .toDouble();
@@ -51,6 +55,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
       setState(() => _recoverable = recoverable);
     });
+  }
+
+  @override
+  void dispose() {
+    ProcessingStatus.instance.completionTick.removeListener(_onJobCompleted);
+    super.dispose();
+  }
+
+  /// 작업 완료 시 끝난 회의의 전사/요약 provider를 새로고침.
+  void _onJobCompleted() {
+    final job = ProcessingStatus.instance.lastCompleted;
+    ref.invalidate(meetingsProvider);
+    if (job != null) {
+      ref.invalidate(meetingTranscriptProvider(job.meetingId));
+      ref.invalidate(meetingSummaryProvider(job.meetingId));
+      ref.invalidate(summaryVersionsProvider(job.meetingId));
+    }
   }
 
   Future<void> _openRecoveryDialog() async {
@@ -92,15 +113,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _startRecordingFromToolbar() {
+  /// 전사/요약 진행 중이면 녹음·업로드를 막을 사유 문구(없으면 null).
+  String? _busyBlockReason() {
+    final job = ProcessingStatus.instance.active.value;
+    if (job != null) {
+      final what = job.kind == 'transcribe'
+          ? tr('전사', 'transcription')
+          : tr('요약', 'summarization');
+      return tr('현재 $what 작업이 진행 중입니다. 완료 후 다시 시도해주세요.',
+          'A $what task is running. Please try again after it finishes.');
+    }
     final activeTask =
         OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (activeTask != null) {
+      return tr('현재 $activeTask 작업 중입니다. 완료 후 다시 시도해주세요.',
+          '$activeTask is currently running. Please try again after it finishes.');
+    }
+    return null;
+  }
+
+  void _startRecordingFromToolbar() {
+    final reason = _busyBlockReason();
+    if (reason != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('현재 $activeTask 작업 중입니다. 완료 후 녹음을 시작해주세요.'),
-          backgroundColor: Colors.orange.shade700,
-        ),
+        SnackBar(content: Text(reason), backgroundColor: Colors.orange.shade700),
       );
       return;
     }
@@ -186,6 +222,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 사이드바 색을 themeMode 변화에 즉시 반영하려면 build 본문에서 직접 watch.
     // (헬퍼 안에서 watch 하면 Riverpod 의존성 추적이 build 재실행을 트리거하지 못하는 케이스 회피)
     final themeMode = ref.watch(themeModeProvider);
+    // 처리 배너에서 "현재 보고 있는 회의"인지 판단용.
+    final selectedId = ref.watch(selectedMeetingIdProvider);
 
     // 색 100% 통제하기 위해 macos_ui Sidebar 사용 안 함.
     // 사이드바는 직접 Container 로 그리고, 메인 영역은 MacosScaffold(toolBar) 로 감싸
@@ -285,6 +323,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       backgroundColor: Colors.transparent,
                       body: Column(
                         children: [
+                          // 어느 화면에 있든 진행 중인 전사/요약을 보여주는 영구 배너.
+                          // (작업 화면을 떠나도 진행이 사라지지 않도록)
+                          ValueListenableBuilder<ProcessingJob?>(
+                            valueListenable: ProcessingStatus.instance.active,
+                            builder: (context, job, _) {
+                              if (job == null) return const SizedBox.shrink();
+                              return _ProcessingBanner(
+                                job: job,
+                                isCurrent: selectedId == job.meetingId,
+                                onJump: () {
+                                  ref
+                                      .read(isRecordingActiveProvider.notifier)
+                                      .state = false;
+                                  ref
+                                      .read(selectedGroupIdProvider.notifier)
+                                      .state = null;
+                                  ref
+                                      .read(selectedMeetingIdProvider.notifier)
+                                      .state = job.meetingId;
+                                },
+                                onCancel: () {
+                                  ProcessingStatus.instance.requestCancel();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(tr(
+                                          '중지를 요청했습니다. 현재 단계를 마무리하고 멈춥니다.',
+                                          'Stop requested. Finishing the current step before stopping.')),
+                                      backgroundColor: Colors.orange.shade700,
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
                           if (_recoverable.isNotEmpty)
                             _RecoveryBanner(
                               count: _recoverable.length,
@@ -414,12 +486,17 @@ class _WelcomeView extends ConsumerWidget {
   const _WelcomeView();
 
   void _startRecording(BuildContext context, WidgetRef ref) {
-    final activeTask =
-        OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
-    if (activeTask != null) {
+    final job = ProcessingStatus.instance.active.value;
+    final busy = job != null
+        ? (job.kind == 'transcribe'
+            ? tr('전사', 'transcription')
+            : tr('요약', 'summarization'))
+        : OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
+    if (busy != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('현재 $activeTask 작업 중입니다. 완료 후 녹음을 시작해주세요.'),
+          content: Text(tr('현재 $busy 작업이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
+              'A $busy task is running. Please start recording after it finishes.')),
           backgroundColor: Colors.orange.shade700,
         ),
       );
@@ -590,6 +667,120 @@ class _RecoveryBanner extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               color: Colors.amber.shade800,
               onPressed: onDismiss,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 처리 중(전사/요약) 영구 진행 배너 ──────────────────────────────
+// 작업 화면을 떠나도 진행 상황이 사라지지 않도록 앱 상단에 항상 표시한다.
+class _ProcessingBanner extends StatelessWidget {
+  final ProcessingJob job;
+
+  /// 지금 그 회의를 보고 있는지 여부(맞으면 '보기' 버튼 숨김).
+  final bool isCurrent;
+  final VoidCallback onJump;
+  final VoidCallback onCancel;
+
+  const _ProcessingBanner({
+    required this.job,
+    required this.isCurrent,
+    required this.onJump,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isTranscribe = job.kind == 'transcribe';
+    final kindLabel = isTranscribe
+        ? tr('전사 중', 'Transcribing')
+        : tr('요약 중', 'Summarizing');
+    final title = job.meetingTitle.trim();
+    final hasPct = job.progress >= 0;
+    final pctStr = hasPct ? ' ${(job.progress * 100).toStringAsFixed(0)}%' : '';
+
+    return Material(
+      color: Colors.indigo.shade50,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.indigo.shade200)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                value: hasPct && job.progress > 0 ? job.progress : null,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Colors.indigo.shade600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title.isEmpty
+                        ? '$kindLabel$pctStr'
+                        : '$kindLabel$pctStr · $title',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.indigo.shade900,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (job.label.trim().isNotEmpty)
+                    Text(
+                      job.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.indigo.shade700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (!isCurrent)
+              FilledButton.tonal(
+                onPressed: onJump,
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(0, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: Colors.indigo.shade100,
+                  foregroundColor: Colors.indigo.shade900,
+                ),
+                child: Text(tr('보기', 'View'),
+                    style: const TextStyle(fontSize: 12)),
+              ),
+            const SizedBox(width: 6),
+            OutlinedButton(
+              onPressed: onCancel,
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: Colors.red.shade700,
+                side: BorderSide(color: Colors.red.shade300),
+              ),
+              child: Text(tr('중지', 'Stop'),
+                  style: const TextStyle(fontSize: 12)),
             ),
           ],
         ),

@@ -14,6 +14,7 @@ import '../../core/services/export_service.dart';
 import '../../core/services/isar_service.dart';
 import '../../core/services/chunked_summarizer.dart';
 import '../../core/services/meeting_quality.dart';
+import '../../core/services/processing_status_service.dart';
 import '../../core/services/speaker_stats.dart';
 import '../../core/services/summary_templates.dart';
 import '../../core/services/tag_extractor.dart';
@@ -104,6 +105,23 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   }
 
   String? _nativeTaskBlockReason(String actionLabel) {
+    // 앱 전역 처리상태가 최우선 기준(다른 회의에서 전사/요약 중인 경우 포함).
+    // 단, '이 회의'에서 진행 중인 작업은 해당 작업 버튼 자체의 로컬 비활성화가
+    // 담당하므로 여기서 막지 않는다(자기 자신을 막아 헷갈리지 않도록).
+    final job = ProcessingStatus.instance.active.value;
+    if (job != null && job.meetingId != widget.meetingId) {
+      final title = job.meetingTitle.trim();
+      final what = job.kind == 'transcribe'
+          ? tr('전사', 'transcription')
+          : tr('요약', 'summarization');
+      final where = title.isEmpty
+          ? tr('다른 회의', 'another meeting')
+          : '"$title"';
+      return tr(
+        '$where에서 $what 작업이 진행 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.',
+        '$what is running in $where. Please try $actionLabel again after it finishes.',
+      );
+    }
     final active = OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (active == null) return null;
     return tr('현재 $active 작업 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.', '$active is currently running. Please try $actionLabel again after it finishes.');
@@ -941,6 +959,19 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       _summarizingProgress = 0.0;
       _summaryStartTime = DateTime.now();
     });
+    // 화면을 떠나도 진행이 보이도록 전역 처리상태에 등록.
+    ProcessingStatus.instance.start(
+      meetingId: widget.meetingId,
+      kind: 'summarize',
+      meetingTitle: meeting?.title ?? '',
+      label: tr('요약 모델 준비 중...', 'Preparing summary model...'),
+      progress: -1,
+    );
+    // 화면을 떠나 cancel UI가 사라져도 배너에서 중지할 수 있도록 콜백 등록.
+    ProcessingStatus.instance.registerCancel(() {
+      _cancelSummaryRequested = true;
+      LlmService.instance.requestCancelActiveGeneration();
+    });
 
     try {
       final appSupport = await getApplicationSupportDirectory();
@@ -1000,7 +1031,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         speedMode: AppSettings.instance.summarySpeedMode,
         isCancelled: () => _cancelSummaryRequested,
         onProgress: (phase, progress) {
-          if (mounted && !_cancelSummaryRequested) {
+          if (_cancelSummaryRequested) return;
+          ProcessingStatus.instance.update(label: phase, progress: progress);
+          if (mounted) {
             setState(() {
               _summarizingStatus = phase;
               _summarizingProgress = progress;
@@ -1140,6 +1173,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           ),
         );
       }
+    } finally {
+      // 화면 이탈 여부와 무관하게 전역 처리상태는 반드시 해제.
+      ProcessingStatus.instance.clear();
     }
   }
 
@@ -1594,6 +1630,19 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       _rerunSttTotalMs = 0;
       _rerunSttStartTime = DateTime.now();
     });
+    // 화면을 떠나도 진행이 보이도록 전역 처리상태에 등록.
+    ProcessingStatus.instance.start(
+      meetingId: widget.meetingId,
+      kind: 'transcribe',
+      meetingTitle: meeting.title,
+      label: tr('Whisper 모델 로드 중...', 'Loading Whisper model...'),
+      progress: 0,
+    );
+    // 화면을 떠나 cancel UI가 사라져도 배너에서 중지할 수 있도록 콜백 등록.
+    // (이 State 인스턴스는 실행 중인 future가 참조를 잡고 있어 dispose 후에도 유효)
+    ProcessingStatus.instance.registerCancel(() {
+      _cancelRerunSttRequested = true;
+    });
     _rerunTicker?.cancel();
     _rerunTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _isRerunningStt) setState(() {});
@@ -1607,24 +1656,27 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       await OnDeviceModelManager.instance.loadStt(sttPath);
       if (_cancelRerunSttRequested) throw const SttCancelledException();
 
+      final sttBusyLabel = tr(
+          '${AppSettings.sttLanguageLabel(options.sttLanguage)} 음성 인식 중...',
+          '${AppSettings.sttLanguageLabel(options.sttLanguage)} transcription in progress...');
       if (mounted) {
-        setState(
-          () => _rerunSttStatus = tr(
-              '${AppSettings.sttLanguageLabel(options.sttLanguage)} 음성 인식 중...',
-              '${AppSettings.sttLanguageLabel(options.sttLanguage)} transcription in progress...'),
-        );
+        setState(() => _rerunSttStatus = sttBusyLabel);
       }
+      ProcessingStatus.instance.update(label: sttBusyLabel, progress: 0);
       final sttSw = Stopwatch()..start();
       final segments = await SttService.instance.transcribeFile(
         audioPath,
         decodeMode: decodeCodeForMode(sttMode),
         isCancelled: () => _cancelRerunSttRequested,
         onProgress: (processedMs, totalMs) {
-          if (!mounted || totalMs <= 0 || _cancelRerunSttRequested) return;
+          if (totalMs <= 0 || _cancelRerunSttRequested) return;
+          final p = (processedMs / totalMs).clamp(0.0, 1.0);
+          ProcessingStatus.instance.update(progress: p);
+          if (!mounted) return;
           setState(() {
             _rerunSttProcessedMs = processedMs;
             _rerunSttTotalMs = totalMs;
-            _rerunSttProgress = (processedMs / totalMs).clamp(0.0, 1.0);
+            _rerunSttProgress = p;
           });
         },
       );
@@ -1640,9 +1692,11 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           final diarSw = Stopwatch()..start();
           await OnDeviceModelManager.instance.unloadStt().catchError((_) {});
           if (_cancelRerunSttRequested) throw const SttCancelledException();
+          final diarBusyLabel = tr('발화자 라벨 생성 중... 긴 녹음은 몇 분 걸릴 수 있습니다.', 'Generating speaker labels... Long recordings may take a few minutes.');
+          ProcessingStatus.instance.update(label: diarBusyLabel, progress: -1);
           if (mounted) {
             setState(() {
-              _rerunSttStatus = tr('발화자 라벨 생성 중... 긴 녹음은 몇 분 걸릴 수 있습니다.', 'Generating speaker labels... Long recordings may take a few minutes.');
+              _rerunSttStatus = diarBusyLabel;
               _rerunSttProgress = 0.0;
               _rerunSttProcessedMs = 0;
               _rerunSttTotalMs = 0;
@@ -1699,6 +1753,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         }
       }
 
+      final savingLabel = tr('새 전사본 저장 중...', 'Saving new transcript...');
+      ProcessingStatus.instance.update(label: savingLabel, progress: 1.0);
       if (mounted) setState(() => _rerunSttStatus = tr('기존 전사본 삭제 중...', 'Deleting existing transcript...'));
       final db = IsarService.instance.db;
       final transcriptRepo = TranscriptRepositoryImpl(db);
@@ -1804,6 +1860,11 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           ),
         );
       }
+    } finally {
+      // 화면을 떠났든(=mounted false) 아니든 전역 처리상태는 반드시 해제.
+      ProcessingStatus.instance.clear();
+      _rerunTicker?.cancel();
+      _rerunTicker = null;
     }
   }
 
