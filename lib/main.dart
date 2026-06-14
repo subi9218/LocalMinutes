@@ -16,6 +16,7 @@ import 'core/services/entitlement_service.dart';
 import 'core/services/isar_service.dart';
 import 'core/services/menu_bar_service.dart';
 import 'core/services/native_appearance.dart';
+import 'core/services/processing_status_service.dart';
 import 'core/services/security_scoped_bookmark_service.dart';
 import 'data/datasources/llm_service.dart';
 import 'data/datasources/microphone_service.dart';
@@ -239,6 +240,10 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
     final mic = MicrophoneService.instance;
     if (mic.isRecording) return '녹음';
     if (mic.isPaused) return '일시 정지된 녹음';
+    // 상세 화면의 다시 전사/재요약은 모델 로드·화자분리·DB 저장 구간에서
+    // native task가 잠시 비활성일 수 있으므로 전역 처리상태를 우선 확인.
+    final job = ProcessingStatus.instance.active.value;
+    if (job != null) return job.kind == 'transcribe' ? '전사' : '요약';
     final native = OnDeviceModelManager.instance.nativeTaskSnapshot;
     if (native.activeLabel != null) return native.activeLabel;
     if (LlmService.instance.isGenerationActive) return '요약 생성';

@@ -894,6 +894,18 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       return;
     }
 
+    // 시스템 오디오 동의는 '모델 로드 중' 진행바를 띄우기 전에 먼저 받는다.
+    // (진행바 뒤에서 다이얼로그가 떠 사용자가 "처리 중이라 기다려야 한다"고
+    //  오해하는 문제 방지 — 실제 모델 로드는 동의 이후 startRecording에서 시작)
+    var resolvedSource = _parseRecordingSource(
+      AppSettings.instance.recordingSource,
+    );
+    if (resolvedSource != RecordingSource.mic) {
+      final consent = await _ensureSystemAudioConsent();
+      if (!mounted) return;
+      if (!consent) resolvedSource = RecordingSource.mic;
+    }
+
     setState(() {
       _phase = _RecordingPhase.loadingModel;
       _statusMsg = tr('음성 인식 모델 준비 중', 'Preparing speech recognition model');
@@ -980,16 +992,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       // 온라인 회의: 선택한 소스가 시스템 오디오를 포함하면 마이크 시작 전에
       // 시스템 캡처를 켜고, 실시간 중간 전사용 PCM 소스를 마이크 서비스에 연결한다.
       // 실패(미지원/권한 거부)해도 마이크 녹음은 계속한다(graceful).
-      _recordingSource = _parseRecordingSource(
-        AppSettings.instance.recordingSource,
-      );
+      _recordingSource = resolvedSource;
       _systemAudioPath = null;
       if (_recordingSource != RecordingSource.mic && _audioSavePath != null) {
-        // 첫 사용 시 통화/회의 녹음 법적 고지에 동의받는다. 거부하면 마이크만.
-        final consent = await _ensureSystemAudioConsent();
-        if (!consent) {
-          _recordingSource = RecordingSource.mic;
-        } else {
+        // 시스템 오디오 동의는 모델 로드 전 단계에서 이미 받았다.
+        // 여기서는 시스템 오디오 캡처만 시작한다.
+        {
           final sysPath = _audioSavePath!.replaceFirst(
             RegExp(r'\.wav$'),
             '_system.wav',

@@ -7,6 +7,7 @@ class MainFlutterWindow: NSWindow {
   private var appearanceChannel: FlutterMethodChannel?
   private var bookmarkChannel: FlutterMethodChannel?
   private var systemAudioChannel: FlutterMethodChannel?
+  private var audioConvertChannel: FlutterMethodChannel?
   private var activeSecurityScopedURLs: [String: URL] = [:]
   // 온라인 회의용 시스템 오디오 캡처 (macOS 14.2+). 미지원 OS에서는 nil 유지.
   private var systemAudioRecorder: AnyObject?
@@ -223,6 +224,45 @@ class MainFlutterWindow: NSWindow {
       }
     }
     self.systemAudioChannel = systemAudioChannel
+
+    // ── Platform channel: app/audio_convert ──────────────────────
+    // 업로드한 임의 오디오/영상 파일을 온디바이스 STT 입력 규격(16kHz 모노 WAV)
+    // 으로 변환. m4a/mp3/aac/mp4/mov/caf/aiff 등 AVFoundation 지원 포맷 전반.
+    let audioConvertChannel = FlutterMethodChannel(
+      name: "app/audio_convert",
+      binaryMessenger: messenger
+    )
+    audioConvertChannel.setMethodCallHandler { (call, result) in
+      switch call.method {
+      case "toWav16kMono":
+        guard
+          let args = call.arguments as? [String: Any],
+          let input = args["input"] as? String,
+          let output = args["output"] as? String,
+          !input.isEmpty, !output.isEmpty
+        else {
+          result(FlutterError(code: "bad_args", message: "Missing input/output", details: nil))
+          return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+          let err = AudioFileConverter.convertToWav16kMono(
+            inputPath: input,
+            outputPath: output
+          )
+          DispatchQueue.main.async {
+            if let err = err {
+              result(FlutterError(code: "convert_failed", message: err, details: nil))
+            } else {
+              result(true)
+            }
+          }
+        }
+
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    self.audioConvertChannel = audioConvertChannel
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
