@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:async';
+import 'dart:isolate';
 import 'package:ffi/ffi.dart';
 import '../l10n/app_tr.dart';
 import '../services/crash_log_service.dart';
@@ -188,29 +189,51 @@ class OnDeviceModelManager {
     }
     if (isLlmLoaded) await _unloadLlmUnlocked();
 
-    final ffi = LlamaFfi.instance;
-    ffi.backendInit();
-
-    final pathPtr = modelPath.toNativeUtf8(allocator: calloc);
-    try {
-      final model = ffi.loadModel(pathPtr, 99);
-      if (model == nullptr) {
-        ffi.backendFree();
-        throw Exception('LLM 로드 실패: $modelPath');
+    // 로드(mmap + Metal 초기화, 수 초~10초)를 워커 isolate에서 실행해
+    // 메인 isolate(UI 스레드)가 얼지 않게 한다. dylib 핸들은 process-wide라
+    // isolate마다 lookup해도 같은 라이브러리이며, 포인터는 주소(int)로 전달한다.
+    // (생성은 이미 _generateInIsolate 워커에서 실행 — 교차 스레드 사용은 기존 패턴)
+    final path = modelPath;
+    final ctxSize = nCtx;
+    final batch = nBatch;
+    final loadFuture = Isolate.run(() {
+      final ffi = LlamaFfi.instance;
+      ffi.backendInit();
+      final pathPtr = path.toNativeUtf8(allocator: calloc);
+      try {
+        final model = ffi.loadModel(pathPtr, 99);
+        if (model == nullptr) {
+          ffi.backendFree();
+          throw Exception('LLM 로드 실패: $path');
+        }
+        final ctx = ffi.createContext(model, ctxSize, batch);
+        if (ctx == nullptr) {
+          ffi.freeModel(model);
+          ffi.backendFree();
+          throw Exception('LLM 컨텍스트 생성 실패 (메모리 부족? n_ctx=$ctxSize)');
+        }
+        return [model.address, ctx.address];
+      } finally {
+        calloc.free(pathPtr);
       }
-
-      final ctx = ffi.createContext(model, nCtx, nBatch);
-      if (ctx == nullptr) {
-        ffi.freeModel(model);
-        ffi.backendFree();
-        throw Exception('LLM 컨텍스트 생성 실패 (메모리 부족? n_ctx=$nCtx)');
-      }
-
-      _model = model;
-      _context = ctx;
-    } finally {
-      calloc.free(pathPtr);
-    }
+    });
+    // STT 로드와 같은 이유의 안전선 (병리적 무한 대기 → lease 영구 점유 방지).
+    final addrs = await loadFuture.timeout(
+      const Duration(minutes: 10),
+      onTimeout: () {
+        loadFuture.then((late) {
+          final ffi = LlamaFfi.instance;
+          ffi.freeContext(Pointer<Void>.fromAddress(late[1]));
+          ffi.freeModel(Pointer<Void>.fromAddress(late[0]));
+          ffi.backendFree();
+        }).catchError((_) {});
+        throw TimeoutException(
+          '요약 모델 로드가 10분을 초과했습니다. 다시 시도하거나 Mac을 재시동해주세요.',
+        );
+      },
+    );
+    _model = Pointer<Void>.fromAddress(addrs[0]);
+    _context = Pointer<Void>.fromAddress(addrs[1]);
   }
 
   /// LLM 해제 (순서: context → model → backend)
@@ -245,17 +268,43 @@ class OnDeviceModelManager {
     }
     if (isSttLoaded) await _unloadSttUnlocked();
 
-    final ffi = WhisperFfi.instance;
-    final pathPtr = modelPath.toNativeUtf8(allocator: calloc);
-    try {
-      final ctx = ffi.loadModel(pathPtr);
-      if (ctx == nullptr) {
-        throw Exception('STT 로드 실패: $modelPath');
+    // CoreML 가속팩(mlmodelc) 최초 로드 시 macOS가 모델을 Neural Engine용으로
+    // 재컴파일하는데, OS 업데이트·앱 재설치로 캐시가 비면 수십 초~수 분 걸린다.
+    // 이 동기 FFI를 메인 isolate에서 부르면 UI 전체가 비치볼로 얼어붙으므로
+    // (App Store 2.2.1 행 리포트: ANE 컴파일 XPC 대기 40초) 워커 isolate에서
+    // 로드하고 컨텍스트 주소만 받는다. dylib 핸들은 process-wide.
+    final path = modelPath;
+    final loadFuture = Isolate.run(() {
+      final ffi = WhisperFfi.instance;
+      final pathPtr = path.toNativeUtf8(allocator: calloc);
+      try {
+        final ctx = ffi.loadModel(pathPtr);
+        if (ctx == nullptr) {
+          throw Exception('STT 로드 실패: $path');
+        }
+        return ctx.address;
+      } finally {
+        calloc.free(pathPtr);
       }
-      _whisperCtx = ctx;
-    } finally {
-      calloc.free(pathPtr);
-    }
+    });
+    // ANE 컴파일 XPC가 영영 안 돌아오는 병리 케이스에서 lease가 영구 점유돼
+    // 이후 모든 작업·앱 종료까지 조용히 막히는 것을 방지하는 안전선.
+    // 정상 콜드 컴파일(수십 초~수 분)은 이 한도 안에 넉넉히 끝난다.
+    final addr = await loadFuture.timeout(
+      const Duration(minutes: 10),
+      onTimeout: () {
+        // 타임아웃 뒤 늦게 완료되면 컨텍스트를 해제해 누수를 막는다.
+        loadFuture.then((late) {
+          if (late != 0) {
+            WhisperFfi.instance.freeModel(Pointer<Void>.fromAddress(late));
+          }
+        }).catchError((_) {});
+        throw TimeoutException(
+          '음성 인식 모델 로드가 10분을 초과했습니다. 다시 시도하거나 Mac을 재시동해주세요.',
+        );
+      },
+    );
+    _whisperCtx = Pointer<Void>.fromAddress(addr);
   }
 
   /// STT 해제 (메모리 반환 ~2 GB)

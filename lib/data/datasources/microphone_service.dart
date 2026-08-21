@@ -92,6 +92,11 @@ class MicrophoneService {
   double get bufferSeconds =>
       (_buffer.length / (_sampleRate * 2)).clamp(0, _windowSec).toDouble();
 
+  /// 마이크 스트림이 실제로 시작된 시각 (녹음 전이면 null).
+  /// 모델 로드가 오래 걸려도 오디오는 이 시각부터 쌓이므로,
+  /// 회의 시작 시각 기록은 이 값을 우선 사용한다.
+  DateTime? get startTime => _startTime;
+
   /// 실제 녹음 경과 시간 (일시 정지 기간 제외)
   Duration get elapsed {
     if (_startTime == null) return Duration.zero;
@@ -138,14 +143,10 @@ class MicrophoneService {
   }) async {
     if (_recording) return;
 
-    // STT 모델 로드 (단일 모델 강제 — LLM 로드 중이면 예외)
-    await OnDeviceModelManager.instance.loadStt(sttModelPath);
-
     _recorder = AudioRecorder();
 
-    // 마이크 권한 확인 — 시스템 단에서 거부 / 미설정 시 명확한 안내
+    // 마이크 권한 확인 — 모델 로드보다 먼저 (권한 프롬프트가 즉시 뜨도록)
     if (!await _recorder!.hasPermission()) {
-      await OnDeviceModelManager.instance.unloadStt();
       throw const MicrophonePermissionDeniedException(
         '마이크 접근 권한이 거부되었습니다.\n'
         '시스템 설정 → 개인정보 보호 및 보안 → 마이크에서 "Local Minutes"를 켜주세요.',
@@ -210,6 +211,28 @@ class MicrophoneService {
       },
     );
 
+    // STT 모델 로드 — 마이크 스트림을 먼저 시작한 뒤에 로드한다.
+    // CoreML 가속팩 최초 로드(ANE 컴파일)는 콜드 캐시에서 몇 분까지 걸리는데,
+    // 그동안에도 위 스트림이 오디오를 버퍼에 쌓아 회의 서두가 유실되지 않는다.
+    // (전사는 어차피 30초 윈도우 단위 — 로드 후 밀린 버퍼를 한 번에 처리한다)
+    try {
+      await OnDeviceModelManager.instance.loadStt(sttModelPath);
+    } catch (_) {
+      // 로드 실패 시 스트림/상태를 원복하고 호출자에 전파
+      await _sub?.cancel();
+      _sub = null;
+      try {
+        await _recorder?.stop();
+      } catch (_) {}
+      _systemDrainTimer?.cancel();
+      _systemDrainTimer = null;
+      _recording = false;
+      _paused = false;
+      _buffer.clear();
+      _fullAudioBytes.clear();
+      rethrow;
+    }
+
     // 타이머 기반 강제 처리: 30초마다 버퍼에 3초 이상 데이터 있으면 처리
     // → 버퍼가 정확히 30초를 채우지 못해도 중간 결과를 표시
     _windowTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -221,6 +244,12 @@ class MicrophoneService {
         _processWindow();
       }
     });
+
+    // 콜드 로드 동안 쌓인 버퍼가 있으면 즉시 1회 처리 (첫 자막 30초 단축)
+    final warmupMinBytes = _sampleRate * 2 * 3;
+    if (!_paused && !_processing && _buffer.length >= warmupMinBytes) {
+      _processWindow();
+    }
   }
 
   /// 녹음 일시 정지 (마이크는 계속 열려있지만 버퍼에 쌓지 않음)

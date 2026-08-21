@@ -941,9 +941,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           _sttAccurateExists;
       if (mounted) {
         setState(() {
+          // CoreML 가속팩 최초 로드는 macOS의 Neural Engine 컴파일 때문에
+          // 몇 분까지 걸릴 수 있어(OS 업데이트·재설치 후 재발) 미리 안내한다.
           _statusMsg = liveSttModelFile == AppConstants.sttModelFileFast
-              ? tr('빠른 음성 인식 준비 중', 'Preparing fast speech recognition')
-              : tr('정확 음성 인식 준비 중', 'Preparing accurate speech recognition');
+              ? tr('빠른 음성 인식 준비 중 — 최초 실행은 가속 준비로 몇 분 걸릴 수 있어요',
+                  'Preparing fast speech recognition — the first run may take a few minutes to warm up')
+              : tr('정확 음성 인식 준비 중 — 최초 실행은 준비에 몇 분 걸릴 수 있어요',
+                  'Preparing accurate speech recognition — the first run may take a few minutes');
         });
       }
 
@@ -1040,15 +1044,33 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           ? SystemAudioService.instance.drainPcm
           : null;
 
+      // 모델 로드(콜드 캐시 시 몇 분) 중 화면을 떠나도 사이드바의
+      // "녹음 진행 중" 배너·가드가 작동하도록 미리 켠다.
+      ref.read(nativeRecordingActiveProvider.notifier).state = true;
+
       await MicrophoneService.instance.startRecording(
         sttPath,
         audioSavePath: _audioSavePath,
         device: _selectedDevice,
       );
 
-      _recordingStartedAt = DateTime.now();
+      if (!mounted) {
+        // 모델 로드 중 사용자가 다른 화면으로 이동해 이 뷰가 dispose됨.
+        // 녹음(마이크 스트림)은 서비스에서 계속되고, 사이드바 배너로 복귀하면
+        // initState 복원 경로가 상태를 되살린다. dispose된 ref/setState를
+        // 건드리면 StateError가 나므로 여기서 조용히 종료한다.
+        CrashLogService.instance.info(
+          'recording continues headless (view disposed during model load)',
+          context: 'recording',
+        );
+        return;
+      }
+
+      // 시작 시각은 마이크 스트림이 실제 열린 시점 기준
+      // (모델 로드가 오래 걸려도 오디오는 그 시점부터 쌓였음)
+      _recordingStartedAt =
+          MicrophoneService.instance.startTime ?? DateTime.now();
       _recordingEndedAt = null;
-      ref.read(nativeRecordingActiveProvider.notifier).state = true;
 
       // 크래시 복구: 녹음 시작 즉시 Meeting을 DB에 저장 (status=recording)
       // 30초마다 부분 transcripts를 flush하여 앱이 비정상 종료돼도 복구 가능
@@ -1072,39 +1094,49 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             : tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
       });
     } on MicrophonePermissionDeniedException catch (e) {
-      setState(() {
-        _phase = _RecordingPhase.error;
-        _statusMsg = e.message;
-      });
-      if (mounted) await _showMicPermissionDialog();
+      // 로드가 비동기화되며 실패 시점에 뷰가 dispose됐을 수 있음 → mounted 가드
+      if (mounted) {
+        ref.read(nativeRecordingActiveProvider.notifier).state = false;
+        setState(() {
+          _phase = _RecordingPhase.error;
+          _statusMsg = e.message;
+        });
+        await _showMicPermissionDialog();
+      }
     } on _RecordingStartException catch (e) {
-      setState(() {
-        _phase = _RecordingPhase.error;
-        _statusMsg = e.message;
-      });
-      if (showTrayFailureNotice) {
-        await _showTrayRecordingStartFailureDialog(
-          title: e.title,
-          message: e.message,
-        );
+      if (mounted) {
+        ref.read(nativeRecordingActiveProvider.notifier).state = false;
+        setState(() {
+          _phase = _RecordingPhase.error;
+          _statusMsg = e.message;
+        });
+        if (showTrayFailureNotice) {
+          await _showTrayRecordingStartFailureDialog(
+            title: e.title,
+            message: e.message,
+          );
+        }
       }
     } catch (e, st) {
       CrashLogService.instance.recordCaught(e, st, context: 'startRecording');
-      final friendly = friendlyErrorMessage(
-        e,
-        fallbackTitle: tr('녹음을 시작하지 못했습니다', 'Could not start recording'),
-        fallbackMessage: tr('잠시 후 다시 시도해주세요.', 'Please try again in a moment.'),
-        nextStep: tr('마이크, 저장 폴더, AI 모델 설치 상태를 확인해주세요.', 'Check the microphone, save folder, and AI model installation.'),
-      );
-      setState(() {
-        _phase = _RecordingPhase.error;
-        _statusMsg = friendly.fullText;
-      });
-      if (showTrayFailureNotice) {
-        await _showTrayRecordingStartFailureDialog(
-          title: friendly.title,
-          message: friendly.message,
+      if (mounted) {
+        ref.read(nativeRecordingActiveProvider.notifier).state = false;
+        final friendly = friendlyErrorMessage(
+          e,
+          fallbackTitle: tr('녹음을 시작하지 못했습니다', 'Could not start recording'),
+          fallbackMessage: tr('잠시 후 다시 시도해주세요.', 'Please try again in a moment.'),
+          nextStep: tr('마이크, 저장 폴더, AI 모델 설치 상태를 확인해주세요.', 'Check the microphone, save folder, and AI model installation.'),
         );
+        setState(() {
+          _phase = _RecordingPhase.error;
+          _statusMsg = friendly.fullText;
+        });
+        if (showTrayFailureNotice) {
+          await _showTrayRecordingStartFailureDialog(
+            title: friendly.title,
+            message: friendly.message,
+          );
+        }
       }
     }
     } finally {

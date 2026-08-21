@@ -1624,7 +1624,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     setState(() {
       _isRerunningStt = true;
       _cancelRerunSttRequested = false;
-      _rerunSttStatus = tr('Whisper 모델 로드 중...', 'Loading Whisper model...');
+      _rerunSttStatus = tr('Whisper 모델 로드 중... 최초 실행은 가속 준비로 몇 분 걸릴 수 있어요.',
+          'Loading Whisper model... The first run may take a few minutes to warm up.');
       _rerunSttProgress = 0.0;
       _rerunSttProcessedMs = 0;
       _rerunSttTotalMs = 0;
@@ -1635,7 +1636,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       meetingId: widget.meetingId,
       kind: 'transcribe',
       meetingTitle: meeting.title,
-      label: tr('Whisper 모델 로드 중...', 'Loading Whisper model...'),
+      label: tr('Whisper 모델 로드 중... 최초 실행은 가속 준비로 몇 분 걸릴 수 있어요.',
+          'Loading Whisper model... The first run may take a few minutes to warm up.'),
       progress: 0,
     );
     // 화면을 떠나 cancel UI가 사라져도 배너에서 중지할 수 있도록 콜백 등록.
@@ -1871,6 +1873,12 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   // ── 용어 자동 추출 ─────────────────────────────────────────────
   Future<void> _extractTerms(List<Transcript> transcripts) async {
     if (transcripts.isEmpty || _isExtractingTerms || _isSummarizing) return;
+    // 다른 네이티브 작업(전사·모델 로드) 중이면 차단 — 형제 액션들과 동일 게이트.
+    // (없으면 loadLlm이 lease 뒤에 큐잉됐다가 단일 모델 가드 StateError로 실패)
+    if (_nativeTaskBlockReason(tr('용어 추출', 'term extraction')) != null) {
+      _showNativeTaskBlocked(tr('용어 추출', 'term extraction'));
+      return;
+    }
     setState(() => _isExtractingTerms = true);
 
     try {
