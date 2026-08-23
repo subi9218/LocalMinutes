@@ -20,6 +20,8 @@ import 'core/services/processing_status_service.dart';
 import 'core/services/security_scoped_bookmark_service.dart';
 import 'data/datasources/llm_service.dart';
 import 'data/datasources/microphone_service.dart';
+import 'data/datasources/system_audio_service.dart';
+import 'presentation/providers/global_container.dart';
 import 'presentation/providers/meeting_providers.dart';
 import 'presentation/providers/settings_providers.dart';
 import 'presentation/screens/home_screen.dart';
@@ -70,7 +72,8 @@ void main() async {
         await _runAutoDelete(); // 자동 삭제 (설정된 경우)
       }
       runApp(
-        ProviderScope(
+        UncontrolledProviderScope(
+          container: globalProviderContainer,
           child: MeetingAssistantApp(
             modelsOk: modelsOk,
             storageReady: storageReady,
@@ -397,13 +400,25 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
       try {
         await MicrophoneService.instance.stopRecording();
       } catch (_) {}
-      // 2) 로드된 LLM/STT 모델 명시적 해제 — Metal/ggml 컨텍스트 정상 정리
+      // 시스템 오디오 캡처도 정지 — 안 하면 ExtAudioFile이 닫히지 않아
+      // 손상된 _system.wav가 저장 폴더에 남는다.
+      try {
+        await SystemAudioService.instance.stop();
+      } catch (_) {}
+      // 2) 로드된 LLM/STT 모델 명시적 해제 — Metal/ggml 컨텍스트 정상 정리.
+      // 모델 로드(콜드 시 몇 분)가 진행 중이면 unload가 lease 큐 뒤에 걸려
+      // 종료가 조용히 수 분 지연될 수 있으므로 5초 상한을 둔다
+      // (프로세스 종료 시 OS가 메모리를 회수하므로 미해제여도 무해).
       try {
         LlmService.instance.requestCancelActiveGeneration();
-        await OnDeviceModelManager.instance.unloadLlm();
+        await OnDeviceModelManager.instance
+            .unloadLlm()
+            .timeout(const Duration(seconds: 5), onTimeout: () {});
       } catch (_) {}
       try {
-        await OnDeviceModelManager.instance.unloadStt();
+        await OnDeviceModelManager.instance
+            .unloadStt()
+            .timeout(const Duration(seconds: 5), onTimeout: () {});
       } catch (_) {}
       // 3) 메뉴바 트레이 아이콘 제거
       try {

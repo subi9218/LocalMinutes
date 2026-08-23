@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -23,6 +24,8 @@ import '../../data/datasources/llm_service.dart';
 import '../../data/repositories/meeting_repository_impl.dart';
 import '../../data/repositories/meeting_group_repository_impl.dart';
 import '../../data/repositories/summary_repository_impl.dart';
+import '../../data/repositories/summary_version_repository_impl.dart';
+import '../../data/repositories/transcript_repository_impl.dart';
 import '../../domain/entities/meeting.dart';
 import '../../domain/entities/meeting_group.dart';
 import '../../domain/entities/meeting_processing_report.dart';
@@ -56,6 +59,39 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
   // ── WAV 파일 불러오기 ────────────────────────────────────────────
   /// 기존 WAV 파일을 선택해 새 Meeting 레코드로 등록.
   /// 전사·요약은 생성되지 않으므로 상세 화면에서 "다시 전사"로 실행.
+  /// WAV 헤더(fmt/data 청크)를 앞부분만 읽어 재생 길이(초)를 계산한다.
+  /// 전체 파일을 메모리에 올리지 않는다(대용량 안전). 실패 시 0.
+  static Future<int> _wavDurationSeconds(String path) async {
+    RandomAccessFile? raf;
+    try {
+      raf = await File(path).open();
+      final head = await raf.read(64 * 1024); // 헤더+청크 테이블은 충분
+      if (head.length < 44) return 0;
+      final data = ByteData.sublistView(head);
+      int? byteRate;
+      int pos = 12;
+      while (pos + 8 <= head.length) {
+        final id = String.fromCharCodes(head.sublist(pos, pos + 4));
+        final size = data.getUint32(pos + 4, Endian.little);
+        if (id == 'fmt ') {
+          byteRate = data.getUint32(pos + 16, Endian.little);
+        } else if (id == 'data') {
+          if (byteRate == null || byteRate == 0) return 0;
+          // data 크기가 파일보다 크게 선언된 손상 파일 방어
+          final fileLen = await File(path).length();
+          final dataLen = size.clamp(0, fileLen - (pos + 8));
+          return dataLen ~/ byteRate;
+        }
+        pos += 8 + size + (size.isOdd ? 1 : 0);
+      }
+      return 0;
+    } catch (_) {
+      return 0;
+    } finally {
+      await raf?.close();
+    }
+  }
+
   Future<void> _importAudioFile() async {
     // 방어적 게이팅: 버튼 비활성화와 별개로, 진행 중 작업이 있으면 막는다.
     if (ProcessingStatus.instance.isBusy) {
@@ -103,10 +139,12 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     final stat = await file.stat();
     final createdAt = stat.modified;
 
-    // WAV가 아니면 16kHz 모노 WAV로 변환(앱 지원 폴더에 저장 → 재실행 후에도 접근 가능).
+    // 원본을 그대로 참조하지 않고 항상 앱 지원 폴더로 복사/변환한다.
+    // 샌드박스에서는 파일 피커로 얻은 접근 권한이 앱 재실행 시 사라지므로,
+    // 원본 경로를 저장하면 다음 실행에서 재생·재전사가 전부 실패한다.
     String audioPath = picked.path;
     int durationSeconds = 0;
-    if (!isWav) {
+    {
       final appSupport = await getApplicationSupportDirectory();
       final importDir = Directory('${appSupport.path}/imported');
       if (!await importDir.exists()) {
@@ -116,54 +154,75 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       final safe = title.replaceAll(RegExp(r'[^A-Za-z0-9가-힣 _-]'), '_').trim();
       final outPath =
           '${importDir.path}/${safe.isEmpty ? 'audio' : safe}-$ts.wav';
-
-      // 변환 진행 모달 (대개 수 초)
-      if (mounted) {
-        showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => _ImportConvertingDialog(ext: ext.toUpperCase()),
-        );
-      }
-      try {
-        await AudioConvertService.instance.toWav16kMono(
-          inputPath: picked.path,
-          outputPath: outPath,
-        );
-        audioPath = outPath;
-        final outLen = await File(outPath).length();
-        // 16kHz mono 16-bit: bytes = 44(header) + seconds*16000*2
-        durationSeconds = ((outLen - 44) / 2 / 16000).round();
-        if (durationSeconds < 0) durationSeconds = 0;
-      } on PlatformException catch (e) {
-        if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (isWav) {
+        try {
+          await file.copy(outPath);
+          audioPath = outPath;
+          durationSeconds = await _wavDurationSeconds(outPath);
+        } catch (e) {
+          // 부분 복사 잔재 정리 (회의 레코드가 없으므로 남기면 영구 쓰레기)
+          await File(outPath).delete().catchError((_) => File(outPath));
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(tr('파일 복사에 실패했습니다.', 'Failed to copy the file.')),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+          }
+          return;
+        }
+      } else {
+        // 변환 진행 모달 (대개 수 초)
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(tr(
-                '파일 변환 실패: ${e.message ?? ext.toUpperCase()}',
-                'Conversion failed: ${e.message ?? ext.toUpperCase()}',
-              )),
-              backgroundColor: Colors.red.shade700,
-              duration: const Duration(seconds: 5),
-            ),
+          showDialog<void>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => _ImportConvertingDialog(ext: ext.toUpperCase()),
           );
         }
-        return;
-      } catch (e) {
-        if (mounted) Navigator.of(context, rootNavigator: true).pop();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(tr('파일 변환 중 오류가 발생했습니다.',
-                  'An error occurred during conversion.')),
-              backgroundColor: Colors.red.shade700,
-            ),
+        try {
+          await AudioConvertService.instance.toWav16kMono(
+            inputPath: picked.path,
+            outputPath: outPath,
           );
+          audioPath = outPath;
+          final outLen = await File(outPath).length();
+          // 16kHz mono 16-bit: bytes = 44(header) + seconds*16000*2
+          durationSeconds = ((outLen - 44) / 2 / 16000).round();
+          if (durationSeconds < 0) durationSeconds = 0;
+        } on PlatformException catch (e) {
+          await File(outPath).delete().catchError((_) => File(outPath));
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(tr(
+                  '파일 변환 실패: ${e.message ?? ext.toUpperCase()}',
+                  'Conversion failed: ${e.message ?? ext.toUpperCase()}',
+                )),
+                backgroundColor: Colors.red.shade700,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+          return;
+        } catch (e) {
+          await File(outPath).delete().catchError((_) => File(outPath));
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(tr('파일 변환 중 오류가 발생했습니다.',
+                    'An error occurred during conversion.')),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+          }
+          return;
         }
-        return;
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
       }
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
 
     final meeting = Meeting()
@@ -366,7 +425,29 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
   }
 
   Future<void> _onDeleteMeeting(Meeting m) async {
-    await MeetingRepositoryImpl(IsarService.instance.db).deleteMeeting(m.id);
+    // 회의에 딸린 전사·요약·요약 이력까지 함께 삭제 (캐스케이드).
+    // Meeting 행만 지우면 고아 레코드가 남고, Isar가 id를 재사용할 때
+    // 새 회의에 남의 요약/전사가 붙는 심각한 데이터 오염이 발생한다.
+    final db = IsarService.instance.db;
+    await TranscriptRepositoryImpl(db).deleteByMeetingId(m.id);
+    await SummaryRepositoryImpl(db).deleteSummaryByMeetingId(m.id);
+    await SummaryVersionRepositoryImpl(db).deleteByMeetingId(m.id);
+    await MeetingRepositoryImpl(db).deleteMeeting(m.id);
+    // 앱이 만든 녹음/변환 파일은 함께 삭제 (회의가 사라지면 auto_delete도
+    // 더는 이 파일을 볼 수 없어 영구 잔재가 된다). 사용자가 직접 가져온
+    // 원본 파일은 앱 소유가 아니므로 남긴다.
+    final audioPath = m.audioFilePath;
+    if (audioPath != null && audioPath.isNotEmpty) {
+      final sep = audioPath.lastIndexOf('/');
+      final base = sep < 0 ? audioPath : audioPath.substring(sep + 1);
+      final dir = sep < 0 ? '' : audioPath.substring(0, sep);
+      final appOwned =
+          (base.startsWith('meeting_') && base.endsWith('.wav')) ||
+          dir.endsWith('/imported');
+      if (appOwned) {
+        await File(audioPath).delete().catchError((_) => File(audioPath));
+      }
+    }
     ref.invalidate(meetingsProvider);
     ref.invalidate(allSummariesProvider);
     if (ref.read(selectedMeetingIdProvider) == m.id) {

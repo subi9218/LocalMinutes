@@ -3,6 +3,10 @@ import 'package:flutter/foundation.dart';
 /// 현재 진행 중인 무거운 작업(전사/요약) 한 건의 상태.
 @immutable
 class ProcessingJob {
+  /// 작업 고유 식별자 — update의 copyWith를 거쳐도 유지되며,
+  /// clearIf가 "같은 작업"인지 판정하는 기준.
+  final Object token;
+
   /// 대상 회의 ID.
   final int meetingId;
 
@@ -19,6 +23,7 @@ class ProcessingJob {
   final double progress;
 
   const ProcessingJob({
+    required this.token,
     required this.meetingId,
     required this.kind,
     required this.meetingTitle,
@@ -27,6 +32,7 @@ class ProcessingJob {
   });
 
   ProcessingJob copyWith({String? label, double? progress}) => ProcessingJob(
+    token: token,
     meetingId: meetingId,
     kind: kind,
     meetingTitle: meetingTitle,
@@ -68,21 +74,33 @@ class ProcessingStatus {
   /// 현재 작업을 중지할 수 있는지(콜백 등록 여부).
   bool get cancelable => _onCancel != null;
 
-  /// 새 작업 시작을 알린다.
-  void start({
+  /// 새 작업 시작을 알린다. 시작된 작업 객체를 반환하며, 호출자는 이 객체로
+  /// [clearIf]를 호출해 "자기 작업일 때만" 종료 처리해야 한다.
+  /// (게이트 공백으로 중복 시작이 발생해도, 먼저 끝난 작업의 clear가
+  ///  진행 중인 다른 작업의 배너·게이트를 지우지 못하게 하는 안전선)
+  ProcessingJob start({
     required int meetingId,
     required String kind,
     required String meetingTitle,
     required String label,
     double progress = -1,
   }) {
-    active.value = ProcessingJob(
+    final job = ProcessingJob(
+      token: Object(),
       meetingId: meetingId,
       kind: kind,
       meetingTitle: meetingTitle,
       label: label,
       progress: progress,
     );
+    active.value = job;
+    return job;
+  }
+
+  /// [job]이 여전히 현재 작업일 때만 종료 처리한다.
+  /// 다른 작업이 이미 자리를 차지했다면 아무것도 하지 않는다.
+  void clearIf(ProcessingJob job) {
+    if (active.value?.token == job.token) clear();
   }
 
   /// 진행 상태/진행률 갱신 (현재 작업이 있을 때만).

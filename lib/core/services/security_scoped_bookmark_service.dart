@@ -26,14 +26,22 @@ class SecurityScopedBookmarkService {
         .timeout(const Duration(seconds: 3));
   }
 
+  /// 현재 접근 중인 북마크 — 같은 북마크로 start를 중복 호출하면
+  /// 네이티브 쪽 URL 맵이 덮어써져 이전 start를 stop할 수 없게 되고
+  /// (커널 리소스 누수), macOS의 start/stop 쌍이 어긋난다.
+  static final Set<String> _activeBookmarks = {};
+
   static Future<bool> startAccessingBookmark(String bookmark) async {
     if (!Platform.isMacOS || bookmark.isEmpty) return true;
+    if (_activeBookmarks.contains(bookmark)) return true; // 이미 접근 중
     final result = await _channel
         .invokeMethod<Map<Object?, Object?>>('startAccessingBookmark', {
           'bookmark': bookmark,
         })
         .timeout(const Duration(seconds: 3));
-    return result?['accessing'] == true;
+    final accessing = result?['accessing'] == true;
+    if (accessing) _activeBookmarks.add(bookmark);
+    return accessing;
   }
 
   static Future<void> stopAccessingBookmark(String bookmark) async {
@@ -41,6 +49,7 @@ class SecurityScopedBookmarkService {
     await _channel.invokeMethod<void>('stopAccessingBookmark', {
       'bookmark': bookmark,
     });
+    _activeBookmarks.remove(bookmark);
   }
 
   static Future<bool> restoreRecordingsFolderAccess() async {

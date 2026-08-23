@@ -213,6 +213,15 @@ class MainFlutterWindow: NSWindow {
           result(FlutterStandardTypedData(bytes: Data()))
         }
 
+      case "setPaused":
+        // 마이크 일시정지와 동기화 — 시스템 트랙만 계속 기록되어
+        // 믹스 싱크가 어긋나는 것을 방지.
+        if #available(macOS 14.2, *),
+           let rec = self.systemAudioRecorder as? SystemAudioRecorder {
+          rec.setPaused((call.arguments as? Bool) ?? false)
+        }
+        result(nil)
+
       case "stop":
         if #available(macOS 14.2, *) {
           (self.systemAudioRecorder as? SystemAudioRecorder)?.stop()

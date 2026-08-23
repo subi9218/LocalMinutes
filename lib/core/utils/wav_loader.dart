@@ -43,9 +43,18 @@ class WavLoader {
         channels      = data.getUint16(pos + 10, Endian.little);
         sampleRate    = data.getUint32(pos + 12, Endian.little);
         bitsPerSample = data.getUint16(pos + 22, Endian.little);
+        // WAVE_FORMAT_EXTENSIBLE(0xFFFE): 실제 포맷은 확장 영역의
+        // subFormat GUID 첫 2바이트에 있다 (많은 녹음기·DAW가 이 형식 사용).
+        if (audioFormat == 0xFFFE &&
+            chunkSize >= 40 &&
+            pos + 34 <= bytes.length) {
+          audioFormat = data.getUint16(pos + 32, Endian.little);
+        }
       } else if (chunkId == 'data') {
         dataOffset = pos + 8;
-        dataSize   = chunkSize;
+        // 헤더의 크기 선언이 실제 파일보다 큰(잘린/손상) WAV 방어 —
+        // clamp 없이는 RangeError 또는 거대 할당이 난다.
+        dataSize = chunkSize.clamp(0, bytes.length - dataOffset);
         break; // data 청크를 찾으면 중단
       }
 

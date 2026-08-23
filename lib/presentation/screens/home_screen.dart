@@ -115,6 +115,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// 전사/요약 진행 중이면 녹음·업로드를 막을 사유 문구(없으면 null).
   String? _busyBlockReason() {
+    // 녹음(마이크) 진행 중 — 툴바/단축키로 중복 시작 방지.
+    final mic = MicrophoneService.instance;
+    if (mic.isRecording || mic.isPaused) {
+      return tr('이미 녹음이 진행 중입니다.', 'A recording is already in progress.');
+    }
+    // 녹음 직후 요약(recording_view의 isSummarizingProvider) 진행 중.
+    if (ref.read(isSummarizingProvider)) {
+      return tr('요약 작업이 진행 중입니다. 완료 후 다시 시도해주세요.',
+          'A summary task is running. Please try again after it finishes.');
+    }
     final job = ProcessingStatus.instance.active.value;
     if (job != null) {
       final what = job.kind == 'transcribe'
@@ -179,10 +189,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   bool _canStartRecordingByShortcut() {
-    final activeTask =
-        OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
-    if (activeTask != null) {
-      _showShortcutSnack('현재 $activeTask 작업 중입니다. 완료 후 녹음을 시작해주세요.');
+    // 툴바 버튼과 동일 게이트 사용 — ProcessingStatus(전사/요약)도 검사.
+    // (예전엔 activeLabel만 봐서 전사 lease 사이 공백에 단축키가 통과했음)
+    final reason = _busyBlockReason();
+    if (reason != null) {
+      _showShortcutSnack(reason);
       return false;
     }
     return true;
@@ -487,11 +498,16 @@ class _WelcomeView extends ConsumerWidget {
 
   void _startRecording(BuildContext context, WidgetRef ref) {
     final job = ProcessingStatus.instance.active.value;
-    final busy = job != null
-        ? (job.kind == 'transcribe'
-            ? tr('전사', 'transcription')
-            : tr('요약', 'summarization'))
-        : OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
+    final mic = MicrophoneService.instance;
+    final busy = (mic.isRecording || mic.isPaused)
+        ? tr('녹음', 'recording')
+        : ref.read(isSummarizingProvider)
+            ? tr('요약', 'summarization')
+            : job != null
+                ? (job.kind == 'transcribe'
+                    ? tr('전사', 'transcription')
+                    : tr('요약', 'summarization'))
+                : OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (busy != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

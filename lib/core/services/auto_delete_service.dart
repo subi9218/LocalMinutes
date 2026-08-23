@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../data/repositories/meeting_repository_impl.dart';
+import '../../domain/entities/meeting.dart';
 import 'isar_service.dart';
 
 /// 오래된 녹음 WAV 파일만 삭제하는 공용 헬퍼.
@@ -26,8 +27,25 @@ class AutoDeleteService {
       final meetings = await repo.getAllMeetings();
       for (final m in meetings) {
         if (!m.createdAt.isBefore(cutoff)) continue;
+        // 복구 대기 중(진행형 상태) 회의는 건드리지 않는다 — WAV를 지우면
+        // 복구 서비스가 회의를 통째로 파기한다. 단 error(실패 확정)는
+        // 복구 대상이 아니므로 정상 삭제 대상에 포함한다.
+        if (m.status != MeetingStatus.done && m.status != MeetingStatus.error) {
+          continue;
+        }
         final path = m.audioFilePath;
         if (path == null || path.isEmpty) continue;
+
+        // 앱이 직접 만든 녹음/변환 파일만 삭제한다.
+        // '파일 불러오기'로 등록된 회의의 audioFilePath는 사용자의 원본
+        // 파일을 가리킬 수 있는데, 그걸 지우면 사용자 데이터 파괴다.
+        final sep = path.lastIndexOf('/');
+        final base = sep < 0 ? path : path.substring(sep + 1);
+        final dir = sep < 0 ? '' : path.substring(0, sep);
+        final appOwned =
+            (base.startsWith('meeting_') && base.endsWith('.wav')) ||
+            dir.endsWith('/imported');
+        if (!appOwned) continue;
 
         final file = File(path);
         // 파일이 이미 없으면 delete 호출을 스킵해서 불필요한 예외 비용을 제거.

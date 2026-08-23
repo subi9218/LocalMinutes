@@ -25,6 +25,7 @@ import '../../core/utils/summary_parser.dart';
 import '../../core/utils/transcript_corrector.dart';
 import '../../data/datasources/diarization_service.dart';
 import '../../data/datasources/llm_service.dart';
+import '../../data/datasources/microphone_service.dart';
 import '../../data/datasources/stt_service.dart';
 import '../../data/repositories/glossary_repository_impl.dart';
 import '../../domain/entities/glossary_entry.dart';
@@ -105,18 +106,29 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   }
 
   String? _nativeTaskBlockReason(String actionLabel) {
-    // 앱 전역 처리상태가 최우선 기준(다른 회의에서 전사/요약 중인 경우 포함).
-    // 단, '이 회의'에서 진행 중인 작업은 해당 작업 버튼 자체의 로컬 비활성화가
-    // 담당하므로 여기서 막지 않는다(자기 자신을 막아 헷갈리지 않도록).
+    // 녹음(마이크) 진행 중이면 무조건 차단. 예전에는 30초 전사 윈도우 '사이'에
+    // activeLabel이 null이라 재전사가 통과 → loadStt가 라이브 녹음의 whisper
+    // 컨텍스트를 해제·교체해 이후 실시간 전사가 소리 없이 죽는 치명 버그 존재.
+    final mic = MicrophoneService.instance;
+    if (mic.isRecording || mic.isPaused) {
+      return tr(
+        '녹음이 진행 중입니다. 녹음을 마친 뒤 $actionLabel을(를) 다시 시도해주세요.',
+        'A recording is in progress. Please try $actionLabel again after the recording ends.',
+      );
+    }
+    // 앱 전역 처리상태 — 어느 회의의 작업이든 진행 중이면 차단.
+    // (예전의 '이 회의' 면제는 위젯 재마운트로 로컬 플래그가 사라지면
+    //  같은 회의에 중복 작업을 허용해 첫 작업의 clear가 두 번째 작업의
+    //  배너·게이트를 지우는 버그를 만들었다 → 면제 제거)
     final job = ProcessingStatus.instance.active.value;
-    if (job != null && job.meetingId != widget.meetingId) {
+    if (job != null) {
       final title = job.meetingTitle.trim();
       final what = job.kind == 'transcribe'
           ? tr('전사', 'transcription')
           : tr('요약', 'summarization');
-      final where = title.isEmpty
-          ? tr('다른 회의', 'another meeting')
-          : '"$title"';
+      final where = job.meetingId == widget.meetingId
+          ? tr('이 회의', 'this meeting')
+          : (title.isEmpty ? tr('다른 회의', 'another meeting') : '"$title"');
       return tr(
         '$where에서 $what 작업이 진행 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.',
         '$what is running in $where. Please try $actionLabel again after it finishes.',
@@ -960,7 +972,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       _summaryStartTime = DateTime.now();
     });
     // 화면을 떠나도 진행이 보이도록 전역 처리상태에 등록.
-    ProcessingStatus.instance.start(
+    final myJob = ProcessingStatus.instance.start(
       meetingId: widget.meetingId,
       kind: 'summarize',
       meetingTitle: meeting?.title ?? '',
@@ -1175,7 +1187,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       }
     } finally {
       // 화면 이탈 여부와 무관하게 전역 처리상태는 반드시 해제.
-      ProcessingStatus.instance.clear();
+      // clearIf: 내 작업일 때만 — 다른 작업의 배너/게이트를 지우지 않도록.
+      ProcessingStatus.instance.clearIf(myJob);
     }
   }
 
@@ -1624,18 +1637,20 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     setState(() {
       _isRerunningStt = true;
       _cancelRerunSttRequested = false;
-      _rerunSttStatus = tr('Whisper 모델 로드 중...', 'Loading Whisper model...');
+      _rerunSttStatus = tr('Whisper 모델 로드 중... 최초 실행은 가속 준비로 몇 분 걸릴 수 있어요.',
+          'Loading Whisper model... The first run may take a few minutes to warm up.');
       _rerunSttProgress = 0.0;
       _rerunSttProcessedMs = 0;
       _rerunSttTotalMs = 0;
       _rerunSttStartTime = DateTime.now();
     });
     // 화면을 떠나도 진행이 보이도록 전역 처리상태에 등록.
-    ProcessingStatus.instance.start(
+    final myJob = ProcessingStatus.instance.start(
       meetingId: widget.meetingId,
       kind: 'transcribe',
       meetingTitle: meeting.title,
-      label: tr('Whisper 모델 로드 중...', 'Loading Whisper model...'),
+      label: tr('Whisper 모델 로드 중... 최초 실행은 가속 준비로 몇 분 걸릴 수 있어요.',
+          'Loading Whisper model... The first run may take a few minutes to warm up.'),
       progress: 0,
     );
     // 화면을 떠나 cancel UI가 사라져도 배너에서 중지할 수 있도록 콜백 등록.
@@ -1862,7 +1877,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       }
     } finally {
       // 화면을 떠났든(=mounted false) 아니든 전역 처리상태는 반드시 해제.
-      ProcessingStatus.instance.clear();
+      // clearIf: 내 작업일 때만 — 다른 작업의 배너/게이트를 지우지 않도록.
+      ProcessingStatus.instance.clearIf(myJob);
       _rerunTicker?.cancel();
       _rerunTicker = null;
     }
@@ -1871,6 +1887,12 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   // ── 용어 자동 추출 ─────────────────────────────────────────────
   Future<void> _extractTerms(List<Transcript> transcripts) async {
     if (transcripts.isEmpty || _isExtractingTerms || _isSummarizing) return;
+    // 다른 네이티브 작업(전사·모델 로드) 중이면 차단 — 형제 액션들과 동일 게이트.
+    // (없으면 loadLlm이 lease 뒤에 큐잉됐다가 단일 모델 가드 StateError로 실패)
+    if (_nativeTaskBlockReason(tr('용어 추출', 'term extraction')) != null) {
+      _showNativeTaskBlocked(tr('용어 추출', 'term extraction'));
+      return;
+    }
     setState(() => _isExtractingTerms = true);
 
     try {
