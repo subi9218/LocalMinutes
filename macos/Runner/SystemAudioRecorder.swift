@@ -35,6 +35,23 @@ final class SystemAudioRecorder {
   private var pcmBuffer = Data()
   private let maxPcmBytes = 16000 * 2 * 60 // 60초 분량 상한
 
+  // 일시정지: IOProc에서 파일 쓰기·PCM 변환을 스킵한다.
+  // 마이크(pause 시 바이트 무시)와 동일 동작 — 두 트랙의 믹스 싱크 유지.
+  // IOProc 실시간 스레드에서 읽으므로 lock으로 보호.
+  private var pausedLock = os_unfair_lock()
+  private var _paused = false
+  private var isPausedNow: Bool {
+    os_unfair_lock_lock(&pausedLock)
+    defer { os_unfair_lock_unlock(&pausedLock) }
+    return _paused
+  }
+
+  func setPaused(_ value: Bool) {
+    os_unfair_lock_lock(&pausedLock)
+    _paused = value
+    os_unfair_lock_unlock(&pausedLock)
+  }
+
   var recording: Bool { isRecording }
 
   /// 누적된 16kHz 모노 int16 PCM을 반환하고 버퍼를 비운다.
@@ -49,6 +66,7 @@ final class SystemAudioRecorder {
   /// 시스템 오디오 캡처 시작. 성공 시 nil, 실패 시 에러 메시지 반환.
   func start(outputPath: String) -> String? {
     if isRecording { return "이미 녹음 중입니다." }
+    setPaused(false) // 이전 세션의 일시정지 상태가 남지 않도록 리셋
 
     // ── 1) 전역(시스템 전체) stereo 탭 생성 — 제외 프로세스 없음 ──────────
     let tapDescription = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
@@ -117,14 +135,20 @@ final class SystemAudioRecorder {
     }
 
     // ── 4) 출력 WAV(int16) 파일 준비 — 클라이언트 포맷=탭 포맷(float) ──────
+    // 파일은 처음부터 16kHz 모노 int16으로 기록한다 (STT 입력 규격과 동일).
+    // ExtAudioFile이 클라이언트(탭 48kHz 스테레오 float) → 파일 포맷 변환을
+    // 고품질 SRC로 내장 수행하므로:
+    //  - 파일 크기가 1/6 (2시간 ≈ 1.4GB → 230MB)
+    //  - 정지 후 믹스 시 Dart 선형보간 리샘플(앨리어싱 유발)을 아예 타지 않음
+    //  - 믹스 메모리 피크가 수 GB → 수백 MB로 감소 (긴 회의 OOM 방지)
     var fileFormat = AudioStreamBasicDescription(
-      mSampleRate: streamFormat.mSampleRate,
+      mSampleRate: 16000,
       mFormatID: kAudioFormatLinearPCM,
       mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
-      mBytesPerPacket: UInt32(2 * Int(streamFormat.mChannelsPerFrame)),
+      mBytesPerPacket: 2,
       mFramesPerPacket: 1,
-      mBytesPerFrame: UInt32(2 * Int(streamFormat.mChannelsPerFrame)),
-      mChannelsPerFrame: streamFormat.mChannelsPerFrame,
+      mBytesPerFrame: 2,
+      mChannelsPerFrame: 1,
       mBitsPerChannel: 16,
       mReserved: 0
     )
@@ -162,6 +186,7 @@ final class SystemAudioRecorder {
     ) {
       [weak self] (_, inInputData, _, _, _) in
       guard let self, let extFile = self.extFile, bytesPerFrame > 0 else { return }
+      if self.isPausedNow { return } // 일시정지 중 — 기록/변환 모두 스킵
       // AudioBufferList 를 안전하게 순회 (포인터를 클로저 밖으로 내보내지 않음)
       let bufferList = UnsafeMutableAudioBufferListPointer(
         UnsafeMutablePointer(mutating: inInputData)

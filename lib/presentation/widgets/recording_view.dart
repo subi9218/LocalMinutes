@@ -41,6 +41,7 @@ import '../../domain/entities/meeting.dart';
 import '../../domain/entities/meeting_processing_report.dart';
 import '../../domain/entities/transcript.dart';
 import '../../domain/entities/summary.dart';
+import '../providers/global_container.dart';
 import '../providers/meeting_providers.dart';
 
 enum _RecordingPhase {
@@ -73,6 +74,26 @@ class RecordingView extends ConsumerStatefulWidget {
 }
 
 class _RecordingViewState extends ConsumerState<RecordingView> {
+  /// 진행 중 녹음 세션의 복구용 meetingId — 위젯이 아니라 세션의 소유물.
+  /// (녹음 중 다른 화면을 봤다 돌아오면 State가 새로 생성되는데, 이 값이
+  ///  위젯 로컬이면 소실되어 정지 시 중복 회의가 생기고 원본이
+  ///  status=recording 고스트로 남는다 → static으로 세션에 귀속)
+  ///
+  /// 반드시 mic.startTime과 쌍으로 대조한다 — id만 보면 '이전에 끝난 세션'의
+  /// id를 다음 세션이 물려받아 완료된 회의를 덮어쓰는 참사가 난다.
+  static int? _sessionRecoveryMeetingId;
+  static DateTime? _sessionRecoveryStartTime;
+
+  /// 이 State가 세션 메타(제목/메모/안건/북마크)의 소유자인지.
+  /// 재마운트된 State는 DB에서 메타를 복원하기 전까지 false — 그동안
+  /// 체크포인트는 세그먼트만 갱신하고 메타를 빈 값으로 덮지 않는다.
+  bool _sessionMetaOwned = true;
+
+  /// dispose 후에도 체크포인트가 제목/메모를 쓸 수 있도록 한 마지막 스냅샷.
+  /// (TextEditingController는 dispose 후 .text 접근이 불가)
+  String _titleSnapshot = '';
+  String _notesSnapshot = '';
+
   _RecordingPhase _phase = _RecordingPhase.idle;
   final List<SttSegment> _segments = [];
   String _statusMsg = '';
@@ -195,6 +216,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
       _sttModelExists = true;
       _llmModelExists = true;
+      // 세션 상태 복원 — 없으면 정상 녹음이 '0초 빈 녹음'으로 판정되어
+      // 삭제 유도 다이얼로그가 뜨고(삭제 시 실제 WAV 소실), 정지 시
+      // 중복 회의가 생기며 크래시 복구 체크포인트도 멈춘다.
+      _restoreSessionState(mic);
+      _checkpointTimer?.cancel();
+      _checkpointTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (!mounted || _phase != _RecordingPhase.recording) return;
+        _saveRecoveryCheckpoint();
+      });
       // UI 경과 시간 갱신 타이머 재시작
       _uiTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() {});
@@ -206,6 +236,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _statusMsg = tr('일시 정지됨 — "계속하기"로 재개하세요.', 'Paused — press "Resume" to continue.');
       _sttModelExists = true;
       _llmModelExists = true;
+      _restoreSessionState(mic);
     } else {
       ref.read(nativeRecordingActiveProvider.notifier).state = false;
       _checkModels();
@@ -355,6 +386,71 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     super.dispose();
   }
 
+  /// 재마운트 시 세션 상태 복원. 세션 id는 mic.startTime과 쌍으로 대조해
+  /// '이전에 끝난 세션'의 id를 잘못 물려받는 것(완료된 회의 파괴)을 막는다.
+  void _restoreSessionState(MicrophoneService mic) {
+    _recordingStartedAt = mic.startTime;
+    _audioSavePath = mic.savedAudioPath;
+    // 시스템 오디오 캡처가 진행 중이면 세션 상태를 서비스에서 되살린다 —
+    // 위젯 필드에만 있으면 재마운트 후 pause/정지 선정지/최종 믹스가 전부
+    // 건너뛰어져 상대방 음성이 최종 오디오에서 사라진다.
+    if (SystemAudioService.instance.isRecording) {
+      _systemAudioPath = SystemAudioService.instance.currentOutputPath;
+      _recordingSource = _parseRecordingSource(
+        AppSettings.instance.recordingSource,
+      );
+    }
+    final sameSession = _sessionRecoveryStartTime != null &&
+        _sessionRecoveryStartTime == mic.startTime;
+    if (sameSession && _sessionRecoveryMeetingId != null) {
+      _recoveryMeetingId = _sessionRecoveryMeetingId;
+      // 메타(제목/메모/안건/북마크)는 DB에서 복원될 때까지 체크포인트가
+      // 덮어쓰지 않는다 — 복원 전에 덮으면 사용자가 입력한 값이 빈 값이 된다.
+      _sessionMetaOwned = false;
+      unawaited(_restoreSessionMeta(_sessionRecoveryMeetingId!));
+    }
+    // sameSession이 아니면 _recoveryMeetingId는 null로 남아
+    // 다음 체크포인트가 initial 분기로 '새 회의'를 만든다 (안전).
+  }
+
+  /// DB에 저장된 진행 중 회의의 메타를 컨트롤러/필드로 되살린다.
+  /// 성공하면 이 State가 메타 소유권을 회복한다.
+  Future<void> _restoreSessionMeta(int meetingId) async {
+    try {
+      final m = await MeetingRepositoryImpl(
+        IsarService.instance.db,
+      ).getMeetingById(meetingId);
+      if (m == null) return; // 사용자가 삭제한 경우 — 소유권 미회복(안 덮음)
+      // 제목은 접두어+접미어 재조합 대신 저장된 전체 제목을 그대로 유지한다.
+      _datePrefix = m.title;
+      _titleSuffixController.clear();
+      _notesCtrl.text = m.notes;
+      _meetingAgenda = m.agenda;
+      _summaryTemplateId = m.summaryTemplateId;
+      _bookmarks
+        ..clear()
+        ..addAll(_parseBookmarksJson(m.bookmarksJson));
+      _titleSnapshot = m.title;
+      _notesSnapshot = m.notes.trim();
+      _sessionMetaOwned = true;
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('[Restore] session meta restore failed: $e');
+    }
+  }
+
+  static List<Bookmark> _parseBookmarksJson(String raw) {
+    if (raw.isEmpty) return const [];
+    try {
+      final list = jsonDecode(raw) as List;
+      return list
+          .map((e) => Bookmark.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   /// 북마크 리스트를 JSON 직렬화 (빈 리스트면 빈 문자열 반환)
   String _bookmarksToJson() => _bookmarks.isEmpty
       ? ''
@@ -411,6 +507,16 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     if (bytes == 0) return ('empty', tr('마이크에서 오디오 데이터가 들어오지 않았습니다.', 'No audio data was received from the microphone.'));
     if (segments == 0 && duration >= const Duration(seconds: 12)) {
+      // 콜드 모델 로드가 끝나기 전에 정지된 세션: 전사가 없는 건 오디오
+      // 문제가 아니라 모델이 준비되기 전이었기 때문. WAV는 정상 저장되므로
+      // 삭제를 유도하지 않고 '다시 전사' 안내로 강등한다.
+      if (!MicrophoneService.instance.sttReadyThisSession) {
+        return (
+          'low',
+          tr('음성 인식 준비가 끝나기 전에 정지되어 실시간 전사가 없습니다. 저장된 녹음에서 "다시 전사"를 실행하면 전사본을 만들 수 있습니다.',
+              'Recording stopped before speech recognition finished preparing, so there is no live transcript. Run "Re-transcribe" on the saved recording to create one.'),
+        );
+      }
       return ('empty', tr('음성 인식 결과가 생성되지 않았습니다.', 'No speech recognition results were produced.'));
     }
     if (chars < 20 &&
@@ -644,6 +750,8 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _recordingStartedAt = null;
       _recordingEndedAt = null;
       _recoveryMeetingId = null;
+      _sessionRecoveryMeetingId = null;
+      _sessionRecoveryStartTime = null;
       _inputLevel = 0;
       _lastAudibleInputAt = null;
       _maxInputLevelDuringRecording = 0;
@@ -728,7 +836,16 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   /// [initial]=true 이면 Meeting을 새로 생성. 이후 호출은 같은 Meeting을 갱신
   /// + 현재 _segments를 transcripts 테이블에 일괄 교체.
   Future<void> _saveRecoveryCheckpoint({bool initial = false}) async {
-    if (!mounted) return;
+    // dispose 후에도 저장은 진행한다 — 정지 마무리(최대 30초+) 중 화면을
+    // 떠나면 예전엔 여기서 return해 마지막 전사 flush가 무산되고 done 회의의
+    // 꼬리 세그먼트가 유실됐다. 컨트롤러는 dispose 후 접근 불가이므로
+    // mounted일 때 스냅샷을 갱신하고, 아니면 마지막 스냅샷을 쓴다.
+    if (mounted) {
+      _titleSnapshot = _fullTitle;
+      _notesSnapshot = _notesCtrl.text.trim();
+    }
+    final title = _titleSnapshot;
+    final notes = _notesSnapshot;
     try {
       final db = IsarService.instance.db;
       final meetingRepo = MeetingRepositoryImpl(db);
@@ -738,35 +855,48 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       Meeting meeting;
       if (initial || _recoveryMeetingId == null) {
         meeting = Meeting()
-          ..title = _fullTitle
+          ..title = title
           ..createdAt = _recordingStartedAt ?? now
           ..status = MeetingStatus.recording
           ..audioFilePath = _audioSavePath
-          ..notes = _notesCtrl.text.trim()
+          ..notes = notes
           ..summaryTemplateId = _summaryTemplateId
           ..agenda = _meetingAgenda
           ..bookmarksJson = _bookmarksToJson();
         _recoveryMeetingId = await meetingRepo.saveMeeting(meeting);
+        // 세션 소유 id — 재마운트된 새 State가 이어받을 수 있도록.
+        // 반드시 시작 시각과 쌍으로 저장한다 (다음 세션이 오염되지 않게).
+        _sessionRecoveryMeetingId = _recoveryMeetingId;
+        _sessionRecoveryStartTime = MicrophoneService.instance.startTime;
+        _sessionMetaOwned = true; // 초기 생성 State가 메타 소유자
       } else {
         final existing = await meetingRepo.getMeetingById(_recoveryMeetingId!);
         if (existing == null) {
           // 사용자가 사이드바에서 삭제한 경우 — 새로 만들지 않고 그냥 무시
           return;
         }
-        existing
-          ..title = _fullTitle
-          ..notes = _notesCtrl.text.trim()
-          ..summaryTemplateId = _summaryTemplateId
-          ..agenda = _meetingAgenda
-          ..bookmarksJson = _bookmarksToJson();
-        await meetingRepo.updateMeeting(existing);
+        // 재마운트 직후(메타 미복원) State는 세그먼트만 flush한다 —
+        // 여기서 메타를 덮으면 사용자가 입력한 제목/메모/북마크가
+        // 재마운트 State의 빈 값으로 파괴된다.
+        if (_sessionMetaOwned) {
+          existing
+            ..title = title
+            ..notes = notes
+            ..summaryTemplateId = _summaryTemplateId
+            ..agenda = _meetingAgenda
+            ..bookmarksJson = _bookmarksToJson();
+          await meetingRepo.updateMeeting(existing);
+        }
       }
 
-      // 현재 segments 일괄 교체 (segmentIndex로 정렬되므로 단순 replace)
+      // 현재 segments 일괄 교체 (segmentIndex로 정렬되므로 단순 replace).
+      // dispose 후에는 onSegment 콜백이 끊겨 위젯 _segments가 최종 flush
+      // 세그먼트를 못 받으므로 서비스 세그먼트를 진실 소스로 쓴다.
+      final segs = mounted ? _segments : MicrophoneService.instance.segments;
       final mid = _recoveryMeetingId!;
       await transcriptRepo.deleteByMeetingId(mid);
-      for (int i = 0; i < _segments.length; i++) {
-        final seg = _segments[i];
+      for (int i = 0; i < segs.length; i++) {
+        final seg = segs[i];
         final t = Transcript()
           ..meetingId = mid
           ..segmentIndex = i
@@ -777,8 +907,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           ..createdAt = now;
         await transcriptRepo.saveSegment(t);
       }
-      // 사이드바 목록 갱신 (녹음 진행 표시)
-      ref.invalidate(meetingsProvider);
+      // 사이드바 목록 갱신 (녹음 진행 표시) — dispose 후에도 안전하도록
+      // ref 대신 전역 컨테이너 사용.
+      globalProviderContainer.invalidate(meetingsProvider);
     } catch (e) {
       debugPrint('[Checkpoint] save failed: $e');
     }
@@ -1044,6 +1175,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           ? SystemAudioService.instance.drainPcm
           : null;
 
+      // 새 세션 시작 — 이전 세션의 static 잔재를 반드시 무효화한다.
+      // (남아 있으면 초기 체크포인트 전에 재마운트될 경우 이전 회의를
+      //  물려받아 그 회의의 전사·제목을 덮어쓴다)
+      _sessionRecoveryMeetingId = null;
+      _sessionRecoveryStartTime = null;
+      _sessionMetaOwned = true;
+
       // 모델 로드(콜드 캐시 시 몇 분) 중 화면을 떠나도 사이드바의
       // "녹음 진행 중" 배너·가드가 작동하도록 미리 켠다.
       ref.read(nativeRecordingActiveProvider.notifier).state = true;
@@ -1240,6 +1378,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   Future<void> _pauseRecording() async {
     await MicrophoneService.instance.pauseRecording();
+    // 시스템 오디오 캡처도 함께 일시정지 — 시스템 트랙만 계속 기록되면
+    // 최종 믹스에서 두 트랙의 시간축이 어긋난다. (서비스 상태 기준 —
+    // 위젯 필드는 재마운트로 비어 있을 수 있다)
+    if (SystemAudioService.instance.isRecording) {
+      await SystemAudioService.instance.setPaused(true);
+    }
     setState(() {
       _phase = _RecordingPhase.paused;
       _statusMsg = tr('일시 정지됨 — "계속하기"로 재개하세요.', 'Paused — press "Resume" to continue.');
@@ -1248,6 +1392,16 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   Future<void> _resumeRecording() async {
     await MicrophoneService.instance.resumeRecording();
+    if (SystemAudioService.instance.isRecording) {
+      await SystemAudioService.instance.setPaused(false);
+    }
+    // paused 상태로 재마운트된 State는 체크포인트 타이머가 없다 — 재개 시 보장.
+    if (_checkpointTimer == null || !_checkpointTimer!.isActive) {
+      _checkpointTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (!mounted || _phase != _RecordingPhase.recording) return;
+        _saveRecoveryCheckpoint();
+      });
+    }
     setState(() {
       _phase = _RecordingPhase.recording;
       _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
@@ -1261,6 +1415,17 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _phase = _RecordingPhase.processing;
       _statusMsg = tr('녹음 정리 중', 'Finalizing recording');
     });
+    // 시스템 오디오 캡처를 마이크 정지보다 먼저 멈춘다 — mic 정지는 최종
+    // 전사 flush로 최대 30초+ 걸리는데, 그동안 시스템 캡처가 계속 파일에
+    // 기록되면 시스템 트랙이 마이크보다 길어져 믹스 싱크가 어긋난다.
+    if (SystemAudioService.instance.isRecording) {
+      // 주의: stop()이 currentOutputPath를 지우므로 최종 믹스용 경로를
+      // 먼저 위젯 필드에 확보해 둔다.
+      _systemAudioPath ??= SystemAudioService.instance.currentOutputPath;
+      try {
+        await SystemAudioService.instance.stop();
+      } catch (_) {}
+    }
     // stopRecording은 최대 30초까지 걸릴 수 있다. 이 사이에 사용자가 화면을
     // 벗어나면 위젯이 dispose되므로, 영속화(회의 status=done + 마지막
     // 체크포인트)를 ref/setState보다 먼저 수행해 중간 이탈에도 회의가
@@ -1288,15 +1453,20 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     await _saveRecoveryCheckpoint();
 
-    // ── 여기서부터 UI/ref 갱신: 위젯이 dispose됐으면 안전하게 종료 ──
+    // provider 정리는 dispose 여부와 무관하게 반드시 실행 — 예전엔 정지
+    // 마무리 중 화면 이탈 시 nativeRecordingActiveProvider가 true로 고착돼
+    // 사이드바 '녹음 진행 중' 배너와 게이트가 영구히 잠겼다.
+    globalProviderContainer.read(nativeRecordingActiveProvider.notifier).state =
+        false;
+    globalProviderContainer.invalidate(meetingsProvider);
+
+    // ── 여기서부터 UI 갱신: 위젯이 dispose됐으면 안전하게 종료 ──
     if (!mounted) return;
-    ref.read(nativeRecordingActiveProvider.notifier).state = false;
     setState(() {
       _inputLevel = 0;
       _phase = _RecordingPhase.stopped;
       _statusMsg = tr('녹음 완료. 요약을 실행하세요.', 'Recording complete. Run the summary.');
     });
-    ref.invalidate(meetingsProvider);
     await _maybeWarnEmptyRecordingAfterStop();
   }
 
@@ -1364,9 +1534,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   /// - micAndSystem: 마이크 + 시스템을 믹스해 마이크 경로에 덮어씀
   /// 시스템 파일이 없거나 믹스 실패 시 마이크 녹음을 그대로 사용한다(graceful).
   Future<void> _finalizeSystemAudioIfNeeded() async {
-    final sysPath = _systemAudioPath;
+    // 위젯 필드가 재마운트로 비었더라도 서비스가 세션 경로를 알고 있다.
+    final sysPath =
+        _systemAudioPath ?? SystemAudioService.instance.currentOutputPath;
     if (sysPath == null) return;
     _systemAudioPath = null;
+    // 믹스가 실제로 성공했을 때만 시스템 원본을 지운다 — 예전엔 finally에서
+    // 무조건 삭제해, 믹스 실패 시 상대방 음성의 유일한 원본이 영구 소실됐다.
+    var mixSucceeded = false;
     try {
       await SystemAudioService.instance.stop();
       final micPath =
@@ -1379,21 +1554,25 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         context: 'systemAudio',
       );
       if (micPath == null) return;
-      if (sysLen <= 0) return; // 시스템 캡처 실패/빈 파일 → 마이크만
+      if (sysLen <= 0) {
+        mixSucceeded = true; // 빈 파일 → 지워도 잃을 것 없음
+        return;
+      }
 
       if (_recordingSource == RecordingSource.systemAudio) {
-        await WavMixer.mixFiles([sysPath], micPath);
+        mixSucceeded = await WavMixer.mixFiles([sysPath], micPath);
       } else {
         final mixedTmp = '$micPath.mix.wav';
         final ok = await WavMixer.mixFiles([micPath, sysPath], mixedTmp);
         if (ok) {
           await File(mixedTmp).rename(micPath);
+          mixSucceeded = true;
         } else {
           await File(mixedTmp).delete().catchError((_) => File(mixedTmp));
         }
       }
       CrashLogService.instance.info(
-        'system audio mix done → $micPath',
+        'system audio mix done → $micPath (ok=$mixSucceeded)',
         context: 'systemAudio',
       );
     } catch (e, st) {
@@ -1403,9 +1582,17 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         context: 'systemAudioFinalize',
       );
     } finally {
-      try {
-        await File(sysPath).delete();
-      } catch (_) {}
+      if (mixSucceeded) {
+        try {
+          await File(sysPath).delete();
+        } catch (_) {}
+      } else {
+        // 원본 보존 — 사용자가 수동으로 복구할 수 있도록 로그에 경로를 남긴다.
+        CrashLogService.instance.info(
+          'system audio kept (mix failed): $sysPath',
+          context: 'systemAudio',
+        );
+      }
     }
   }
 
@@ -2098,6 +2285,20 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   // ── LLM 요약 + Isar 저장 ──────────────────────────────────────
   Future<void> _runSummary() async {
+    // 재진입 방지 — 요약 준비 다이얼로그가 떠 있는 동안 ⌘⇧S 재입력 등으로
+    // 두 번째 _runSummary가 겹치면 다이얼로그 중복·이중 요약이 발생한다.
+    if (_summaryFlowActive) return;
+    _summaryFlowActive = true;
+    try {
+      await _runSummaryInner();
+    } finally {
+      _summaryFlowActive = false;
+    }
+  }
+
+  bool _summaryFlowActive = false;
+
+  Future<void> _runSummaryInner() async {
     if (_segments.isEmpty) {
       if (_looksLikeEmptyRecording()) {
         _recordQualityIfNeeded(context: 'summaryBlockedEmptyRecording');
@@ -2165,13 +2366,13 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           : 'disabled';
     });
     _startSummaryTicker();
-    ref.read(isSummarizingProvider.notifier).state = true;
+    globalProviderContainer.read(isSummarizingProvider.notifier).state = true;
 
     if (_failedSummaryMeetingId == null) {
       await _refreshFinalTranscriptIfNeeded();
     }
     if (_cancelSummaryRequested) {
-      ref.read(isSummarizingProvider.notifier).state = false;
+      globalProviderContainer.read(isSummarizingProvider.notifier).state = false;
       _summaryTicker?.cancel();
       if (mounted) {
         final totalStr = _formatDurationKr(_currentSummaryElapsed());
@@ -2188,7 +2389,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     // 실패해도 치명 오류로 취급하지 않고 라벨 없이 계속 진행한다.
     await _runDiarizationIfEnabled();
     if (_cancelSummaryRequested) {
-      ref.read(isSummarizingProvider.notifier).state = false;
+      globalProviderContainer.read(isSummarizingProvider.notifier).state = false;
       _summaryTicker?.cancel();
       if (mounted) {
         final totalStr = _formatDurationKr(_currentSummaryElapsed());
@@ -2221,7 +2422,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         st,
         context: 'persistMeetingAndTranscripts',
       );
-      ref.read(isSummarizingProvider.notifier).state = false;
+      globalProviderContainer.read(isSummarizingProvider.notifier).state = false;
       final totalStr = _formatDurationKr(_currentSummaryElapsed());
       _summaryTicker?.cancel();
       final friendly = friendlyErrorText(
@@ -2360,9 +2561,18 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
       await OnDeviceModelManager.instance.unloadLlm();
 
+      // 전역 플래그 정리는 화면 이탈(dispose) 여부와 무관하게 반드시 실행 —
+      // mounted 가드 안에 두면 요약 중 화면을 떠났을 때 isSummarizing이
+      // true로 고착돼 새 녹음·파일 불러오기가 영구히 잠긴다.
+      _summaryTicker?.cancel();
+      globalProviderContainer.read(isSummarizingProvider.notifier).state =
+          false;
+      globalProviderContainer.read(nativeRecordingActiveProvider.notifier)
+          .state = false;
+      globalProviderContainer.invalidate(meetingsProvider);
+
       if (mounted) {
         final totalStr = _formatDurationKr(_currentSummaryElapsed());
-        _summaryTicker?.cancel();
         setState(() {
           _phase = _RecordingPhase.done;
           _statusMsg = tr('저장 완료 · 총 소요 $totalStr · meetingId: $meetingId', 'Saved · total $totalStr · meetingId: $meetingId');
@@ -2376,17 +2586,14 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           ),
         );
 
-        // Riverpod 상태 갱신 → MeetingDetailView로 이동
-        ref.invalidate(meetingsProvider);
-        ref.read(isSummarizingProvider.notifier).state = false;
+        // MeetingDetailView로 이동 (화면에 있을 때만 의미 있는 동작)
         ref.read(selectedMeetingIdProvider.notifier).state = meetingId;
         ref.read(isRecordingActiveProvider.notifier).state = false;
-        ref.read(nativeRecordingActiveProvider.notifier).state = false;
       }
     } catch (e, st) {
       await OnDeviceModelManager.instance.unloadLlm().catchError((_) {});
       CrashLogService.instance.recordCaught(e, st, context: 'runSummary');
-      ref.read(isSummarizingProvider.notifier).state = false;
+      globalProviderContainer.read(isSummarizingProvider.notifier).state = false;
       final totalStr = _formatDurationKr(_currentSummaryElapsed());
       _summaryTicker?.cancel();
       final friendly = friendlyErrorText(
@@ -2696,8 +2903,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       await transcriptRepo.saveSegment(t);
     }
 
-    // 복구 ID 정리 — 정상 흐름 종료
+    // 복구 ID 정리 — 정상 흐름 종료 (세션 static도 함께 무효화:
+    // 남겨두면 다음 세션의 재마운트가 이 완료된 회의를 물려받아 파괴한다)
     _recoveryMeetingId = null;
+    _sessionRecoveryMeetingId = null;
+    _sessionRecoveryStartTime = null;
 
     // ── macOS Calendar.app에 자동 이벤트 등록 (설정 ON일 때) ───────
     if (AppSettings.instance.autoAddToCalendar) {
@@ -3970,6 +4180,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         ref.read(pendingTrayQuickStartProvider.notifier).state = false;
         ref.read(pendingTrayQuickStartFromTrayProvider.notifier).state = false;
         _startRecording(showTrayFailureNotice: fromTray);
+      } else {
+        // 시작 불가 phase에 온 신호도 pending 플래그는 소거한다 —
+        // 남겨두면 다음 위젯 마운트 때 유령 자동 시작이 발생한다.
+        ref.read(pendingTrayQuickStartProvider.notifier).state = false;
+        ref.read(pendingTrayQuickStartFromTrayProvider.notifier).state = false;
       }
     });
     ref.listen<int>(trayStopRecordingSignalProvider, (prev, next) {

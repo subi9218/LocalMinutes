@@ -361,6 +361,10 @@ class ModelDownloadService {
           '가속팩 압축 해제가 불완전합니다. 파일이 손상되었을 수 있으니 다시 시도하세요.',
         );
       }
+
+      // 압축 해제 성공 — 더 이상 필요 없는 원본 zip(~1.2GB)을 정리한다.
+      // (예전엔 남겨둬서 사용자 디스크를 영구히 점유했다)
+      await File(destZipPath).delete().catchError((_) => File(destZipPath));
     } on ModelDownloadException {
       rethrow;
     } catch (e) {

@@ -342,7 +342,25 @@ class SttService {
     );
 
     try {
-      final result = await receivePort.first;
+      // 병리적 네이티브 행(모델 로드의 10분 안전선과 동일 계열)이 전사에서
+      // 발생하면 전역 lease가 영구 점유돼 이후 모든 AI 작업·녹음 정지가
+      // 조용히 동결된다 → 오디오 길이 비례 타임아웃으로 방어.
+      // (30초 윈도우는 실측 1~4초 → ×6 여유는 최저 사양에서도 넉넉)
+      final audioSec = samples.length ~/ _sampleRate;
+      final hangGuard = Duration(seconds: 600 + audioSec * 6);
+      final Object? result;
+      try {
+        result = await receivePort.first.timeout(hangGuard);
+      } on TimeoutException {
+        // 네이티브 전사 스레드가 컨텍스트를 계속 쓰고 있을 수 있으므로
+        // 이후 whisper_free와 충돌(SIGABRT)하지 않게 오염 마킹 —
+        // unloadStt가 free를 건너뛴다(프로세스 종료 시 OS가 회수).
+        OnDeviceModelManager.instance.markSttContextPoisoned();
+        throw Exception(
+          '음성 인식이 ${hangGuard.inMinutes}분을 초과해 중단했습니다. '
+          '앱을 재시작한 뒤 다시 시도해주세요.',
+        );
+      }
       if (result is Exception) throw result;
 
       final rawList = result as List;

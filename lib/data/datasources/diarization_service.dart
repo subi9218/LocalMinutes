@@ -196,6 +196,15 @@ class DiarizationService {
         }
       }
       return result;
+    } on DiarizationTimeoutException {
+      // 타임아웃이어도 lease를 쥔 채로 잠시 자연 종료를 기다린다 —
+      // 여기서 바로 lease를 놓으면 아직 실행 중인 sherpa 네이티브 추론과
+      // 곧이어 시작되는 LLM 로드가 메모리를 두고 겹친다(16GB 기기 압박).
+      // 60초 안에 끝나는 경우가 대부분이고, 안 끝나면 그때 포기한다.
+      try {
+        await exited.future.timeout(const Duration(seconds: 60));
+      } catch (_) {}
+      rethrow;
     } finally {
       timeoutTimer.cancel();
       await sub.cancel();

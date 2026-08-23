@@ -59,9 +59,15 @@ class AppSettings {
     const defaultsMarker = '_settingsDefaultsApplied_v1';
     if (!(_prefs.getBool(defaultsMarker) ?? false)) {
       // 음성 인식 방식: 빠름 (ultraFast)
+      // 단, 구버전(sttProcessingMode 도입 전)에서 '정밀'(sttAccurateMode=true)을
+      // 직접 선택했던 사용자의 의도는 보존한다 — 일괄 ultraFast로 덮지 않는다.
       if (_prefs.getString('sttProcessingMode') == null) {
-        await _prefs.setString('sttProcessingMode', sttModeUltraFast);
-        await _prefs.setBool('sttAccurateMode', false);
+        if (_prefs.getBool('sttAccurateMode') == true) {
+          await _prefs.setString('sttProcessingMode', sttModeAccurate);
+        } else {
+          await _prefs.setString('sttProcessingMode', sttModeUltraFast);
+          await _prefs.setBool('sttAccurateMode', false);
+        }
       }
       // 기본 회의 유형: 주제별 요약 (topic_report)
       if (_prefs.getString('summaryTemplateId') == null) {

@@ -58,6 +58,12 @@ class MicrophoneService {
   final _fullAudioBytes = BytesBuilder();
   String? _audioSavePath; // 저장 경로 (startRecording 시 지정)
 
+  // 세션 세대 카운터 — 콜드 모델 로드(수 분) 중 정지→재시작이 일어나면
+  // 낡은 startRecording 연속(continuation)이 새 세션의 _recording=true를 보고
+  // 되살아나 곧 해제될 whisper 컨텍스트로 전사를 시작할 수 있다(SIGABRT).
+  // 각 시작/정지가 세대를 올리고, 연속은 자기 세대가 최신일 때만 진행한다.
+  int _sessionSeq = 0;
+
   // ── 시스템 오디오 실시간 믹스 (온라인 회의, B 마일스톤) ─────────────
   // 설정 시, 주기적으로 시스템 오디오 PCM(16kHz 모노 int16)을 끌어와 STT
   // 윈도우(_buffer)에 마이크와 합산한다. 최종 저장 WAV는 _fullAudioBytes(마이크)
@@ -70,6 +76,12 @@ class MicrophoneService {
 
   bool _recording = false;
   int _baseOffsetMs = 0; // 다음 윈도우 기준 타임스탬프 오프셋
+
+  /// 이 세션 중 STT 모델이 실제로 준비 완료됐는지.
+  /// 콜드 로드가 끝나기 전에 정지된 세션은 false — 이 경우 '전사 0건'은
+  /// 오디오 문제가 아니므로 빈 녹음 판정(삭제 유도)을 하면 안 된다.
+  bool _sttReadyThisSession = false;
+  bool get sttReadyThisSession => _sttReadyThisSession;
   bool _processing = false; // 윈도우 처리 중 중복 방지
 
   // ── 일시 정지 ─────────────────────────────────────────────────────
@@ -142,6 +154,7 @@ class MicrophoneService {
     InputDevice? device,
   }) async {
     if (_recording) return;
+    final session = ++_sessionSeq;
 
     _recorder = AudioRecorder();
 
@@ -182,6 +195,7 @@ class MicrophoneService {
     _totalBytesReceived = 0;
     _audioSavePath = audioSavePath;
     _startTime = DateTime.now();
+    _sttReadyThisSession = false;
     _systemQueue.clear();
     _sysLeftover = Uint8List(0);
 
@@ -232,6 +246,13 @@ class MicrophoneService {
       _fullAudioBytes.clear();
       rethrow;
     }
+
+    // 콜드 로드 중 정지(또는 정지→재시작)가 일어난 경우: 이 연속은 낡은
+    // 세대이므로 아무것도 만들지 않고 조용히 종료한다. 전역 _recording만 보면
+    // 다음 세션이 true로 되돌렸을 때 낡은 연속이 되살아나 타이머 누수와
+    // 낡은 컨텍스트 전사(SIGABRT 경합)를 일으킨다.
+    if (session != _sessionSeq || !_recording) return;
+    _sttReadyThisSession = true;
 
     // 타이머 기반 강제 처리: 30초마다 버퍼에 3초 이상 데이터 있으면 처리
     // → 버퍼가 정확히 30초를 채우지 못해도 중간 결과를 표시
@@ -288,6 +309,8 @@ class MicrophoneService {
   /// 누락되는 문제를 막기 위한 종료 전용 flush 경로다.
   /// WAV 파일 저장 후 반환 (audioSavePath 지정 시)
   Future<void> stopRecording() async {
+    // 진행 중일 수 있는 낡은 startRecording 연속을 무효화
+    _sessionSeq++;
     if (!_recording) return;
     _recording = false;
     _paused = false;
@@ -347,7 +370,11 @@ class MicrophoneService {
     }
     _buffer.clear();
 
-    await OnDeviceModelManager.instance.unloadStt().catchError((_) {});
+    // 언로드는 정지 흐름을 막지 않는다. 콜드 모델 로드가 아직 진행 중이면
+    // unloadStt가 lease FIFO에서 로드 완료(수 분)까지 대기하는데, 그동안
+    // UI가 '녹음 정리 중'에 멈춰 보이는 것을 방지 — 큐가 순서를 보장하므로
+    // 로드가 끝나는 즉시 알아서 언로드된다.
+    unawaited(OnDeviceModelManager.instance.unloadStt().catchError((_) {}));
   }
 
   /// 상태 초기화 (녹음 중지 후 재사용 시 호출)
@@ -478,6 +505,11 @@ class MicrophoneService {
 
   Future<void> _processWindow({bool finalWindow = false}) async {
     if (_processing) return;
+    // 모델 로드 완료 전에는 버퍼를 소비하지 않는다 (takeBytes 이전에 검사).
+    // 콜드 로드(CoreML 최초 컴파일, 수십 초~수 분) 중 윈도우가 돌면 예전엔
+    // 버퍼를 꺼낸 뒤 그냥 버려서 회의 서두 발화가 라이브 전사에서 유실되고
+    // 오프셋도 어긋났다. 여기서 막으면 로드 완료 후 밀린 버퍼를 통째로 전사한다.
+    if (!OnDeviceModelManager.instance.isSttLoaded) return;
     _processing = true;
     onProcessing?.call(true);
 
@@ -524,30 +556,30 @@ class MicrophoneService {
       //   speechRatio 0.01 → 0.03. 짧은 기침/노이즈 burst에 속아 whisper를
       //   깨우지 않도록 조금 더 엄격하게. 회의 발화는 최소 수초 지속되므로
       //   30초 윈도우 기준 3%(≈0.9s) 요건은 조용한 화자도 충분히 통과.
+      // 어떤 경로(VAD 스킵/전사 성공/전사 예외)로 끝나든 오디오는 이미
+      // 소비됐으므로 오프셋을 먼저 전진시켜 타임스탬프 일관성을 지킨다.
+      // (예전엔 전사 예외 시 미전진 → 이후 모든 세그먼트 시간이 앞으로 밀림)
+      final windowBaseMs = _baseOffsetMs;
+      _baseOffsetMs += actualAdvanceMs;
+
       final rmsAvg = VadFilter.averageRms(samples);
       debugPrint(
         '[VAD] rms avg: ${rmsAvg.toStringAsFixed(4)}, samples: $processedSamples, advanceMs: $actualAdvanceMs, bufTotal: $_totalBytesReceived bytes',
       );
       if (!VadFilter.hasSpeech(samples, threshold: 0.002, speechRatio: 0.03)) {
-        _baseOffsetMs += actualAdvanceMs;
         debugPrint('[VAD] 무음/잡음만 — Whisper 스킵');
         return;
       }
 
       debugPrint(
         '[VAD] 통과 → Whisper 처리 시작 '
-        '(baseOffset: ${_baseOffsetMs}ms, final=$finalWindow)',
+        '(baseOffset: ${windowBaseMs}ms, final=$finalWindow)',
       );
-
-      // Whisper 처리
-      if (!OnDeviceModelManager.instance.isSttLoaded) return;
 
       final newSegments = await SttService.instance.transcribeFromSamples(
         samples,
-        _baseOffsetMs,
+        windowBaseMs,
       );
-
-      _baseOffsetMs += actualAdvanceMs;
 
       int added = 0;
       int halluc = 0;

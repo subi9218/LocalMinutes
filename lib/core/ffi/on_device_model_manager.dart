@@ -311,6 +311,25 @@ class OnDeviceModelManager {
   Future<void> unloadStt() =>
       runExclusiveNativeTask(tr('음성 인식 모델 해제', 'Unloading speech recognition model'), _unloadSttUnlocked);
 
+  /// 전사 행 타임아웃으로 버려진 컨텍스트 — 네이티브 스레드가 아직 쓰고
+  /// 있을 수 있어 free도, 재사용도 불가. 의도적으로 누수시켜 보관만 한다
+  /// (프로세스 종료 시 OS가 회수). 디버깅용으로 참조를 남겨둔다.
+  // ignore: unused_field
+  Pointer<Void>? _leakedWhisperCtx;
+
+  /// 전사 행 타임아웃 시 호출 — 컨텍스트를 즉시 사용 불가로 만든다.
+  /// (_whisperCtx=null → isSttLoaded=false → 이후 전사/free 자연 차단.
+  ///  그대로 두면 다음 30초 윈도우가 행 중인 네이티브 스레드와 같은
+  ///  컨텍스트로 두 번째 전사를 시작해 heap corruption이 난다.)
+  void markSttContextPoisoned() {
+    _leakedWhisperCtx = _whisperCtx;
+    _whisperCtx = null;
+    CrashLogService.instance.info(
+      'whisper ctx poisoned (transcribe hang timeout) — leaked, not freed',
+      context: 'model',
+    );
+  }
+
   Future<void> _unloadSttUnlocked() async {
     if (!isSttLoaded) return;
     WhisperFfi.instance.freeModel(_whisperCtx!);

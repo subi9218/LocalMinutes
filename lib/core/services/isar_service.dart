@@ -135,15 +135,9 @@ class IsarService {
     // 기존 DB(_isar=current)를 계속 쓸 수 있다.
     final next = await Isar.open(_schemas, directory: targetPath);
 
-    // 타깃 열기 성공 → 이제 소스를 닫고 포인터를 교체한다.
-    if (current != null && current.isOpen) {
-      try {
-        await current.close();
-      } catch (_) {}
-    }
-    _isar = next;
-    _directoryPath = targetPath;
-
+    // 데이터 복사를 포인터 교체보다 먼저 수행한다 — 복사가 실패(디스크 부족 등)
+    // 하면 next를 닫고 예외를 전파해, 세션이 기존 DB를 그대로 유지하게 한다.
+    // (예전엔 _isar를 먼저 교체해 복사 실패 시 세션이 '빈 DB'로 남았다)
     final hasData =
         meetings.isNotEmpty ||
         groups.isNotEmpty ||
@@ -152,15 +146,37 @@ class IsarService {
         summaryVersions.isNotEmpty ||
         glossaryEntries.isNotEmpty;
     if (hasData) {
-      await next.writeTxn(() async {
-        await next.meetingGroups.putAll(groups);
-        await next.meetings.putAll(meetings);
-        await next.transcripts.putAll(transcripts);
-        await next.summarys.putAll(summaries);
-        await next.summaryVersions.putAll(summaryVersions);
-        await next.glossaryEntrys.putAll(glossaryEntries);
-      });
+      try {
+        await next.writeTxn(() async {
+          await next.meetingGroups.putAll(groups);
+          await next.meetings.putAll(meetings);
+          await next.transcripts.putAll(transcripts);
+          await next.summarys.putAll(summaries);
+          await next.summaryVersions.putAll(summaryVersions);
+          await next.glossaryEntrys.putAll(glossaryEntries);
+        });
+      } catch (_) {
+        try {
+          await next.close();
+        } catch (_) {}
+        // 방금 만든 빈 DB 파일을 정리한다 — 남겨두면 다음 시도에서 I4
+        // 가드('타깃에 데이터 있음')가 이 빈 DB를 채택해 원본이 버려진다.
+        // (putAll 경로는 타깃이 비어 있을 때만 도달하므로 삭제 안전)
+        try {
+          await _deleteLegacyIsarFiles(targetPath);
+        } catch (_) {}
+        rethrow;
+      }
     }
+
+    // 복사 성공 → 이제 소스를 닫고 포인터를 교체한다.
+    if (current != null && current.isOpen) {
+      try {
+        await current.close();
+      } catch (_) {}
+    }
+    _isar = next;
+    _directoryPath = targetPath;
 
     // I2: 녹음 WAV 파일을 새 폴더로 옮기고 audioFilePath 갱신 (best-effort).
     await _migrateAudioFiles(currentPath, targetPath, next);

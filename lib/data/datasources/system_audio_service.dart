@@ -19,6 +19,12 @@ class SystemAudioService {
   bool _recording = false;
   bool get isRecording => _recording;
 
+  /// 현재 캡처 중인 시스템 오디오 파일 경로 (캡처 중이 아니면 null).
+  /// 세션 상태를 위젯이 아니라 서비스가 소유해야, 녹음 중 화면 이탈→복귀로
+  /// 위젯이 재생성돼도 pause/정지/최종 믹스가 시스템 트랙을 잃지 않는다.
+  String? _currentOutputPath;
+  String? get currentOutputPath => _currentOutputPath;
+
   /// 현재 OS/빌드에서 시스템 오디오 캡처가 지원되는지 (macOS 14.2+).
   Future<bool> isSupported() async {
     if (!Platform.isMacOS) return false;
@@ -40,6 +46,7 @@ class SystemAudioService {
       'path': outputPath,
     });
     _recording = ok ?? false;
+    _currentOutputPath = _recording ? outputPath : null;
     return _recording;
   }
 
@@ -53,6 +60,15 @@ class SystemAudioService {
     } catch (_) {
       return Uint8List(0);
     }
+  }
+
+  /// 일시정지/재개 — 마이크 pause와 동기화해 두 트랙의 믹스 싱크를 지킨다.
+  /// (일시정지 중 시스템 트랙만 계속 기록되면 최종 믹스가 어긋난다)
+  Future<void> setPaused(bool paused) async {
+    if (!Platform.isMacOS || !_recording) return;
+    try {
+      await _channel.invokeMethod<void>('setPaused', paused);
+    } catch (_) {}
   }
 
   /// 시스템 설정 > 개인정보 보호 및 보안 패널을 연다.
@@ -77,6 +93,7 @@ class SystemAudioService {
       // 중지 실패는 치명적이지 않음.
     } finally {
       _recording = false;
+      _currentOutputPath = null;
     }
   }
 }

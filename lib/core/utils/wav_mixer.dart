@@ -49,14 +49,12 @@ class WavMixer {
     return mixed;
   }
 
-  /// 16kHz 모노 float32 [-1,1] 샘플을 16-bit PCM WAV로 인코딩한다.
-  static Uint8List encodeMonoWav(Float32List samples, {int rate = sampleRate}) {
+  /// 44바이트 WAV 헤더 (16-bit PCM 모노).
+  static Uint8List _monoWavHeader(int dataSize, int rate) {
     const channels = 1;
     const bitsPerSample = 16;
     final byteRate = rate * channels * (bitsPerSample ~/ 8);
     final blockAlign = channels * (bitsPerSample ~/ 8);
-    final dataSize = samples.length * 2;
-    final out = BytesBuilder();
     final header = ByteData(44);
 
     void writeAscii(int offset, String s) {
@@ -78,7 +76,14 @@ class WavMixer {
     header.setUint16(34, bitsPerSample, Endian.little);
     writeAscii(36, 'data');
     header.setUint32(40, dataSize, Endian.little);
-    out.add(header.buffer.asUint8List());
+    return header.buffer.asUint8List();
+  }
+
+  /// 16kHz 모노 float32 [-1,1] 샘플을 16-bit PCM WAV로 인코딩한다.
+  static Uint8List encodeMonoWav(Float32List samples, {int rate = sampleRate}) {
+    final dataSize = samples.length * 2;
+    final out = BytesBuilder();
+    out.add(_monoWavHeader(dataSize, rate));
 
     final pcm = ByteData(dataSize);
     for (var i = 0; i < samples.length; i++) {
@@ -108,7 +113,27 @@ class WavMixer {
     if (tracks.isEmpty) return false;
     final mixed = mixFloat(tracks);
     if (mixed.isEmpty) return false;
-    await File(outputPath).writeAsBytes(encodeMonoWav(mixed), flush: true);
+    // 인코딩 결과를 통째로 메모리에 만들지 않고 청크 단위로 스트리밍 기록
+    // (긴 회의에서 수백 MB의 이중 버퍼가 생기는 것을 방지).
+    final sink = File(outputPath).openWrite();
+    try {
+      sink.add(_monoWavHeader(mixed.length * 2, sampleRate));
+      const chunkFrames = 1 << 16; // 64k 샘플(≈4초)씩
+      for (var i = 0; i < mixed.length; i += chunkFrames) {
+        final end = (i + chunkFrames < mixed.length)
+            ? i + chunkFrames
+            : mixed.length;
+        final pcm = ByteData((end - i) * 2);
+        for (var j = i; j < end; j++) {
+          final v = (mixed[j].clamp(-1.0, 1.0) * 32767.0).round();
+          pcm.setInt16((j - i) * 2, v, Endian.little);
+        }
+        sink.add(pcm.buffer.asUint8List());
+      }
+      await sink.flush();
+    } finally {
+      await sink.close();
+    }
     return true;
   }
 }
