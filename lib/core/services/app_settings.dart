@@ -186,6 +186,14 @@ class AppSettings {
   Future<void> setSidebarWidth(double v) =>
       _prefs.setDouble('sidebarWidth', v.clamp(260, 480).toDouble());
 
+  // ── 모델 프리워밍 ─────────────────────────────────────────────────
+  /// 마지막으로 CoreML(ANE) 프리워밍을 완료한 macOS 버전 문자열.
+  /// OS가 업데이트되면 값이 달라져 다음 유휴 시점에 다시 프리워밍한다.
+  String get lastPrewarmOsVersion =>
+      _prefs.getString('lastPrewarmOsVersion') ?? '';
+  Future<void> setLastPrewarmOsVersion(String v) =>
+      _prefs.setString('lastPrewarmOsVersion', v);
+
   // ── 테마 모드 ─────────────────────────────────────────────────────
   /// 'light' | 'dark' | 'system'
   ///

@@ -16,6 +16,7 @@ import 'core/services/crash_log_service.dart';
 import 'core/services/entitlement_service.dart';
 import 'core/services/isar_service.dart';
 import 'core/services/menu_bar_service.dart';
+import 'core/services/model_prewarm_service.dart';
 import 'core/services/native_appearance.dart';
 import 'core/services/processing_status_service.dart';
 import 'core/services/security_scoped_bookmark_service.dart';
@@ -198,6 +199,16 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
       ) {
         unawaited(_syncTrayStartState());
       });
+
+      // 모델 프리워밍 — macOS 업데이트 후 첫 녹음이 ANE 재컴파일로 몇 분씩
+      // 대기하지 않도록, 시작 15초 뒤 유휴 상태에서 미리 컴파일해 둔다.
+      // (온보딩 중이거나 모델 미설치면 서비스가 알아서 건너뛴다)
+      if (_showHome && _storageReady) {
+        unawaited(
+          Future<void>.delayed(const Duration(seconds: 15))
+              .then((_) => ModelPrewarmService.maybePrewarm()),
+        );
+      }
     });
   }
 
