@@ -33,7 +33,6 @@ import '../../domain/entities/summary.dart';
 import '../providers/meeting_providers.dart';
 import '../screens/glossary_screen.dart';
 import '../screens/action_items_screen.dart';
-import '../screens/settings_screen.dart';
 import '../screens/stats_screen.dart';
 import 'app_version_credit.dart';
 import 'app_notice.dart';
@@ -652,50 +651,15 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
       child: Column(
         children: [
           // ── 헤더 ────────────────────────────────────────────────
+          // 앱 이름 헤더는 제거 — 툴바·메뉴바가 이미 앱 이름을 보여준다.
+          // (창 안에 'Local Minutes'가 두 번 반복되던 중복 해소)
+          // 유틸 아이콘도 툴바 기어(설정)와 겹치는 것·수동 새로고침은 정리하고
+          // 사이드바는 검색·목록에 집중한다. 단어집/할 일/통계는 우측 정렬 유지.
           Container(
-            padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(
-                  Icons.edit_note,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Local Minutes',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        tr('내 기기의 로컬 회의록', 'On-device meeting minutes'),
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 16),
-                  tooltip: tr('새로고침', 'Refresh'),
-                  onPressed: () {
-                    ref.invalidate(meetingsProvider);
-                    ref.invalidate(groupsProvider);
-                    ref.invalidate(allSummariesProvider);
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
                 IconButton(
                   icon: const Icon(Icons.menu_book_outlined, size: 16),
                   tooltip: tr('단어집', 'Glossary'),
@@ -712,12 +676,6 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                   icon: const Icon(Icons.bar_chart_outlined, size: 16),
                   tooltip: tr('통계', 'Statistics'),
                   onPressed: () => showStatsDialog(context),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined, size: 16),
-                  tooltip: tr('설정', 'Settings'),
-                  onPressed: () => showSettingsDialog(context, ref),
                   visualDensity: VisualDensity.compact,
                 ),
               ],

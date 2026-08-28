@@ -606,11 +606,14 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
           // S1: _GlobalShortcuts 를 Navigator 위(builder)에 두어 모든 라우트
           // (pushReplacement 로 전환된 화면 포함)에서 전역 단축키가 살아 있도록 한다.
           // (알림은 AppNotice(HUD)로 통일되어 루트 ScaffoldMessenger는 제거 — 2.3)
-          child: _GlobalShortcuts(
+          child: _AppMenuBar(
             ref: ref,
-            child: Material(
-              type: MaterialType.transparency,
-              child: child ?? const SizedBox.shrink(),
+            child: _GlobalShortcuts(
+              ref: ref,
+              child: Material(
+                type: MaterialType.transparency,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );
@@ -667,6 +670,137 @@ class _GlobalShortcuts extends StatelessWidget {
             _bump(shortcutOpenSettingsSignalProvider),
       },
       child: Focus(autofocus: true, child: child),
+    );
+  }
+}
+
+/// macOS 메뉴바(NSMenu)에 앱 명령을 등록한다.
+///
+/// 예전에는 명령이 CallbackShortcuts로만 존재해 메뉴바가 빈 템플릿
+/// 그대로였다 — 사용자가 메뉴에서 기능을 발견할 수 없고, 죽은
+/// 'Preferences…' 항목이 남는 등 Mac 앱의 기본 요건에 미달했다.
+class _AppMenuBar extends StatelessWidget {
+  final WidgetRef ref;
+  final Widget child;
+
+  const _AppMenuBar({required this.ref, required this.child});
+
+  void _bump(StateProvider<int> provider) {
+    ref.read(provider.notifier).update((s) => s + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PlatformMenuBar(
+      menus: [
+        PlatformMenu(
+          label: 'Local Minutes',
+          menus: [
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.about))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.about,
+                  ),
+              ],
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                PlatformMenuItem(
+                  label: tr('설정…', 'Settings…'),
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.comma,
+                    meta: true,
+                  ),
+                  onSelected: () =>
+                      _bump(shortcutOpenSettingsSignalProvider),
+                ),
+              ],
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.hide))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.hide,
+                  ),
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.hideOtherApplications))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.hideOtherApplications,
+                  ),
+              ],
+            ),
+            if (PlatformProvidedMenuItem.hasMenu(
+                PlatformProvidedMenuItemType.quit))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.quit,
+              ),
+          ],
+        ),
+        PlatformMenu(
+          label: tr('파일', 'File'),
+          menus: [
+            PlatformMenuItem(
+              label: tr('새 녹음', 'New Recording'),
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyR,
+                meta: true,
+                shift: true,
+              ),
+              onSelected: () => _bump(shortcutToggleRecordSignalProvider),
+            ),
+            PlatformMenuItem(
+              label: tr('요약 실행', 'Run Summary'),
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyS,
+                meta: true,
+                shift: true,
+              ),
+              onSelected: () => _bump(shortcutRunSummarySignalProvider),
+            ),
+          ],
+        ),
+        PlatformMenu(
+          label: tr('편집', 'Edit'),
+          menus: [
+            PlatformMenuItem(
+              label: tr('검색', 'Find'),
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyF,
+                meta: true,
+              ),
+              onSelected: () => _bump(shortcutFocusSearchSignalProvider),
+            ),
+          ],
+        ),
+        PlatformMenu(
+          label: tr('윈도우', 'Window'),
+          menus: [
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.minimizeWindow))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.minimizeWindow,
+                  ),
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.zoomWindow))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.zoomWindow,
+                  ),
+              ],
+            ),
+            if (PlatformProvidedMenuItem.hasMenu(
+                PlatformProvidedMenuItemType.toggleFullScreen))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.toggleFullScreen,
+              ),
+          ],
+        ),
+      ],
+      child: child,
     );
   }
 }
