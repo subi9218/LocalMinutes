@@ -2226,7 +2226,9 @@ class _MeetingTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _formatDate(meeting.createdAt),
+                        _subtitleFor(meeting),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
                           color: secondaryTextColor,
@@ -2409,6 +2411,33 @@ class _MeetingTile extends StatelessWidget {
       '${dt.day.toString().padLeft(2, '0')} '
       '${dt.hour.toString().padLeft(2, '0')}:'
       '${dt.minute.toString().padLeft(2, '0')}';
+
+  /// 자동 생성 날짜 제목 패턴 (한국어 '26년 08월 23일 23:01' / 영어 'Aug 23, 2026 23:01').
+  static final _autoDateTitleRe = RegExp(
+    r'^(\d{2}년 \d{2}월 \d{2}일 \d{2}:\d{2}|[A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2})',
+  );
+
+  /// 리스트 부제 — 제목과 같은 날짜를 반복하지 않는다.
+  /// 제목이 자동 날짜 제목이면: "길이 · 전사 미리보기" (날짜는 제목에 이미 있음).
+  /// 제목이 사용자 지정이면: "날짜 · 길이".
+  String _subtitleFor(Meeting m) {
+    final isAutoTitle = _autoDateTitleRe.hasMatch(m.title.trim());
+    final parts = <String>[];
+    if (!isAutoTitle) parts.add(_formatDate(m.createdAt));
+    final dur = m.durationSeconds;
+    if (dur >= 60) {
+      final h = dur ~/ 3600;
+      final min = (dur % 3600) ~/ 60;
+      parts.add(h > 0 ? tr('$h시간 $min분', '${h}h ${min}m') : tr('$min분', '$min min'));
+    }
+    if (isAutoTitle) {
+      final preview = (m.transcriptPreview ?? '').replaceAll('\n', ' ').trim();
+      // '(전사본 없음 — ...)' 류 안내문은 미리보기가 아니므로 제외
+      if (preview.isNotEmpty && !preview.startsWith('(')) parts.add(preview);
+    }
+    if (parts.isEmpty) parts.add(_formatDate(m.createdAt));
+    return parts.join(' · ');
+  }
 }
 
 class _SeriesSuggestionTile extends StatelessWidget {

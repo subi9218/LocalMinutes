@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:async';
 import 'core/constants/app_constants.dart';
+import 'core/l10n/app_tr.dart';
 import 'core/ffi/on_device_model_manager.dart';
 import 'core/services/app_settings.dart';
 import 'core/services/auto_delete_service.dart';
@@ -241,16 +242,24 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
 
   String? _activeWorkLabel() {
     final mic = MicrophoneService.instance;
-    if (mic.isRecording) return '녹음';
-    if (mic.isPaused) return '일시 정지된 녹음';
+    if (mic.isRecording) return tr('녹음', 'recording');
+    if (mic.isPaused) return tr('일시 정지된 녹음', 'paused recording');
     // 상세 화면의 다시 전사/재요약은 모델 로드·화자분리·DB 저장 구간에서
     // native task가 잠시 비활성일 수 있으므로 전역 처리상태를 우선 확인.
     final job = ProcessingStatus.instance.active.value;
-    if (job != null) return job.kind == 'transcribe' ? '전사' : '요약';
+    if (job != null) {
+      return job.kind == 'transcribe'
+          ? tr('전사', 'transcription')
+          : tr('요약', 'summarization');
+    }
     final native = OnDeviceModelManager.instance.nativeTaskSnapshot;
     if (native.activeLabel != null) return native.activeLabel;
-    if (LlmService.instance.isGenerationActive) return '요약 생성';
-    if (native.queuedLabel != null) return '대기 중인 ${native.queuedLabel}';
+    if (LlmService.instance.isGenerationActive) {
+      return tr('요약 생성', 'summary generation');
+    }
+    if (native.queuedLabel != null) {
+      return tr('대기 중인 ${native.queuedLabel}', 'queued ${native.queuedLabel}');
+    }
     return null;
   }
 
@@ -272,25 +281,30 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
               const SizedBox(width: 8),
-              const Flexible(child: Text('작업이 진행 중입니다')),
+              Flexible(child: Text(tr('작업이 진행 중입니다', 'A task is in progress'))),
             ],
           ),
           content: Text(
-            '현재 $label 작업 중입니다.\n'
-            '종료하면 진행 중인 작업이 중단되거나 결과가 저장되지 않을 수 있습니다.\n\n'
-            '앱을 종료할까요?',
+            tr(
+              '현재 $label 작업 중입니다.\n'
+                  '종료하면 진행 중인 작업이 중단되거나 결과가 저장되지 않을 수 있습니다.\n\n'
+                  '앱을 종료할까요?',
+              'A $label task is currently running.\n'
+                  'Quitting now may interrupt it or lose unsaved results.\n\n'
+                  'Quit the app?',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: const Text('취소'),
+              child: Text(tr('취소', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogCtx).pop(true),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.red.shade600,
               ),
-              child: const Text('종료'),
+              child: Text(tr('종료', 'Quit')),
             ),
           ],
         ),
@@ -318,15 +332,17 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
     await _showAppWindow();
     if (!_storageReady) {
       await _showTrayStartBlockedDialog(
-        title: '저장 폴더 선택이 필요합니다',
-        message: '회의 녹음을 시작하려면 먼저 녹음 파일을 저장할 폴더를 선택해주세요.',
+        title: tr('저장 폴더 선택이 필요합니다', 'Choose a save folder first'),
+        message: tr('회의 녹음을 시작하려면 먼저 녹음 파일을 저장할 폴더를 선택해주세요.',
+            'To start recording, please choose a folder for your recordings first.'),
       );
       return;
     }
     if (!_showHome) {
       await _showTrayStartBlockedDialog(
-        title: 'AI 모델 준비가 필요합니다',
-        message: '트레이에서 바로 녹음하려면 먼저 음성 인식 모델과 요약 모델을 준비해주세요.',
+        title: tr('AI 모델 준비가 필요합니다', 'AI models need to be set up'),
+        message: tr('트레이에서 바로 녹음하려면 먼저 음성 인식 모델과 요약 모델을 준비해주세요.',
+            'To record from the menu bar, please set up the speech and summary models first.'),
       );
       return;
     }
@@ -334,8 +350,9 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (activeTask != null) {
       await _showTrayStartBlockedDialog(
-        title: 'AI 작업이 진행 중입니다',
-        message: '현재 $activeTask 작업 중입니다. 작업이 끝난 뒤 빠른 녹음을 시작해주세요.',
+        title: tr('AI 작업이 진행 중입니다', 'An AI task is in progress'),
+        message: tr('현재 $activeTask 작업 중입니다. 작업이 끝난 뒤 빠른 녹음을 시작해주세요.',
+            '$activeTask is currently running. Please start quick recording after it finishes.'),
       );
       await _syncTrayStartState();
       return;
@@ -371,7 +388,7 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('확인'),
+            child: Text(tr('확인', 'OK')),
           ),
         ],
       ),
@@ -390,7 +407,9 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         : TrayStartState.ready;
     return MenuBarService.instance.setStartState(
       state,
-      busyLabel: activeTask == null ? null : '$activeTask 중...',
+      busyLabel: activeTask == null
+          ? null
+          : tr('$activeTask 중...', '$activeTask...'),
     );
   }
 

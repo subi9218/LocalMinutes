@@ -105,8 +105,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         duration: const Duration(seconds: 3),
         content: Text(
           recovered == list.length
-              ? '$recovered개 회의를 복구했습니다 — 일반 목록에서 요약 가능'
-              : '$recovered/${list.length}개 회의를 복구했습니다 (일부 실패)',
+              ? tr('$recovered개 회의를 복구했습니다 — 일반 목록에서 요약 가능',
+                  'Recovered $recovered meeting(s) — you can summarize them from the list')
+              : tr('$recovered/${list.length}개 회의를 복구했습니다 (일부 실패)',
+                  'Recovered $recovered of ${list.length} meeting(s) (some failed)'),
         ),
         backgroundColor: Colors.green.shade700,
       ),
@@ -296,7 +298,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 titleWidth: 200,
                 title: const Text('Local Minutes'),
                 leading: MacosTooltip(
-                  message: _sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기',
+                  message: _sidebarCollapsed
+                      ? tr('사이드바 펼치기', 'Show Sidebar')
+                      : tr('사이드바 접기', 'Hide Sidebar'),
                   child: MacosIconButton(
                     icon: Icon(CupertinoIcons.sidebar_left, size: 19),
                     onPressed: () =>
@@ -323,7 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     icon: const MacosIcon(CupertinoIcons.gear),
                     onPressed: () => showSettingsDialog(context, ref),
                     showLabel: false,
-                    tooltipMessage: '설정 (⌘,)',
+                    tooltipMessage: tr('설정 (⌘,)', 'Settings (⌘,)'),
                   ),
                 ],
               ),
@@ -529,6 +533,11 @@ class _WelcomeView extends ConsumerWidget {
     final color = Theme.of(context).colorScheme;
     final accent = macosTheme.primaryColor;
     final secondaryText = macosTheme.typography.subheadline.color;
+    // 회의가 이미 있으면 '빈 상태'가 아니라 '미선택 상태' — 문구를 분기한다.
+    // (예전엔 회의가 있어도 "회의록이 아직 없습니다"라고 표시해 사이드바와
+    //  모순되는 인상을 줬다)
+    final hasMeetings =
+        ref.watch(meetingsProvider).asData?.value.isNotEmpty ?? false;
 
     return SafeArea(
       top: false,
@@ -557,7 +566,9 @@ class _WelcomeView extends ConsumerWidget {
                     ),
                     const SizedBox(height: 22),
                     Text(
-                      tr('새 회의 녹음', 'New meeting recording'),
+                      hasMeetings
+                          ? tr('회의를 선택하세요', 'Select a meeting')
+                          : tr('새 회의 녹음', 'New meeting recording'),
                       textAlign: TextAlign.center,
                       style: macosTheme.typography.largeTitle.copyWith(
                         fontWeight: FontWeight.w700,
@@ -567,7 +578,10 @@ class _WelcomeView extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      tr('회의록이 아직 없습니다', 'No meetings yet'),
+                      hasMeetings
+                          ? tr('왼쪽 목록에서 회의를 선택하거나 새 녹음을 시작하세요',
+                              'Choose a meeting from the sidebar, or start a new recording')
+                          : tr('회의록이 아직 없습니다', 'No meetings yet'),
                       textAlign: TextAlign.center,
                       style: macosTheme.typography.subheadline.copyWith(
                         color: secondaryText,
@@ -652,8 +666,12 @@ class _RecoveryBanner extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '비정상 종료된 녹음 $count개가 있습니다. '
-                '복구하려면 오른쪽 버튼을 눌러주세요.',
+                tr(
+                  '비정상 종료된 녹음 $count개가 있습니다. '
+                      '복구하려면 오른쪽 버튼을 눌러주세요.',
+                  'Found $count recording(s) from an unexpected quit. '
+                      'Click the button on the right to recover them.',
+                ),
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.amber.shade900,
@@ -672,12 +690,12 @@ class _RecoveryBanner extends StatelessWidget {
                 backgroundColor: Colors.amber.shade100,
                 foregroundColor: Colors.amber.shade900,
               ),
-              child: const Text('복구하기', style: TextStyle(fontSize: 12)),
+              child: Text(tr('복구하기', 'Recover'), style: const TextStyle(fontSize: 12)),
             ),
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.close, size: 16),
-              tooltip: '닫기',
+              tooltip: tr('닫기', 'Dismiss'),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),

@@ -189,16 +189,29 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     return suffix.isEmpty ? _datePrefix : '$_datePrefix $suffix';
   }
 
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
+  /// 기본 회의 제목용 날짜 접두어 — 표시 언어를 따른다.
+  /// (예전엔 영어 UI에서도 '26년 08월 23일…' 한국어 형식으로 생성돼
+  ///  모든 제목·내보내기 파일명에 한국어가 박혔다)
+  static String _makeDatePrefix(DateTime now) {
     final yy = now.year.toString().substring(2);
     final mm = now.month.toString().padLeft(2, '0');
     final dd = now.day.toString().padLeft(2, '0');
     final hh = now.hour.toString().padLeft(2, '0');
     final min = now.minute.toString().padLeft(2, '0');
-    _datePrefix = '$yy년 $mm월 $dd일 $hh:$min';
+    const monthsEn = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return tr(
+      '$yy년 $mm월 $dd일 $hh:$min',
+      '${monthsEn[now.month - 1]} ${now.day}, ${now.year} $hh:$min',
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _datePrefix = _makeDatePrefix(DateTime.now());
     _titleSuffixController = TextEditingController();
     _setupMicCallbacks();
     _loadInputDevices();
@@ -1047,13 +1060,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _participants.clear();
       _participantInputCtrl.clear();
       // 날짜/시간 갱신 (재녹음 시 새 시각으로)
-      final now2 = DateTime.now();
-      final yy = now2.year.toString().substring(2);
-      final mm = now2.month.toString().padLeft(2, '0');
-      final dd = now2.day.toString().padLeft(2, '0');
-      final hh = now2.hour.toString().padLeft(2, '0');
-      final min = now2.minute.toString().padLeft(2, '0');
-      _datePrefix = '$yy년 $mm월 $dd일 $hh:$min';
+      _datePrefix = _makeDatePrefix(DateTime.now());
       _titleSuffixController.text = prep.titleSuffix.trim();
     });
     MicrophoneService.instance.reset();

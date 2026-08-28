@@ -189,9 +189,11 @@ class AppSettings {
   // ── 테마 모드 ─────────────────────────────────────────────────────
   /// 'light' | 'dark' | 'system'
   ///
-  /// 신규 설치 기본값은 App Store 스크린샷과 첫인상을 위해 밝은 테마로 둔다.
-  /// 사용자가 설정에서 시스템/다크로 바꾸면 그 선택은 그대로 보존된다.
-  String get themeMode => _prefs.getString('themeMode') ?? 'light';
+  /// 기본값은 'system' — macOS 사용자는 앱이 시스템 외형(다크/라이트)을
+  /// 따르는 것을 기본으로 기대한다(HIG). 예전 기본 'light'는 다크 데스크톱에
+  /// 혼자 하얀 창을 띄워 네이티브 앱이 아닌 인상을 줬다(2.3에서 변경).
+  /// 사용자가 설정에서 직접 고른 값은 그대로 보존된다.
+  String get themeMode => _prefs.getString('themeMode') ?? 'system';
   Future<void> setThemeMode(String v) => _prefs.setString('themeMode', v);
 
   // ── 요약 템플릿 ───────────────────────────────────────────────────
