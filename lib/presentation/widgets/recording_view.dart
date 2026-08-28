@@ -44,6 +44,7 @@ import '../../domain/entities/transcript.dart';
 import '../../domain/entities/summary.dart';
 import '../providers/global_container.dart';
 import '../providers/meeting_providers.dart';
+import 'app_notice.dart';
 
 enum _RecordingPhase {
   idle,
@@ -743,11 +744,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     } catch (e) {
       debugPrint('[EmptyRecording] discard failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('빈 녹음 삭제 실패: $e', 'Failed to delete empty recording: $e')),
-            backgroundColor: Colors.red.shade700,
-          ),
+        AppNotice.show(
+          tr('빈 녹음 삭제 실패: $e', 'Failed to delete empty recording: $e'),
+          kind: NoticeKind.error,
         );
       }
       return;
@@ -784,29 +783,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     final sec = _currentRecordingSec();
     setState(() => _bookmarks.add(Bookmark(sec: sec, label: label)));
 
-    // SnackBar 피드백
+    // 저장 피드백
     if (!showFeedback) return;
     final time = Bookmark(sec: sec).timeStr;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(milliseconds: 1500),
-        content: Row(
-          children: [
-            const Icon(
-              Icons.bookmark_added_rounded,
-              color: Colors.amber,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label.isEmpty
-                  ? tr('북마크 저장됨 — $time', 'Bookmark saved — $time')
-                  : tr('북마크 저장됨 — $time · $label', 'Bookmark saved — $time · $label'),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.indigo.shade700,
-      ),
+    AppNotice.show(
+      label.isEmpty
+          ? tr('북마크 저장됨 — $time', 'Bookmark saved — $time')
+          : tr('북마크 저장됨 — $time · $label', 'Bookmark saved — $time · $label'),
+      kind: NoticeKind.success,
+      duration: const Duration(milliseconds: 1500),
     );
   }
 
@@ -825,24 +810,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     final sec = _currentRecordingSec();
     final time = Bookmark(sec: sec).timeStr;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(milliseconds: 1600),
-        content: Row(
-          children: [
-            const Icon(
-              Icons.bookmark_added_rounded,
-              color: Colors.amber,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(count == 1
-                ? tr('트레이 북마크 저장됨 — $time', 'Tray bookmark saved — $time')
-                : tr('트레이 북마크 $count개 저장됨', '$count tray bookmarks saved')),
-          ],
-        ),
-        backgroundColor: Colors.indigo.shade700,
-      ),
+    AppNotice.show(
+      count == 1
+          ? tr('트레이 북마크 저장됨 — $time', 'Tray bookmark saved — $time')
+          : tr('트레이 북마크 $count개 저장됨', '$count tray bookmarks saved'),
+      kind: NoticeKind.success,
+      duration: const Duration(milliseconds: 1600),
     );
   }
 
@@ -950,8 +923,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   void _showNativeTaskBlocked(String actionLabel) {
     final reason = _nativeTaskBlockReason(actionLabel);
     if (reason == null || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(reason), backgroundColor: Colors.orange.shade700),
+    AppNotice.show(
+      reason,
+      kind: NoticeKind.warning,
     );
   }
 
@@ -1004,12 +978,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     // 백업/복원 중에는 녹음 시작 금지 (복원은 DB를 닫는다).
     if (BackupService.isBusy) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('백업/복원이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
-                'A backup or restore is in progress. Please start recording after it finishes.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('백업/복원이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
+                'A backup or restore is in progress. Please start recording after it finishes.'),
+          kind: NoticeKind.warning,
         );
       }
       return;
@@ -1537,16 +1509,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   /// 시스템 오디오 시작 실패 안내 + '설정 열기' 액션.
   void _showSystemAudioFailSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        action: SnackBarAction(
-          label: tr('설정 열기', 'Open settings'),
-          onPressed: () => SystemAudioService.instance.openPrivacySettings(),
-        ),
-        duration: const Duration(seconds: 6),
-      ),
+    AppNotice.show(
+      message,
+      kind: NoticeKind.warning,
+      duration: const Duration(seconds: 6),
+      actionLabel: tr('설정 열기', 'Open settings'),
+      onAction: () => SystemAudioService.instance.openPrivacySettings(),
     );
   }
 
@@ -2600,11 +2568,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           _failedSummaryMeetingId = null;
           _cancelSummaryRequested = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('요약 완료 · 총 소요 $totalStr', 'Summary complete · total $totalStr')),
-            backgroundColor: Colors.green.shade700,
-          ),
+        AppNotice.show(
+          tr('요약 완료 · 총 소요 $totalStr', 'Summary complete · total $totalStr'),
+          kind: NoticeKind.success,
         );
 
         // MeetingDetailView로 이동 (화면에 있을 때만 의미 있는 동작)
@@ -2724,12 +2690,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         setState(() {
           _statusMsg = tr('정확 전사 실패 — 실시간 전사본으로 요약을 계속합니다.', 'Accurate transcription failed — continuing the summary with the live transcript.');
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(friendly.fullText),
-            backgroundColor: Colors.orange.shade700,
-            duration: const Duration(seconds: 6),
-          ),
+        AppNotice.show(
+          friendly.fullText,
+          kind: NoticeKind.warning,
+          duration: const Duration(seconds: 6),
         );
       }
     } finally {
@@ -2801,14 +2765,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         setState(() {
           _statusMsg = tr('발화자 구분에 실패했습니다. 라벨 없이 요약을 계속합니다.', 'Speaker separation failed. Continuing the summary without labels.');
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              friendlyDiarizationFailureMessage(nextStep: tr('회의 요약은 계속 진행합니다.', 'The meeting summary will continue.')),
-            ),
-            backgroundColor: Colors.orange.shade700,
-            duration: const Duration(seconds: 6),
-          ),
+        AppNotice.show(
+          friendlyDiarizationFailureMessage(nextStep: tr('회의 요약은 계속 진행합니다.', 'The meeting summary will continue.')),
+          kind: NoticeKind.warning,
+          duration: const Duration(seconds: 6),
         );
       }
     }
@@ -2932,7 +2892,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     // ── macOS Calendar.app에 자동 이벤트 등록 (설정 ON일 때) ───────
     if (AppSettings.instance.autoAddToCalendar) {
-      // UI 블록 안 되도록 fire-and-forget. 결과는 SnackBar로 알림.
+      // UI 블록 안 되도록 fire-and-forget. 결과는 알림(HUD)으로 표시.
       unawaited(
         _addCurrentMeetingToCalendar(
           title: _fullTitle,
@@ -2969,20 +2929,16 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     );
     if (!mounted) return;
     if (err == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 2),
-          content: Text(tr('macOS 캘린더에 회의가 등록되었습니다', 'The meeting was added to the macOS Calendar')),
-          backgroundColor: Colors.indigo.shade600,
-        ),
+      AppNotice.show(
+        tr('macOS 캘린더에 회의가 등록되었습니다', 'The meeting was added to the macOS Calendar'),
+        kind: NoticeKind.info,
+        duration: const Duration(seconds: 2),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 4),
-          content: Text(tr('캘린더 등록 실패 · $err', 'Calendar registration failed · $err')),
-          backgroundColor: Colors.orange.shade700,
-        ),
+      AppNotice.show(
+        tr('캘린더 등록 실패 · $err', 'Calendar registration failed · $err'),
+        kind: NoticeKind.warning,
+        duration: const Duration(seconds: 4),
       );
     }
   }
@@ -4232,25 +4188,19 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       }
       if (_phase == _RecordingPhase.recording ||
           _phase == _RecordingPhase.paused) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('녹음을 중지한 뒤 요약을 실행할 수 있습니다.', 'Stop recording before running the summary.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('녹음을 중지한 뒤 요약을 실행할 수 있습니다.', 'Stop recording before running the summary.'),
+          kind: NoticeKind.warning,
         );
       } else if (_phase == _RecordingPhase.summarizing) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.'),
+          kind: NoticeKind.warning,
         );
       } else if (_segments.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('요약할 전사 내용이 없습니다. 먼저 녹음해 주세요.', 'No transcript to summarize. Please record first.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('요약할 전사 내용이 없습니다. 먼저 녹음해 주세요.', 'No transcript to summarize. Please record first.'),
+          kind: NoticeKind.warning,
         );
       }
     });

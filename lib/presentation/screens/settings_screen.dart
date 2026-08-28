@@ -28,6 +28,7 @@ import '../providers/meeting_providers.dart';
 import '../../data/datasources/microphone_service.dart';
 import '../../data/datasources/system_audio_service.dart';
 import '../providers/settings_providers.dart';
+import '../widgets/app_notice.dart';
 
 /// 설정 다이얼로그 열기 헬퍼
 void showSettingsDialog(BuildContext context, WidgetRef ref) {
@@ -210,13 +211,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       _diarEmbDl.status == _DlStatus.downloading;
 
   void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : null,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-      ),
+    AppNotice.show(
+      message,
+      kind: isError ? NoticeKind.error : NoticeKind.info,
+      duration: const Duration(seconds: 4),
     );
   }
 
@@ -931,14 +929,11 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 await _checkModels();
                 if (!mounted) return;
                 setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      tr('${AppSettings.sttProcessingModeLabel(next)} 방식으로 전환했습니다.',
+                AppNotice.show(
+                  tr('${AppSettings.sttProcessingModeLabel(next)} 방식으로 전환했습니다.',
                           'Switched to ${AppSettings.sttProcessingModeLabel(next)} mode.'),
-                    ),
-                    duration: const Duration(seconds: 3),
-                  ),
+                  kind: NoticeKind.info,
+                  duration: const Duration(seconds: 3),
                 );
               }
             },
@@ -1033,11 +1028,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     await settings.setMicGuideShown(false);
                     setState(() {});
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(tr('가이드가 초기화되었습니다. 다음 녹음 시작 시 다시 표시됩니다.',
-                              'The guide has been reset. It will appear again the next time you start recording.')),
-                        ),
+                      AppNotice.show(
+                        tr('가이드가 초기화되었습니다. 다음 녹음 시작 시 다시 표시됩니다.',
+                              'The guide has been reset. It will appear again the next time you start recording.'),
+                        kind: NoticeKind.info,
                       );
                     }
                   }
@@ -2127,8 +2121,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       await CrashLogService.instance.clearLog();
                       await _loadCrashLogInfo();
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(tr('로그가 비워졌습니다.', 'Logs cleared.'))),
+                      AppNotice.show(
+                        tr('로그가 비워졌습니다.', 'Logs cleared.'),
+                        kind: NoticeKind.info,
                       );
                     }
                   },
@@ -2154,25 +2149,22 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       final path = await DiagnosticExportService.exportWithSavePanel();
       if (!mounted) return;
       if (path == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-            content: Text(tr('진단 자료 내보내기를 취소했습니다.',
-                'Diagnostic export was cancelled.'))));
+        AppNotice.show(
+          tr('진단 자료 내보내기를 취소했습니다.',
+                'Diagnostic export was cancelled.'),
+          kind: NoticeKind.info,
+        );
       } else {
         await _loadCrashLogInfo();
         await Clipboard.setData(ClipboardData(text: path));
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 8),
-            content: Text(tr('진단 자료를 저장했습니다. 파일 경로도 복사했습니다.',
-                'Diagnostic data saved. The file path was also copied.')),
-            action: SnackBarAction(
-              label: tr('Finder 열기', 'Open in Finder'),
-              onPressed: () => _openPathInFinder(path),
-            ),
-          ),
+        AppNotice.show(
+          tr('진단 자료를 저장했습니다. 파일 경로도 복사했습니다.',
+              'Diagnostic data saved. The file path was also copied.'),
+          kind: NoticeKind.success,
+          duration: const Duration(seconds: 8),
+          actionLabel: tr('Finder 열기', 'Open in Finder'),
+          onAction: () => _openPathInFinder(path),
         );
       }
     } catch (e, st) {
@@ -2190,12 +2182,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         nextStep: tr('저장 위치 권한과 디스크 여유 공간을 확인한 뒤 다시 시도해주세요.',
             'Check the save location permissions and free disk space, then try again.'),
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(friendly),
-          backgroundColor: Colors.red.shade700,
-          duration: const Duration(seconds: 7),
-        ),
+      AppNotice.show(
+        friendly,
+        kind: NoticeKind.error,
+        duration: const Duration(seconds: 7),
       );
     } finally {
       if (mounted) setState(() => _exportingDiagnostics = false);
@@ -2272,20 +2262,16 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       if (!mounted) return;
       await Clipboard.setData(ClipboardData(text: path));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyErrorText(
+      AppNotice.show(
+        friendlyErrorText(
               e,
               fallbackTitle: tr('파일 위치를 열지 못했습니다', 'Could not open the file location'),
               fallbackMessage: tr('Finder에서 폴더를 열 수 없습니다. 대신 경로를 복사했습니다.',
                   'Could not open the folder in Finder. The path was copied instead.'),
               nextStep: path,
             ),
-          ),
-          backgroundColor: Colors.orange.shade700,
-          duration: const Duration(seconds: 7),
-        ),
+        kind: NoticeKind.warning,
+        duration: const Duration(seconds: 7),
       );
     }
   }
@@ -2367,10 +2353,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: content));
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(tr('로그를 클립보드에 복사했습니다.',
-                          'Logs copied to clipboard.'))),
+                AppNotice.show(
+                  tr('로그를 클립보드에 복사했습니다.',
+                          'Logs copied to clipboard.'),
+                  kind: NoticeKind.info,
                 );
               },
             ),

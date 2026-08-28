@@ -36,6 +36,7 @@ import '../screens/action_items_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/stats_screen.dart';
 import 'app_version_credit.dart';
+import 'app_notice.dart';
 
 class MeetingSidebar extends ConsumerStatefulWidget {
   const MeetingSidebar({super.key});
@@ -96,12 +97,10 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     // 방어적 게이팅: 버튼 비활성화와 별개로, 진행 중 작업이 있으면 막는다.
     if (ProcessingStatus.instance.isBusy) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('진행 중인 작업이 끝난 뒤 파일을 불러올 수 있습니다.',
-                'You can import a file after the current task finishes.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('진행 중인 작업이 끝난 뒤 파일을 불러올 수 있습니다.',
+                'You can import a file after the current task finishes.'),
+          kind: NoticeKind.warning,
         );
       }
       return;
@@ -120,9 +119,10 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     final file = File(picked.path);
     if (!await file.exists()) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(tr('파일을 읽을 수 없습니다.', 'Cannot read the file.'))));
+        AppNotice.show(
+          tr('파일을 읽을 수 없습니다.', 'Cannot read the file.'),
+          kind: NoticeKind.info,
+        );
       }
       return;
     }
@@ -163,11 +163,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
           // 부분 복사 잔재 정리 (회의 레코드가 없으므로 남기면 영구 쓰레기)
           await File(outPath).delete().catchError((_) => File(outPath));
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(tr('파일 복사에 실패했습니다.', 'Failed to copy the file.')),
-                backgroundColor: Colors.red.shade700,
-              ),
+            AppNotice.show(
+              tr('파일 복사에 실패했습니다.', 'Failed to copy the file.'),
+              kind: NoticeKind.error,
             );
           }
           return;
@@ -195,15 +193,13 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
           await File(outPath).delete().catchError((_) => File(outPath));
           if (mounted) Navigator.of(context, rootNavigator: true).pop();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(tr(
+            AppNotice.show(
+              tr(
                   '파일 변환 실패: ${e.message ?? ext.toUpperCase()}',
                   'Conversion failed: ${e.message ?? ext.toUpperCase()}',
-                )),
-                backgroundColor: Colors.red.shade700,
-                duration: const Duration(seconds: 5),
-              ),
+                ),
+              kind: NoticeKind.error,
+              duration: const Duration(seconds: 5),
             );
           }
           return;
@@ -211,12 +207,10 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
           await File(outPath).delete().catchError((_) => File(outPath));
           if (mounted) Navigator.of(context, rootNavigator: true).pop();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(tr('파일 변환 중 오류가 발생했습니다.',
-                    'An error occurred during conversion.')),
-                backgroundColor: Colors.red.shade700,
-              ),
+            AppNotice.show(
+              tr('파일 변환 중 오류가 발생했습니다.',
+                    'An error occurred during conversion.'),
+              kind: NoticeKind.error,
             );
           }
           return;
@@ -245,15 +239,13 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     if (!mounted) return;
     ref.invalidate(meetingsProvider);
     ref.read(selectedMeetingIdProvider.notifier).state = meetingId;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(tr(
+    AppNotice.show(
+      tr(
           '${isWav ? 'WAV' : '${ext.toUpperCase()}(변환됨)'} 불러옴 — 상세 화면에서 "다시 전사"를 눌러 전사하세요.',
           '${isWav ? 'WAV' : '${ext.toUpperCase()} (converted)'} imported — tap "Re-transcribe" in the detail view to transcribe.',
-        )),
-        backgroundColor: Colors.green.shade700,
-        duration: const Duration(seconds: 4),
-      ),
+        ),
+      kind: NoticeKind.success,
+      duration: const Duration(seconds: 4),
     );
   }
 
@@ -267,11 +259,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
 
     if (ref.read(isRecordingActiveProvider)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('녹음 중에는 AI 검색을 사용할 수 없습니다.', 'AI search is unavailable while recording.')),
-            backgroundColor: Colors.orange,
-          ),
+        AppNotice.show(
+          tr('녹음 중에는 AI 검색을 사용할 수 없습니다.', 'AI search is unavailable while recording.'),
+          kind: NoticeKind.warning,
         );
       }
       return;
@@ -360,11 +350,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     } catch (e) {
       await OnDeviceModelManager.instance.unloadLlm().catchError((_) {});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('AI 검색 오류: $e', 'AI search error: $e')),
-            backgroundColor: Colors.red.shade700,
-          ),
+        AppNotice.show(
+          tr('AI 검색 오류: $e', 'AI search error: $e'),
+          kind: NoticeKind.error,
         );
       }
     } finally {
@@ -517,8 +505,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
 
     if (suggestions.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('아직 자동으로 묶을 정기 회의 후보가 없습니다.', 'No recurring meeting candidates to group yet.'))),
+      AppNotice.show(
+        tr('아직 자동으로 묶을 정기 회의 후보가 없습니다.', 'No recurring meeting candidates to group yet.'),
+        kind: NoticeKind.info,
       );
       return;
     }
@@ -600,11 +589,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
     if (!mounted) return;
     ref.invalidate(groupsProvider);
     ref.invalidate(meetingsProvider);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(tr('정기 회의 시리즈 ${suggestions.length}개를 만들었습니다.', 'Created ${suggestions.length} recurring series.')),
-        backgroundColor: Colors.green.shade700,
-      ),
+    AppNotice.show(
+      tr('정기 회의 시리즈 ${suggestions.length}개를 만들었습니다.', 'Created ${suggestions.length} recurring series.'),
+      kind: NoticeKind.success,
     );
   }
 

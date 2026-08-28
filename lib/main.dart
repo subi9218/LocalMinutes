@@ -31,6 +31,7 @@ import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/language_setup_screen.dart';
 import 'presentation/screens/setup_screen.dart';
 import 'presentation/screens/storage_setup_screen.dart';
+import 'presentation/widgets/app_notice.dart';
 
 void main() async {
   // 충돌·예외 캡처 핸들러 — 모든 init보다 먼저 설치
@@ -162,6 +163,7 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
   @override
   void initState() {
     super.initState();
+    AppNotice.attach(_navigatorKey); // 전역 알림(HUD) 오버레이 연결
     _showHome = widget.modelsOk || AppSettings.instance.modelsSetupComplete;
     _storageReady = widget.storageReady;
     _languageChosen = AppSettings.instance.languageChosen;
@@ -605,17 +607,14 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
                 ? const Color(0xFF1E1E1E)
                 : Colors.white,
           ),
-          // MacosApp 은 자동으로 ScaffoldMessenger 를 제공하지 않는다 (MaterialApp 과 차이).
-          // SnackBar 호출이 죽지 않도록 root 에 ScaffoldMessenger 를 명시 추가.
           // S1: _GlobalShortcuts 를 Navigator 위(builder)에 두어 모든 라우트
           // (pushReplacement 로 전환된 화면 포함)에서 전역 단축키가 살아 있도록 한다.
+          // (알림은 AppNotice(HUD)로 통일되어 루트 ScaffoldMessenger는 제거 — 2.3)
           child: _GlobalShortcuts(
             ref: ref,
-            child: ScaffoldMessenger(
-              child: Material(
-                type: MaterialType.transparency,
-                child: child ?? const SizedBox.shrink(),
-              ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: child ?? const SizedBox.shrink(),
             ),
           ),
         );

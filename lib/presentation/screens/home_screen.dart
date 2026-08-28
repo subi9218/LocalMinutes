@@ -19,6 +19,7 @@ import '../widgets/meeting_detail_view.dart';
 import '../widgets/recording_view.dart';
 import '../widgets/series_dashboard_view.dart';
 import 'settings_screen.dart' show showSettingsDialog;
+import '../widgets/app_notice.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -82,7 +83,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_recoverable.isEmpty) return;
     // 일단 즉시 일괄 복구 — 모달 다이얼로그 사용을 피해 click 차단 사고 방지.
     // 사용자가 더 세밀히 선택하고 싶으면 추후 별도 화면으로 이전 가능.
-    final messenger = ScaffoldMessenger.of(context);
     final list = List<Meeting>.from(_recoverable);
     int recovered = 0;
     Meeting? last;
@@ -101,18 +101,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(selectedMeetingIdProvider.notifier).state = last.id;
     }
     setState(() => _recoverable = const []);
-    messenger.showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 3),
-        content: Text(
-          recovered == list.length
+    AppNotice.show(
+      recovered == list.length
               ? tr('$recovered개 회의를 복구했습니다 — 일반 목록에서 요약 가능',
                   'Recovered $recovered meeting(s) — you can summarize them from the list')
               : tr('$recovered/${list.length}개 회의를 복구했습니다 (일부 실패)',
                   'Recovered $recovered of ${list.length} meeting(s) (some failed)'),
-        ),
-        backgroundColor: Colors.green.shade700,
-      ),
+      kind: NoticeKind.success,
+      duration: const Duration(seconds: 3),
     );
   }
 
@@ -153,8 +149,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _startRecordingFromToolbar() {
     final reason = _busyBlockReason();
     if (reason != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(reason), backgroundColor: Colors.orange.shade700),
+      AppNotice.show(
+        reason,
+        kind: NoticeKind.warning,
       );
       return;
     }
@@ -186,13 +183,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _showShortcutSnack(String message, {bool isError = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.orange.shade700,
-        duration: const Duration(seconds: 3),
-      ),
+    AppNotice.show(
+      message,
+      kind: isError ? NoticeKind.error : NoticeKind.warning,
     );
   }
 
@@ -366,13 +359,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 },
                                 onCancel: () {
                                   ProcessingStatus.instance.requestCancel();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(tr(
+                                  AppNotice.show(
+                                    tr(
                                           '중지를 요청했습니다. 현재 단계를 마무리하고 멈춥니다.',
-                                          'Stop requested. Finishing the current step before stopping.')),
-                                      backgroundColor: Colors.orange.shade700,
-                                    ),
+                                          'Stop requested. Finishing the current step before stopping.'),
+                                    kind: NoticeKind.warning,
                                   );
                                 },
                               );
@@ -519,12 +510,10 @@ class _WelcomeView extends ConsumerWidget {
                     : tr('요약', 'summarization'))
                 : OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (busy != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('현재 $busy 작업이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
-              'A $busy task is running. Please start recording after it finishes.')),
-          backgroundColor: Colors.orange.shade700,
-        ),
+      AppNotice.show(
+        tr('현재 $busy 작업이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
+              'A $busy task is running. Please start recording after it finishes.'),
+        kind: NoticeKind.warning,
       );
       return;
     }

@@ -43,6 +43,7 @@ import '../../domain/entities/meeting_processing_report.dart';
 import '../../domain/entities/summary.dart';
 import '../../domain/entities/transcript.dart';
 import '../providers/meeting_providers.dart';
+import 'app_notice.dart';
 
 class MeetingDetailView extends ConsumerStatefulWidget {
   final int meetingId;
@@ -148,8 +149,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   void _showNativeTaskBlocked(String actionLabel) {
     final reason = _nativeTaskBlockReason(actionLabel);
     if (reason == null || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(reason), backgroundColor: Colors.orange.shade700),
+    AppNotice.show(
+      reason,
+      kind: NoticeKind.warning,
     );
   }
 
@@ -253,20 +255,15 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     if (bestIdx < 0 || bestScore == 0) return;
 
     final startSec = segments[bestIdx].startTimeSeconds;
-    final messenger = ScaffoldMessenger.of(context);
     final err = await _seekTranscriptAudio?.call(startSec);
     if (!mounted) return;
     final ok = err == null;
-    messenger.showSnackBar(
-      SnackBar(
-        duration: Duration(seconds: ok ? 2 : 4),
-        content: Text(
-          ok
-              ? tr('검색 결과 — ${_secStr(startSec)} 시점 재생', 'Search result — playing at ${_secStr(startSec)}')
-              : tr('검색 결과 — ${_secStr(startSec)} 시점 전사로 이동 · $err', 'Search result — jumped to transcript at ${_secStr(startSec)} · $err'),
-        ),
-        backgroundColor: ok ? Colors.indigo.shade600 : Colors.blueGrey.shade600,
-      ),
+    AppNotice.show(
+      ok
+          ? tr('검색 결과 — ${_secStr(startSec)} 시점 재생', 'Search result — playing at ${_secStr(startSec)}')
+          : tr('검색 결과 — ${_secStr(startSec)} 시점 전사로 이동 · $err', 'Search result — jumped to transcript at ${_secStr(startSec)} · $err'),
+      kind: NoticeKind.info,
+      duration: Duration(seconds: ok ? 2 : 4),
     );
   }
 
@@ -315,20 +312,15 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       return;
     }
     // LLM 시간 명시 → 즉시 점프
-    final messenger = ScaffoldMessenger.of(context);
     final audioErr = await _seekTranscriptAudio?.call(sec);
     if (!mounted) return;
     final ok = audioErr == null;
-    messenger.showSnackBar(
-      SnackBar(
-        duration: Duration(seconds: ok ? 2 : 4),
-        content: Text(
-          ok
-              ? tr('$evidenceTs 시점 — 전사로 이동 + 오디오 재생', 'At $evidenceTs — jumped to transcript + playing audio')
-              : tr('$evidenceTs 시점 전사로 이동 · $audioErr', 'Jumped to transcript at $evidenceTs · $audioErr'),
-        ),
-        backgroundColor: ok ? Colors.indigo.shade600 : Colors.blueGrey.shade600,
-      ),
+    AppNotice.show(
+      ok
+          ? tr('$evidenceTs 시점 — 전사로 이동 + 오디오 재생', 'At $evidenceTs — jumped to transcript + playing audio')
+          : tr('$evidenceTs 시점 전사로 이동 · $audioErr', 'Jumped to transcript at $evidenceTs · $audioErr'),
+      kind: NoticeKind.info,
+      duration: Duration(seconds: ok ? 2 : 4),
     );
   }
 
@@ -412,25 +404,18 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                             ? null
                             : () async {
                                 final navigator = Navigator.of(ctx);
-                                final messenger = ScaffoldMessenger.of(context);
-                                final startSec = c.transcript.startTimeSeconds;
+                                                            final startSec = c.transcript.startTimeSeconds;
                                 final audioErr = await _seekTranscriptAudio
                                     ?.call(startSec);
                                 if (!mounted) return;
                                 final okJump = audioErr == null;
                                 navigator.pop();
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    duration: Duration(seconds: okJump ? 2 : 4),
-                                    content: Text(
-                                      okJump
-                                          ? tr('${_secStr(startSec)} 시점 — 전사로 이동 + 오디오 재생', 'At ${_secStr(startSec)} — jumped to transcript + playing audio')
-                                          : tr('${_secStr(startSec)} 시점 전사로 이동 · $audioErr', 'Jumped to transcript at ${_secStr(startSec)} · $audioErr'),
-                                    ),
-                                    backgroundColor: okJump
-                                        ? Colors.indigo.shade600
-                                        : Colors.blueGrey.shade600,
-                                  ),
+                                AppNotice.show(
+                                  okJump
+                                      ? tr('${_secStr(startSec)} 시점 — 전사로 이동 + 오디오 재생', 'At ${_secStr(startSec)} — jumped to transcript + playing audio')
+                                      : tr('${_secStr(startSec)} 시점 전사로 이동 · $audioErr', 'Jumped to transcript at ${_secStr(startSec)} · $audioErr'),
+                                  kind: NoticeKind.info,
+                                  duration: Duration(seconds: okJump ? 2 : 4),
                                 );
                               },
                         child: Padding(
@@ -1153,11 +1138,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         final styleSuffix = picked.styleMode == SummaryStyleMode.standard
             ? ''
             : ' (${picked.styleMode.displayName})';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('재요약 완료$styleSuffix · 총 소요 $totalStr', 'Re-summarize complete$styleSuffix · Total $totalStr')),
-            backgroundColor: Colors.green.shade700,
-          ),
+        AppNotice.show(
+          tr('재요약 완료$styleSuffix · 총 소요 $totalStr', 'Re-summarize complete$styleSuffix · Total $totalStr'),
+          kind: NoticeKind.success,
         );
       }
     } catch (e, st) {
@@ -1175,20 +1158,16 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           _cancelSummaryRequested = false;
           _summarizingStatus = '';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e is SummaryCancelledException
-                  ? tr('재요약 중지됨 · 총 소요 $totalStr', 'Re-summarize stopped · Total $totalStr')
-                  : tr('재요약 오류 · 총 소요 $totalStr\n'
-                        '${friendlyErrorText(e, fallbackTitle: '요약을 다시 만들지 못했습니다', fallbackMessage: 'AI 요약 생성 중 문제가 발생했습니다.', nextStep: '잠시 후 다시 시도하거나 더 빠른 요약 모델을 선택해주세요.')}',
-                        'Re-summarize error · Total $totalStr\n'
-                        '${friendlyErrorText(e, fallbackTitle: 'Could not regenerate the summary', fallbackMessage: 'A problem occurred while generating the AI summary.', nextStep: 'Please try again later or choose a faster summary model.')}'),
-            ),
-            backgroundColor: e is SummaryCancelledException
-                ? Colors.orange.shade700
-                : Colors.red.shade700,
-          ),
+        AppNotice.show(
+          e is SummaryCancelledException
+              ? tr('재요약 중지됨 · 총 소요 $totalStr', 'Re-summarize stopped · Total $totalStr')
+              : tr('재요약 오류 · 총 소요 $totalStr\n'
+                    '${friendlyErrorText(e, fallbackTitle: '요약을 다시 만들지 못했습니다', fallbackMessage: 'AI 요약 생성 중 문제가 발생했습니다.', nextStep: '잠시 후 다시 시도하거나 더 빠른 요약 모델을 선택해주세요.')}',
+                    'Re-summarize error · Total $totalStr\n'
+                    '${friendlyErrorText(e, fallbackTitle: 'Could not regenerate the summary', fallbackMessage: 'A problem occurred while generating the AI summary.', nextStep: 'Please try again later or choose a faster summary model.')}'),
+          kind: e is SummaryCancelledException
+              ? NoticeKind.warning
+              : NoticeKind.error,
         );
       }
     } finally {
@@ -1209,11 +1188,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     if (audioPath == null) return;
     if (!await File(audioPath).exists()) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('오디오 파일을 찾을 수 없습니다: $audioPath', 'Audio file not found: $audioPath')),
-            backgroundColor: Colors.red.shade700,
-          ),
+        AppNotice.show(
+          tr('오디오 파일을 찾을 수 없습니다: $audioPath', 'Audio file not found: $audioPath'),
+          kind: NoticeKind.error,
         );
       }
       return;
@@ -1230,11 +1207,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     ).exists();
     if (!fastInstalled && !accurateInstalled) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('설치된 음성 인식 모델이 없습니다. 설정 → 모델 관리에서 다운로드하세요.', 'No transcription model installed. Download one from Settings → Model management.')),
-            backgroundColor: Colors.red.shade700,
-          ),
+        AppNotice.show(
+          tr('설치된 음성 인식 모델이 없습니다. 설정 → 모델 관리에서 다운로드하세요.', 'No transcription model installed. Download one from Settings → Model management.'),
+          kind: NoticeKind.error,
         );
       }
       return;
@@ -1759,16 +1734,12 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
             setState(() {
               _rerunSttStatus = tr('발화자 구분에 실패했습니다. 라벨 없이 전사본을 저장합니다.', 'Speaker separation failed. Saving the transcript without labels.');
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  friendlyDiarizationFailureMessage(
+            AppNotice.show(
+              friendlyDiarizationFailureMessage(
                     nextStep: tr('전사본은 발화자 라벨 없이 저장합니다.', 'The transcript will be saved without speaker labels.'),
                   ),
-                ),
-                backgroundColor: Colors.orange.shade700,
-                duration: const Duration(seconds: 6),
-              ),
+              kind: NoticeKind.warning,
+              duration: const Duration(seconds: 6),
             );
           }
         }
@@ -1839,13 +1810,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
         final totalStr = tr(
             '${totalElapsed.inMinutes}분 ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}초',
             '${totalElapsed.inMinutes}m ${(totalElapsed.inSeconds % 60).toString().padLeft(2, '0')}s');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              tr('음성 인식 완료 — ${segments.length}개 세그먼트 · 총 소요 $totalStr', 'Transcription complete — ${segments.length} segments · Total $totalStr'),
-            ),
-            backgroundColor: Colors.green.shade700,
-          ),
+        AppNotice.show(
+          tr('음성 인식 완료 — ${segments.length}개 세그먼트 · 총 소요 $totalStr', 'Transcription complete — ${segments.length} segments · Total $totalStr'),
+          kind: NoticeKind.success,
         );
       }
     } catch (e, st) {
@@ -1865,20 +1832,16 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           _cancelRerunSttRequested = false;
           _rerunSttStatus = '';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e is SttCancelledException
-                  ? tr('음성 인식 중지됨 · 총 소요 $totalStr', 'Transcription stopped · Total $totalStr')
-                  : tr('음성 인식 오류 · 총 소요 $totalStr\n'
-                        '${friendlyErrorText(e, fallbackTitle: '음성 인식을 완료하지 못했습니다', fallbackMessage: '녹음 파일을 텍스트로 변환하는 중 문제가 발생했습니다.', nextStep: '오디오 파일과 AI 모델 설치 상태를 확인한 뒤 다시 시도해주세요.')}',
-                        'Transcription error · Total $totalStr\n'
-                        '${friendlyErrorText(e, fallbackTitle: 'Could not complete transcription', fallbackMessage: 'A problem occurred while converting the recording to text.', nextStep: 'Check the audio file and AI model installation, then try again.')}'),
-            ),
-            backgroundColor: e is SttCancelledException
-                ? Colors.orange.shade700
-                : Colors.red.shade700,
-          ),
+        AppNotice.show(
+          e is SttCancelledException
+              ? tr('음성 인식 중지됨 · 총 소요 $totalStr', 'Transcription stopped · Total $totalStr')
+              : tr('음성 인식 오류 · 총 소요 $totalStr\n'
+                    '${friendlyErrorText(e, fallbackTitle: '음성 인식을 완료하지 못했습니다', fallbackMessage: '녹음 파일을 텍스트로 변환하는 중 문제가 발생했습니다.', nextStep: '오디오 파일과 AI 모델 설치 상태를 확인한 뒤 다시 시도해주세요.')}',
+                    'Transcription error · Total $totalStr\n'
+                    '${friendlyErrorText(e, fallbackTitle: 'Could not complete transcription', fallbackMessage: 'A problem occurred while converting the recording to text.', nextStep: 'Check the audio file and AI model installation, then try again.')}'),
+          kind: e is SttCancelledException
+              ? NoticeKind.warning
+              : NoticeKind.error,
         );
       }
     } finally {
@@ -1967,9 +1930,10 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       setState(() => _isExtractingTerms = false);
 
       if (extracted.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(tr('추출된 전문 용어가 없습니다.', 'No technical terms were extracted.'))));
+        AppNotice.show(
+          tr('추출된 전문 용어가 없습니다.', 'No technical terms were extracted.'),
+          kind: NoticeKind.info,
+        );
         return;
       }
 
@@ -1994,18 +1958,14 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       CrashLogService.instance.recordCaught(e, st, context: 'extractTerms');
       if (mounted) {
         setState(() => _isExtractingTerms = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              friendlyErrorText(
+        AppNotice.show(
+          friendlyErrorText(
                 e,
                 fallbackTitle: tr('용어를 추출하지 못했습니다', 'Could not extract terms'),
                 fallbackMessage: tr('전사본에서 용어를 찾는 중 문제가 발생했습니다.', 'A problem occurred while finding terms in the transcript.'),
                 nextStep: tr('회의록 내용은 그대로 유지됩니다. 잠시 후 다시 시도해주세요.', 'The meeting notes are kept unchanged. Please try again later.'),
               ),
-            ),
-            backgroundColor: Colors.red.shade700,
-          ),
+          kind: NoticeKind.error,
         );
       }
     }
@@ -2063,11 +2023,10 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     if (mounted) {
       ref.invalidate(meetingSummaryProvider(widget.meetingId));
       ref.invalidate(summaryVersionsProvider(widget.meetingId));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('요약을 수정했습니다. 이전 버전은 이력에 저장되었습니다.', 'Summary updated. The previous version was saved to history.')),
-          duration: const Duration(seconds: 2),
-        ),
+      AppNotice.show(
+        tr('요약을 수정했습니다. 이전 버전은 이력에 저장되었습니다.', 'Summary updated. The previous version was saved to history.'),
+        kind: NoticeKind.info,
+        duration: const Duration(seconds: 2),
       );
     }
   }
@@ -2115,11 +2074,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           .asData
           ?.value;
       if (_isSummarizing) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.'),
+          kind: NoticeKind.warning,
         );
         return;
       }
@@ -2131,11 +2088,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
           meeting: meeting,
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('요약할 전사 내용이 없습니다. 먼저 음성 인식을 실행해주세요.', 'There is no transcript to summarize. Please run transcription first.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('요약할 전사 내용이 없습니다. 먼저 음성 인식을 실행해주세요.', 'There is no transcript to summarize. Please run transcription first.'),
+          kind: NoticeKind.warning,
         );
       }
     });
@@ -2841,22 +2796,15 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                 child: _BookmarksCard(
                   bookmarks: bms,
                   onJump: (sec) async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    final err = await _seekTranscriptAudio?.call(
+                                    final err = await _seekTranscriptAudio?.call(
                       sec.toDouble(),
                     );
                     if (!mounted) return;
                     final ok = err == null;
-                    messenger.showSnackBar(
-                      SnackBar(
-                        duration: Duration(seconds: ok ? 2 : 4),
-                        content: Text(
-                          ok ? tr('북마크 지점으로 이동 + 오디오 재생', 'Jumped to bookmark + playing audio') : tr('북마크 지점 전사로 이동 · $err', 'Jumped to bookmark transcript · $err'),
-                        ),
-                        backgroundColor: ok
-                            ? Colors.indigo.shade600
-                            : Colors.blueGrey.shade600,
-                      ),
+                    AppNotice.show(
+                      ok ? tr('북마크 지점으로 이동 + 오디오 재생', 'Jumped to bookmark + playing audio') : tr('북마크 지점 전사로 이동 · $err', 'Jumped to bookmark transcript · $err'),
+                      kind: NoticeKind.info,
+                      duration: Duration(seconds: ok ? 2 : 4),
                     );
                   },
                 ),
@@ -3589,31 +3537,14 @@ class _ExportMenuState extends State<_ExportMenu> {
   }
 
   void _showSnack(String msg, {bool isError = false, String? openPath}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: openPath != null
-            ? GestureDetector(
-                onTap: () {
-                  Process.run('open', [openPath]);
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                },
-                child: Row(
-                  children: [
-                    Expanded(child: Text(msg)),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.open_in_new,
-                      size: 15,
-                      color: Colors.white70,
-                    ),
-                  ],
-                ),
-              )
-            : Text(msg),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.grey.shade800,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 6),
-      ),
+    AppNotice.show(
+      msg,
+      kind: isError ? NoticeKind.error : NoticeKind.info,
+      duration: const Duration(seconds: 6),
+      actionLabel: openPath == null ? null : tr('열기', 'Open'),
+      onAction: openPath == null
+          ? null
+          : () => Process.run('open', [openPath]),
     );
   }
 
@@ -4871,12 +4802,10 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
 
   void _showTagSnack(String message, {Color? backgroundColor}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 2),
-        content: Text(message),
-        backgroundColor: backgroundColor,
-      ),
+    AppNotice.show(
+      message,
+      kind: NoticeKind.info,
+      duration: const Duration(seconds: 2),
     );
   }
 
@@ -5104,13 +5033,11 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
     ref.read(aiSearchResultsProvider.notifier).state = null;
     // 검색창에 포커스 (Cmd+F와 동일 효과)
     ref.read(shortcutFocusSearchSignalProvider.notifier).update((s) => s + 1);
-    // 토스트로 알려주기 — 사이드바가 좁아져 안 보일 수 있음
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 2),
-        content: Text(tr('태그 "$tag"로 검색합니다', 'Searching for tag "$tag"')),
-        backgroundColor: Colors.indigo.shade600,
-      ),
+    // 알림으로 알려주기
+    AppNotice.show(
+      tr('태그 "$tag"로 검색합니다', 'Searching for tag "$tag"'),
+      kind: NoticeKind.info,
+      duration: const Duration(seconds: 2),
     );
   }
 
@@ -5593,11 +5520,9 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
     await GlossaryRepositoryImpl(IsarService.instance.db).saveEntry(entry);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('단어집에 "${entry.term}" 추가됨', 'Added "${entry.term}" to glossary')),
-          backgroundColor: Colors.green.shade700,
-        ),
+      AppNotice.show(
+        tr('단어집에 "${entry.term}" 추가됨', 'Added "${entry.term}" to glossary'),
+        kind: NoticeKind.success,
       );
     }
   }
@@ -5698,20 +5623,14 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
 
     widget.onTranscriptChanged?.call();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            changed == 0
-                ? tr('"$find" 을(를) 찾지 못했습니다.', 'Could not find "$find".')
-                : tr('$changed개 세그먼트에서 "$find" → "$replace" 치환됨'
-                      '${addToGlossary ? ' · 단어집에 추가됨' : ''}',
-                      'Replaced "$find" → "$replace" in $changed segments'
-                      '${addToGlossary ? ' · added to glossary' : ''}'),
-          ),
-          backgroundColor: changed == 0
-              ? Colors.orange.shade700
-              : Colors.green.shade700,
-        ),
+      AppNotice.show(
+        changed == 0
+            ? tr('"$find" 을(를) 찾지 못했습니다.', 'Could not find "$find".')
+            : tr('$changed개 세그먼트에서 "$find" → "$replace" 치환됨'
+                  '${addToGlossary ? ' · 단어집에 추가됨' : ''}',
+                  'Replaced "$find" → "$replace" in $changed segments'
+                  '${addToGlossary ? ' · added to glossary' : ''}'),
+        kind: changed == 0 ? NoticeKind.warning : NoticeKind.success,
       );
     }
   }
@@ -5896,18 +5815,14 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
 
     widget.onTranscriptChanged?.call();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 2),
-          content: Text(
-            mergedCount > 0
+      AppNotice.show(
+        mergedCount > 0
                 ? tr('$mergedCount개 발화가 화자 ${result.mergeInto}로 통합되었습니다', '$mergedCount utterances merged into speaker ${result.mergeInto}')
                 : (result.name.isEmpty
                       ? tr('화자 $letter 이름이 초기화되었습니다', 'Speaker $letter name was reset')
                       : tr('화자 $letter → "${result.name}" 으로 저장되었습니다', 'Speaker $letter saved as "${result.name}"')),
-          ),
-          backgroundColor: Colors.green.shade700,
-        ),
+        kind: NoticeKind.success,
+        duration: const Duration(seconds: 2),
       );
     }
   }
@@ -5930,17 +5845,11 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
 
     widget.onTranscriptChanged?.call();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            changed == 0
-                ? tr('단어집 별칭으로 교정할 내용을 찾지 못했습니다.', 'Nothing to correct using glossary aliases.')
-                : tr('$changed개 세그먼트에서 단어집 별칭 기반 교정 적용됨', 'Applied glossary alias corrections to $changed segments'),
-          ),
-          backgroundColor: changed == 0
-              ? Colors.blueGrey.shade600
-              : Colors.green.shade700,
-        ),
+      AppNotice.show(
+        changed == 0
+            ? tr('단어집 별칭으로 교정할 내용을 찾지 못했습니다.', 'Nothing to correct using glossary aliases.')
+            : tr('$changed개 세그먼트에서 단어집 별칭 기반 교정 적용됨', 'Applied glossary alias corrections to $changed segments'),
+        kind: changed == 0 ? NoticeKind.info : NoticeKind.success,
       );
     }
   }
@@ -6884,12 +6793,10 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                       }
                       // 오디오 없거나 시킹 실패 — 안내 메시지
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          duration: const Duration(seconds: 2),
-                          content: Text(tr('오디오 파일이 없거나 자동 삭제되어 재생할 수 없습니다', 'The audio file is missing or was auto-deleted, so it cannot be played')),
-                          backgroundColor: Colors.blueGrey.shade600,
-                        ),
+                      AppNotice.show(
+                        tr('오디오 파일이 없거나 자동 삭제되어 재생할 수 없습니다', 'The audio file is missing or was auto-deleted, so it cannot be played'),
+                        kind: NoticeKind.info,
+                        duration: const Duration(seconds: 2),
                       );
                     },
                     borderRadius: BorderRadius.circular(4),
@@ -7624,13 +7531,9 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                             await widget.onSave(selected);
                             if (context.mounted) {
                               Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    tr('${selected.length}개 용어를 단어집에 추가했습니다.', 'Added ${selected.length} terms to the glossary.'),
-                                  ),
-                                  backgroundColor: Colors.teal.shade600,
-                                ),
+                              AppNotice.show(
+                                tr('${selected.length}개 용어를 단어집에 추가했습니다.', 'Added ${selected.length} terms to the glossary.'),
+                                kind: NoticeKind.info,
                               );
                             }
                           },
@@ -8130,9 +8033,10 @@ class _ActionItemEditDialogState extends State<_ActionItemEditDialog> {
         onPressed: () {
           final task = _taskCtrl.text.trim();
           if (task.isEmpty) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(tr('할 일을 입력해주세요.', 'Please enter a task.'))));
+            AppNotice.show(
+              tr('할 일을 입력해주세요.', 'Please enter a task.'),
+              kind: NoticeKind.info,
+            );
             return;
           }
           Navigator.pop(
@@ -8302,18 +8206,20 @@ class _AudioFileRevealState extends State<_AudioFileReveal> {
     final file = File(widget.path);
     if (!file.existsSync()) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(tr('파일을 찾을 수 없습니다: ${widget.path}', 'File not found: ${widget.path}'))));
+      AppNotice.show(
+        tr('파일을 찾을 수 없습니다: ${widget.path}', 'File not found: ${widget.path}'),
+        kind: NoticeKind.info,
+      );
       return;
     }
     try {
       await Process.run('open', ['-R', widget.path]);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(tr('Finder 열기 실패: $e', 'Failed to open Finder: $e'))));
+      AppNotice.show(
+        tr('Finder 열기 실패: $e', 'Failed to open Finder: $e'),
+        kind: NoticeKind.info,
+      );
     }
   }
 

@@ -9,6 +9,7 @@ import '../../domain/entities/summary.dart';
 import '../../core/l10n/app_tr.dart';
 import '../providers/meeting_providers.dart';
 import 'glossary_screen.dart';
+import '../widgets/app_notice.dart';
 
 /// 통계 다이얼로그 열기 헬퍼
 void showStatsDialog(BuildContext context) {
@@ -901,12 +902,10 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
         .read(shortcutFocusSearchSignalProvider.notifier)
         .update((s) => s + 1);
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 2),
-        content: Text(tr('태그 "$tag"로 검색합니다', 'Searching for tag "$tag"')),
-        backgroundColor: Colors.indigo.shade600,
-      ),
+    AppNotice.show(
+      tr('태그 "$tag"로 검색합니다', 'Searching for tag "$tag"'),
+      kind: NoticeKind.info,
+      duration: const Duration(seconds: 2),
     );
   }
 

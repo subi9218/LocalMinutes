@@ -15,6 +15,7 @@ import '../../core/services/crash_log_service.dart';
 import '../../core/services/model_download_service.dart';
 import '../../core/services/user_error_message.dart';
 import 'home_screen.dart';
+import '../widgets/app_notice.dart';
 
 PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
   pageBuilder: (_, _, _) => child,
@@ -585,13 +586,10 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? Colors.red.shade700 : null,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-      ),
+    AppNotice.show(
+      msg,
+      kind: isError ? NoticeKind.error : NoticeKind.info,
+      duration: const Duration(seconds: 5),
     );
   }
 
