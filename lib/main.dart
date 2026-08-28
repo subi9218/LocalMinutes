@@ -12,6 +12,7 @@ import 'core/l10n/app_tr.dart';
 import 'core/ffi/on_device_model_manager.dart';
 import 'core/services/app_settings.dart';
 import 'core/services/auto_delete_service.dart';
+import 'core/services/backup_service.dart';
 import 'core/services/crash_log_service.dart';
 import 'core/services/entitlement_service.dart';
 import 'core/services/isar_service.dart';
@@ -55,6 +56,10 @@ void main() async {
       // 저장 폴더 미준비로 간주해 저장 폴더 화면을 보여준다(창은 항상 렌더).
       if (storageReady) {
         try {
+          // 복원 도중 강제종료된 흔적이 있으면 원본 라이브러리를 먼저 되살린다.
+          await BackupService.recoverInterruptedRestoreIfNeeded(
+            AppSettings.instance.recordingsSavePath.trim(),
+          );
           await IsarService.instance.init();
         } catch (e, st) {
           CrashLogService.instance.recordCaught(e, st, context: 'isarInit');
@@ -354,6 +359,14 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         title: tr('AI 모델 준비가 필요합니다', 'AI models need to be set up'),
         message: tr('트레이에서 바로 녹음하려면 먼저 음성 인식 모델과 요약 모델을 준비해주세요.',
             'To record from the menu bar, please set up the speech and summary models first.'),
+      );
+      return;
+    }
+    if (BackupService.isBusy) {
+      await _showTrayStartBlockedDialog(
+        title: tr('백업/복원이 진행 중입니다', 'A backup or restore is in progress'),
+        message: tr('백업/복원이 끝난 뒤 녹음을 시작해주세요.',
+            'Please start recording after the backup or restore finishes.'),
       );
       return;
     }

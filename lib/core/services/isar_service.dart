@@ -30,6 +30,21 @@ class IsarService {
 
   bool get isOpen => _isar?.isOpen ?? false;
 
+  /// 현재 열려 있는 DB 디렉터리 경로 (백업/복원용).
+  String? get directoryPath => _directoryPath;
+
+  /// 백업 복원을 위해 DB를 닫는다. 이후 init()으로 다시 연다.
+  Future<void> closeForRestore() async {
+    final cur = _isar;
+    _isar = null;
+    _directoryPath = null;
+    if (cur != null && cur.isOpen) {
+      try {
+        await cur.close();
+      } catch (_) {}
+    }
+  }
+
   Isar get db {
     if (_isar == null || !_isar!.isOpen) {
       throw StateError('IsarService not initialized. Call init() first.');

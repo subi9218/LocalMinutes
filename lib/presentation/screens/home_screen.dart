@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
+import '../../core/services/backup_service.dart';
 import '../../core/services/processing_status_service.dart';
 import '../../core/services/recovery_service.dart';
 import '../../data/datasources/microphone_service.dart';
@@ -117,6 +118,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// 전사/요약 진행 중이면 녹음·업로드를 막을 사유 문구(없으면 null).
   String? _busyBlockReason() {
+    // 백업/복원 중 — DB가 닫히거나 스냅샷 중이므로 녹음 시작 금지.
+    if (BackupService.isBusy) {
+      return tr('백업/복원이 진행 중입니다. 완료 후 다시 시도해주세요.',
+          'A backup or restore is in progress. Please try again after it finishes.');
+    }
     // 녹음(마이크) 진행 중 — 툴바/단축키로 중복 시작 방지.
     final mic = MicrophoneService.instance;
     if (mic.isRecording || mic.isPaused) {

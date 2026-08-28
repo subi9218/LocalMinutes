@@ -9,6 +9,7 @@ import 'package:macos_ui/macos_ui.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
+import '../../core/services/backup_service.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/export_service.dart';
 import '../../core/services/isar_service.dart';
@@ -106,6 +107,11 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
   }
 
   String? _nativeTaskBlockReason(String actionLabel) {
+    // 백업/복원 중 — DB가 닫히거나 스냅샷 중이므로 모든 AI 작업 차단.
+    if (BackupService.isBusy) {
+      return tr('백업/복원이 진행 중입니다. 완료 후 $actionLabel을(를) 다시 시도해주세요.',
+          'A backup or restore is in progress. Please try $actionLabel again after it finishes.');
+    }
     // 녹음(마이크) 진행 중이면 무조건 차단. 예전에는 30초 전사 윈도우 '사이'에
     // activeLabel이 null이라 재전사가 통과 → loadStt가 라이브 녹음의 whisper
     // 컨텍스트를 해제·교체해 이후 실시간 전사가 소리 없이 죽는 치명 버그 존재.

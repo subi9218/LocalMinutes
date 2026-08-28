@@ -12,6 +12,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
+import '../../core/services/backup_service.dart';
 import '../../core/services/calendar_service.dart';
 import '../../core/services/chunked_summarizer.dart';
 import '../../core/services/crash_log_service.dart';
@@ -1000,6 +1001,19 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     // 재진입 방지: 준비 다이얼로그가 열려 있는 동안 트레이 quick-start 등으로
     // 두 번째 _startRecording이 호출되면 중복 회의가 생성된다.
     if (_startInProgress) return;
+    // 백업/복원 중에는 녹음 시작 금지 (복원은 DB를 닫는다).
+    if (BackupService.isBusy) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(tr('백업/복원이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
+                'A backup or restore is in progress. Please start recording after it finishes.')),
+            backgroundColor: Colors.orange.shade700,
+          ),
+        );
+      }
+      return;
+    }
     _startInProgress = true;
     try {
     final prep = await _showRecordingPrepDialog();

@@ -186,6 +186,48 @@ class AppSettings {
   Future<void> setSidebarWidth(double v) =>
       _prefs.setDouble('sidebarWidth', v.clamp(260, 480).toDouble());
 
+  // ── 백업/복원 (설정 이식) ──────────────────────────────────────────
+  /// 백업에 담지 않는 기기 종속 키 — 새 Mac에서 그대로 쓰면 잘못된 값이 된다.
+  static const _backupExcludedKeys = {
+    'recordingsSavePath', // 기기별 경로
+    'recordingsSaveBookmark', // security-scoped bookmark는 기기·앱 서명 종속
+    'lastPrewarmOsVersion', // 기기 OS 종속
+    'modelsSetupComplete', // 모델은 기기별 재다운로드 필요
+    '_settingsDefaultsApplied_v1', // 마이그레이션 마커
+  };
+
+  /// 백업 파일에 담을 이식 가능한 설정 스냅샷.
+  Map<String, Object> exportableSettings() {
+    final out = <String, Object>{};
+    for (final key in _prefs.getKeys()) {
+      if (_backupExcludedKeys.contains(key)) continue;
+      final Object? v = _prefs.get(key);
+      if (v is String || v is int || v is double || v is bool) {
+        out[key] = v as Object;
+      }
+    }
+    return out;
+  }
+
+  /// 백업에서 읽은 설정을 적용. 기기 종속 키는 무시한다.
+  Future<void> applyImportedSettings(Map<String, dynamic> settings) async {
+    for (final e in settings.entries) {
+      if (_backupExcludedKeys.contains(e.key)) continue;
+      final v = e.value;
+      if (v is String) {
+        await _prefs.setString(e.key, v);
+      } else if (v is bool) {
+        await _prefs.setBool(e.key, v);
+      } else if (v is int) {
+        await _prefs.setInt(e.key, v);
+      } else if (v is double) {
+        await _prefs.setDouble(e.key, v);
+      }
+    }
+    // 가져온 설정도 현재 빌드 기준으로 정합화 (지원 안 되는 모델 선택 등 교정)
+    await _sanitizeForCurrentBuild();
+  }
+
   // ── 모델 프리워밍 ─────────────────────────────────────────────────
   /// 마지막으로 CoreML(ANE) 프리워밍을 완료한 macOS 버전 문자열.
   /// OS가 업데이트되면 값이 달라져 다음 유휴 시점에 다시 프리워밍한다.
