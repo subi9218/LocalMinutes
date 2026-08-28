@@ -1959,30 +1959,36 @@ class _GroupSectionState extends State<_GroupSection> {
   }
 
   void _showDeleteDialog(BuildContext context) {
-    showDialog(
+    showMacosAlertDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => MacosAlertDialog(
+        appIcon: const Icon(
+          Icons.folder_delete_outlined,
+          color: Colors.red,
+          size: 48,
+        ),
         title: Text(tr('그룹 삭제', 'Delete group')),
-        content: Text(
+        message: Text(
           tr(
             '「${widget.group.name}」 그룹을 삭제합니다.\n그룹 내 회의는 미분류로 이동됩니다.',
             'Delete the group "${widget.group.name}".\nMeetings in it will move to Ungrouped.',
           ),
+          textAlign: TextAlign.center,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(tr('취소', 'Cancel')),
-          ),
-          TextButton(
-            onPressed: () {
-              widget.onDeleteGroup(widget.group);
-              Navigator.pop(ctx);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(tr('삭제', 'Delete')),
-          ),
-        ],
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () {
+            Navigator.pop(ctx);
+            widget.onDeleteGroup(widget.group);
+          },
+          child: Text(tr('삭제', 'Delete')),
+        ),
+        secondaryButton: PushButton(
+          controlSize: ControlSize.large,
+          secondary: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(tr('취소', 'Cancel')),
+        ),
       ),
     );
   }
@@ -2130,40 +2136,8 @@ class _MeetingTile extends StatelessWidget {
         : scheme.onSurfaceVariant;
     final tileBackground = isSelected ? scheme.primary : Colors.transparent;
 
-    return Dismissible(
-      key: ValueKey(meeting.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        color: Colors.red.shade600,
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(tr('회의 삭제', 'Delete meeting')),
-                content: Text(tr('「${meeting.title}」을(를) 삭제하시겠습니까?', 'Delete "${meeting.title}"?')),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(tr('취소', 'Cancel')),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(
-                      tr('삭제', 'Delete'),
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                ],
-              ),
-            ) ??
-            false;
-      },
-      onDismissed: (_) => onDelete(),
-      child: GestureDetector(
+    // macOS 관례: 스와이프 삭제(모바일) 대신 우클릭 컨텍스트 메뉴로 삭제.
+    return GestureDetector(
         onSecondaryTapUp: (d) => _showContextMenu(context, d.globalPosition),
         child: InkWell(
           borderRadius: BorderRadius.circular(7),
@@ -2265,7 +2239,6 @@ class _MeetingTile extends StatelessWidget {
             ),
           ),
         ),
-      ),
     );
   }
 
@@ -2383,7 +2356,37 @@ class _MeetingTile extends StatelessWidget {
       if (value == 'rename') {
         _showRenameDialog(context);
       } else if (value == 'delete') {
-        onDelete();
+        // Dismissible(스와이프 삭제) 제거로 확인창이 여기로 이동 — macOS 스타일
+        showMacosAlertDialog<void>(
+          context: context,
+          builder: (ctx) => MacosAlertDialog(
+            appIcon: const Icon(
+              Icons.delete_outline_rounded,
+              color: Colors.red,
+              size: 48,
+            ),
+            title: Text(tr('회의 삭제', 'Delete meeting')),
+            message: Text(
+              tr('「${meeting.title}」을(를) 삭제하시겠습니까?\n전사·요약도 함께 삭제됩니다.',
+                  'Delete "${meeting.title}"?\nIts transcript and summary will also be deleted.'),
+              textAlign: TextAlign.center,
+            ),
+            primaryButton: PushButton(
+              controlSize: ControlSize.large,
+              onPressed: () {
+                Navigator.pop(ctx);
+                onDelete();
+              },
+              child: Text(tr('삭제', 'Delete')),
+            ),
+            secondaryButton: PushButton(
+              controlSize: ControlSize.large,
+              secondary: true,
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(tr('취소', 'Cancel')),
+            ),
+          ),
+        );
       } else if (value == 'group_null') {
         onMoveGroup(null);
       } else if (value.startsWith('group_')) {

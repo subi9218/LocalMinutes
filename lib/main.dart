@@ -291,18 +291,17 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
 
     _exitPromptShowing = true;
     try {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showMacosAlertDialog<bool>(
         context: ctx,
         barrierDismissible: false,
-        builder: (dialogCtx) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-              const SizedBox(width: 8),
-              Flexible(child: Text(tr('작업이 진행 중입니다', 'A task is in progress'))),
-            ],
+        builder: (dialogCtx) => MacosAlertDialog(
+          appIcon: const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange,
+            size: 48,
           ),
-          content: Text(
+          title: Text(tr('작업이 진행 중입니다', 'A task is in progress')),
+          message: Text(
             tr(
               '현재 $label 작업 중입니다.\n'
                   '종료하면 진행 중인 작업이 중단되거나 결과가 저장되지 않을 수 있습니다.\n\n'
@@ -311,20 +310,19 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
                   'Quitting now may interrupt it or lose unsaved results.\n\n'
                   'Quit the app?',
             ),
+            textAlign: TextAlign.center,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: Text(tr('취소', 'Cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade600,
-              ),
-              child: Text(tr('종료', 'Quit')),
-            ),
-          ],
+          primaryButton: PushButton(
+            controlSize: ControlSize.large,
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: Text(tr('종료', 'Quit')),
+          ),
+          secondaryButton: PushButton(
+            controlSize: ControlSize.large,
+            secondary: true,
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(tr('취소', 'Cancel')),
+          ),
         ),
       );
       return confirmed == true;
@@ -400,23 +398,21 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
   }) async {
     final ctx = _navigatorKey.currentContext;
     if (!mounted || ctx == null) return;
-    await showDialog<void>(
+    await showMacosAlertDialog<void>(
       context: ctx,
-      builder: (dialogCtx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.info_outline_rounded),
-            const SizedBox(width: 8),
-            Flexible(child: Text(title)),
-          ],
+      builder: (dialogCtx) => MacosAlertDialog(
+        appIcon: const Icon(
+          Icons.info_outline_rounded,
+          color: Colors.blueGrey,
+          size: 48,
         ),
-        content: Text(message),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: Text(tr('확인', 'OK')),
-          ),
-        ],
+        title: Text(title),
+        message: Text(message, textAlign: TextAlign.center),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () => Navigator.of(dialogCtx).pop(),
+          child: Text(tr('확인', 'OK')),
+        ),
       ),
     );
   }
