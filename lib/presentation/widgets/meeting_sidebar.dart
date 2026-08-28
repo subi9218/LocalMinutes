@@ -37,6 +37,7 @@ import '../screens/settings_screen.dart';
 import '../screens/stats_screen.dart';
 import 'app_version_credit.dart';
 import 'app_notice.dart';
+import 'theme_tint.dart';
 
 class MeetingSidebar extends ConsumerStatefulWidget {
   const MeetingSidebar({super.key});
@@ -741,9 +742,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: tintBg(context, Colors.red),
                   border: Border(
-                    bottom: BorderSide(color: Colors.red.shade200),
+                    bottom: BorderSide(color: tintBorder(context, Colors.red)),
                   ),
                 ),
                 child: Row(
@@ -760,7 +761,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Colors.red.shade700,
+                              color: tintFg(context, Colors.red),
                             ),
                           ),
                           Text(
@@ -951,9 +952,9 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
               margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.deepPurple.shade50,
+                color: tintBg(context, Colors.deepPurple),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.deepPurple.shade200),
+                border: Border.all(color: tintBorder(context, Colors.deepPurple)),
               ),
               child: Row(
                 children: [
@@ -971,7 +972,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: Colors.deepPurple.shade700,
+                      color: tintFg(context, Colors.deepPurple),
                     ),
                   ),
                 ],
@@ -989,7 +990,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     tr('오류: $e', 'Error: $e'),
-                    style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                    style: TextStyle(fontSize: 12, color: tintFg(context, Colors.red)),
                   ),
                 ),
               ),
@@ -1009,7 +1010,7 @@ class _MeetingSidebarState extends ConsumerState<MeetingSidebar> {
                             tr('검색 오류: $e', 'Search error: $e'),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.red.shade700,
+                              color: tintFg(context, Colors.red),
                             ),
                           ),
                         ),
@@ -1478,7 +1479,7 @@ class _SearchMatchList extends ConsumerWidget {
                           tokens: tokens,
                           baseStyle: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade700,
+                            color: mutedText(context),
                             height: 1.3,
                           ),
                         ),
@@ -2293,7 +2294,7 @@ class _MeetingTile extends StatelessWidget {
           value: 'rename',
           child: Row(
             children: [
-              Icon(Icons.edit_outlined, size: 15, color: Colors.grey.shade700),
+              Icon(Icons.edit_outlined, size: 15, color: mutedText(context)),
               const SizedBox(width: 8),
               Text(tr('제목 수정', 'Rename'), style: const TextStyle(fontSize: 13)),
             ],
@@ -2329,7 +2330,7 @@ class _MeetingTile extends StatelessWidget {
               value: 'group_${g.id}',
               child: Row(
                 children: [
-                  Icon(Icons.folder, size: 15, color: Colors.amber.shade700),
+                  Icon(Icons.folder, size: 15, color: tintFg(context, Colors.amber)),
                   const SizedBox(width: 8),
                   Text(g.name, style: const TextStyle(fontSize: 13)),
                 ],
@@ -2499,7 +2500,7 @@ class _SeriesSuggestionTile extends StatelessWidget {
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: mutedText(context)),
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -2535,13 +2536,13 @@ class _MiniMeetingChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: tintBorder(context, Colors.grey)),
         ),
         child: Text(
           '${_formatShortDate(meeting.createdAt)} ${meeting.title}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+          style: TextStyle(fontSize: 11, color: mutedText(context)),
         ),
       ),
     );
@@ -2944,7 +2945,7 @@ class _DigestSheetState extends ConsumerState<_DigestSheet> {
                             const SizedBox(height: 8),
                             Text(
                               tr('${_period.label}에는 회의가 없습니다.', 'No meetings ${_period.label.toLowerCase()}.'),
-                              style: TextStyle(color: Colors.grey.shade600),
+                              style: TextStyle(color: mutedText(context)),
                             ),
                           ],
                         ),
@@ -3067,11 +3068,11 @@ class _DigestMetaPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: Colors.grey.shade700),
+          Icon(icon, size: 12, color: mutedText(context)),
           const SizedBox(width: 4),
           Text(
             text,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 11, color: mutedText(context)),
           ),
         ],
       ),
@@ -3177,7 +3178,7 @@ class _DigestRow extends StatelessWidget {
                         meta.join(' · '),
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade600,
+                          color: mutedText(context),
                         ),
                       ),
                     ),
@@ -3267,7 +3268,7 @@ class _SeriesOverviewSheetState extends ConsumerState<_SeriesOverviewSheet> {
                   '회의 1회 이상 묶인 시리즈를 마지막 회의가 최신인 순으로 표시합니다.',
                   'Series with at least one meeting, ordered by most recent meeting.',
                 ),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: mutedText(context)),
               ),
               const Divider(height: 20),
               Expanded(
@@ -3294,7 +3295,7 @@ class _SeriesOverviewSheetState extends ConsumerState<_SeriesOverviewSheet> {
                             const SizedBox(height: 8),
                             Text(
                               tr('아직 회의가 묶인 시리즈가 없습니다.', 'No series with grouped meetings yet.'),
-                              style: TextStyle(color: Colors.grey.shade600),
+                              style: TextStyle(color: mutedText(context)),
                             ),
                           ],
                         ),
@@ -3364,7 +3365,7 @@ class _SeriesOverviewCard extends StatelessWidget {
                     tr('${report.meetingCount}회', '${report.meetingCount}×'),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade700,
+                      color: mutedText(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -3470,7 +3471,7 @@ class _ImportConvertingDialog extends StatelessWidget {
               tr('16kHz 모노 WAV로 변환합니다. 잠시만 기다려 주세요.',
                   'Converting to 16kHz mono WAV. Please wait.'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 11, color: mutedText(context)),
             ),
           ],
         ),

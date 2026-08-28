@@ -45,6 +45,7 @@ import '../../domain/entities/summary.dart';
 import '../providers/global_container.dart';
 import '../providers/meeting_providers.dart';
 import 'app_notice.dart';
+import 'theme_tint.dart';
 
 enum _RecordingPhase {
   idle,
@@ -657,12 +658,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           Icon(
                             Icons.delete_outline,
                             size: 16,
-                            color: Colors.red.shade700,
+                            color: tintFg(context, Colors.red),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             tr('삭제', 'Delete'),
-                            style: TextStyle(color: Colors.red.shade700),
+                            style: TextStyle(color: tintFg(context, Colors.red)),
                           ),
                         ],
                       ),
@@ -2103,7 +2104,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 children: [
                   Text(
                     tr('마우스를 올리면 모델 설명이 보입니다.', 'Hover to see the model description.'),
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 11, color: mutedText(context)),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -3019,11 +3020,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.pause, size: 18, color: Colors.orange.shade700),
+                    Icon(Icons.pause, size: 18, color: tintFg(context, Colors.orange)),
                     const SizedBox(width: 6),
                     Text(
                       tr('일시 정지  ${_elapsedStr()}', 'Pause  ${_elapsedStr()}'),
-                      style: TextStyle(color: Colors.orange.shade700),
+                      style: TextStyle(color: tintFg(context, Colors.orange)),
                     ),
                   ],
                 ),
@@ -3046,12 +3047,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     Icon(
                       Icons.bookmark_add_rounded,
                       size: 18,
-                      color: Colors.amber.shade800,
+                      color: tintFg(context, Colors.amber),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       tr('북마크 ${_bookmarks.isEmpty ? "" : "${_bookmarks.length}"}', 'Bookmark ${_bookmarks.isEmpty ? "" : "${_bookmarks.length}"}'),
-                      style: TextStyle(color: Colors.amber.shade800),
+                      style: TextStyle(color: tintFg(context, Colors.amber)),
                     ),
                   ],
                 ),
@@ -3609,7 +3610,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       tr('입력됨', 'Filled'),
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.amber.shade900,
+                        color: tintFg(context, Colors.amber),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -3633,9 +3634,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           // 전체를 하나의 테두리 컨테이너로 감싸기
           Container(
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: tintBg(context, Colors.amber),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade200),
+              border: Border.all(color: tintBorder(context, Colors.amber)),
             ),
             child: Column(
               children: [
@@ -3717,7 +3718,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           child: Icon(
                             Icons.drag_handle,
                             size: 16,
-                            color: Colors.amber.shade900,
+                            color: tintFg(context, Colors.amber),
                           ),
                         ),
                       ),
@@ -3744,11 +3745,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       children: [
         Row(
           children: [
-            Icon(Icons.people_outline, size: 14, color: Colors.grey.shade600),
+            Icon(Icons.people_outline, size: 14, color: mutedText(context)),
             const SizedBox(width: 6),
             Text(
               tr('참석자 (선택)', 'Attendees (optional)'),
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: mutedText(context)),
             ),
             if (_participants.isNotEmpty) ...[
               const SizedBox(width: 6),
@@ -3836,11 +3837,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     return Row(
       children: [
-        Icon(Icons.auto_awesome, size: 14, color: Colors.grey.shade600),
+        Icon(Icons.auto_awesome, size: 14, color: mutedText(context)),
         const SizedBox(width: 6),
         Text(
           tr('회의 유형', 'Meeting type'),
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 12, color: mutedText(context)),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -3849,7 +3850,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             isDense: true,
             isExpanded: true,
             underline: const SizedBox(),
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface),
             items: [
               DropdownMenuItem<String?>(
                 value: null,
@@ -3904,11 +3907,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   Widget _buildDeviceSelector() {
     return Row(
       children: [
-        Icon(Icons.mic, size: 14, color: Colors.grey.shade600),
+        Icon(Icons.mic, size: 14, color: mutedText(context)),
         const SizedBox(width: 6),
         Text(
           tr('마이크', 'Microphone'),
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 12, color: mutedText(context)),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -3916,7 +3919,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             child: DropdownButton<String>(
               value: _selectedDevice?.id,
               isDense: true,
-              style: const TextStyle(fontSize: 12, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface),
               items: _inputDevices.map((d) {
                 final isBluetooth =
                     d.label.contains('AirPods') ||
@@ -4260,7 +4265,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade700,
+                        color: mutedText(context),
                       ),
                     ),
                   ),
@@ -4704,7 +4709,7 @@ class _ModelFileRow extends StatelessWidget {
                 filename,
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.grey.shade600,
+                  color: mutedText(context),
                   fontFamily: 'monospace',
                 ),
               ),
@@ -4782,7 +4787,7 @@ class _LiveSummaryPreviewState extends State<_LiveSummaryPreview> {
         style: TextStyle(
           fontSize: 11,
           height: 1.45,
-          color: Colors.grey.shade800,
+          color: mutedText(context),
           fontFamily: 'monospace',
         ),
       ),
@@ -4867,14 +4872,14 @@ class _VoicePulseCardState extends State<_VoicePulseCard>
     if (l < 0.06) {
       return (
         label: tr('음성을 감지하지 못하고 있어요', 'Not detecting any voice'),
-        color: Colors.grey.shade600,
+        color: mutedText(context),
         icon: Icons.hearing_rounded,
       );
     }
     if (l < 0.15) {
       return (
         label: tr('말씀하시면 마이크가 따라갑니다', 'The mic follows when you speak'),
-        color: Colors.orange.shade700,
+        color: tintFg(context, Colors.orange),
         icon: Icons.mic_rounded,
       );
     }
@@ -5183,7 +5188,7 @@ class _CalendarSuggestionPanelState extends State<_CalendarSuggestionPanel> {
               const SizedBox(width: 6),
               Text(
                 tr('· 클릭하면 제목/어젠다 자동 채움', '· Click to auto-fill title/agenda'),
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10, color: mutedText(context)),
               ),
             ],
           ),
@@ -5227,7 +5232,7 @@ class _CalendarSuggestionPanelState extends State<_CalendarSuggestionPanel> {
                               '· ${_relativeStart(e.start)} · ${e.calendarName}',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: Colors.grey.shade600,
+                                color: mutedText(context),
                               ),
                             ),
                           ],
@@ -5410,7 +5415,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('확인 필요', 'Needs review'),
         hint: _error!,
-        color: Colors.red.shade700,
+        color: tintFg(context, Colors.red),
         icon: Icons.mic_off_rounded,
       );
     }
@@ -5418,7 +5423,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('테스트 준비 중', 'Preparing test'),
         hint: tr('선택한 마이크 입력을 확인하고 있습니다.', 'Checking the selected microphone input.'),
-        color: Colors.grey.shade600,
+        color: mutedText(context),
         icon: Icons.hourglass_empty_rounded,
       );
     }
@@ -5426,7 +5431,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('입력이 잘 들어오고 있어요', 'Input is coming in clearly'),
         hint: tr('이 상태로 녹음하면 음성 인식 품질이 좋아집니다.', 'Recording in this state gives good recognition quality.'),
-        color: Colors.green.shade700,
+        color: tintFg(context, Colors.green),
         icon: Icons.check_circle_outline_rounded,
       );
     }
@@ -5434,14 +5439,14 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('조금 작게 들립니다', 'Sounds a bit quiet'),
         hint: tr('마이크를 말하는 사람 가까이에 두면 더 좋습니다.', 'Placing the mic closer to the speaker helps.'),
-        color: Colors.orange.shade700,
+        color: tintFg(context, Colors.orange),
         icon: Icons.warning_amber_rounded,
       );
     }
     return (
       label: tr('너무 조용합니다', 'Too quiet'),
       hint: tr('3초 정도 말해보세요. 계속 낮으면 입력 장치나 권한을 확인해주세요.', 'Try speaking for ~3 seconds. If it stays low, check the input device or permissions.'),
-      color: Colors.red.shade700,
+      color: tintFg(context, Colors.red),
       icon: Icons.hearing_disabled_outlined,
     );
   }
@@ -5645,7 +5650,7 @@ class _PrepGuideRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 17, color: Colors.grey.shade700),
+          Icon(icon, size: 17, color: mutedText(context)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

@@ -10,6 +10,7 @@ import '../../core/services/isar_service.dart';
 import '../../core/services/security_scoped_bookmark_service.dart';
 import 'home_screen.dart';
 import 'setup_screen.dart';
+import '../widgets/theme_tint.dart';
 
 PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
   pageBuilder: (_, _, _) => child,
@@ -489,7 +490,7 @@ class _ReconnectBanner extends StatelessWidget {
           Row(
             children: [
               Icon(Icons.warning_amber_rounded,
-                  size: 18, color: Colors.amber.shade800),
+                  size: 18, color: tintFg(context, Colors.amber)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -500,7 +501,7 @@ class _ReconnectBanner extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Colors.amber.shade900,
+                    color: tintFg(context, Colors.amber),
                   ),
                 ),
               ),
@@ -515,7 +516,7 @@ class _ReconnectBanner extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               height: 1.4,
-              color: Colors.amber.shade900,
+              color: tintFg(context, Colors.amber),
             ),
           ),
           const SizedBox(height: 8),

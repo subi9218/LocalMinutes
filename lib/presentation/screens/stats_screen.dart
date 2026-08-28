@@ -10,6 +10,7 @@ import '../../core/l10n/app_tr.dart';
 import '../providers/meeting_providers.dart';
 import 'glossary_screen.dart';
 import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 /// 통계 다이얼로그 열기 헬퍼
 void showStatsDialog(BuildContext context) {
@@ -532,7 +533,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                       const SizedBox(height: 6),
                       Text(e.key,
                           style: TextStyle(
-                              fontSize: 10.5, color: Colors.grey.shade600)),
+                              fontSize: 10.5, color: mutedText(context))),
                     ],
                   ),
                 ),
@@ -612,7 +613,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                         child: Text(t,
                             style: TextStyle(
                                 fontSize: 10.5,
-                                color: Colors.grey.shade600)),
+                                color: mutedText(context))),
                       ),
                     )),
               ]),
@@ -628,7 +629,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700)),
+                              color: mutedText(context))),
                     ),
                     for (int tb = 0; tb < 6; tb++)
                       Expanded(
@@ -759,7 +760,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                         Text('${e.value}',
                             style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade600)),
+                                color: mutedText(context))),
                         if (!inGlossary) ...[
                           const SizedBox(width: 4),
                           Icon(Icons.add_circle_outline,
@@ -878,7 +879,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                           '${s.count}',
                           style: TextStyle(
                             fontSize: fontSize * 0.65,
-                            color: Colors.grey.shade600,
+                            color: mutedText(context),
                           ),
                         ),
                       ],
@@ -968,7 +969,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.indigo.shade700),
+                            color: tintFg(context, Colors.indigo)),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -991,7 +992,7 @@ class _StatsDialogState extends ConsumerState<_StatsDialog> {
                       child: Text(tr('${s.count}회', '${s.count}×'),
                           textAlign: TextAlign.right,
                           style: TextStyle(
-                              fontSize: 11, color: Colors.grey.shade600)),
+                              fontSize: 11, color: mutedText(context))),
                     ),
                     const SizedBox(width: 6),
                     SizedBox(

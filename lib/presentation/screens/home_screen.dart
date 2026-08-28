@@ -20,6 +20,7 @@ import '../widgets/recording_view.dart';
 import '../widgets/series_dashboard_view.dart';
 import 'settings_screen.dart' show showSettingsDialog;
 import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -645,17 +646,17 @@ class _RecoveryBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.amber.shade50,
+      color: tintBg(context, Colors.amber),
       child: Container(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.amber.shade300)),
+          border: Border(bottom: BorderSide(color: tintBorder(context, Colors.amber))),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
             Icon(
               Icons.history_toggle_off,
-              color: Colors.amber.shade800,
+              color: tintFg(context, Colors.amber),
               size: 18,
             ),
             const SizedBox(width: 10),
@@ -669,7 +670,7 @@ class _RecoveryBanner extends StatelessWidget {
                 ),
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.amber.shade900,
+                  color: tintFg(context, Colors.amber),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -682,7 +683,7 @@ class _RecoveryBanner extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 minimumSize: const Size(0, 28),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                backgroundColor: Colors.amber.shade100,
+                backgroundColor: tintBg(context, Colors.amber),
                 foregroundColor: Colors.amber.shade900,
               ),
               child: Text(tr('복구하기', 'Recover'), style: const TextStyle(fontSize: 12)),
@@ -694,7 +695,7 @@ class _RecoveryBanner extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              color: Colors.amber.shade800,
+              color: tintFg(context, Colors.amber),
               onPressed: onDismiss,
             ),
           ],
@@ -732,10 +733,10 @@ class _ProcessingBanner extends StatelessWidget {
     final pctStr = hasPct ? ' ${(job.progress * 100).toStringAsFixed(0)}%' : '';
 
     return Material(
-      color: Colors.indigo.shade50,
+      color: tintBg(context, Colors.indigo),
       child: Container(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.indigo.shade200)),
+          border: Border(bottom: BorderSide(color: tintBorder(context, Colors.indigo))),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
@@ -765,7 +766,7 @@ class _ProcessingBanner extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.indigo.shade900,
+                      color: tintFg(context, Colors.indigo),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -776,7 +777,7 @@ class _ProcessingBanner extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.indigo.shade700,
+                        color: tintFg(context, Colors.indigo),
                       ),
                     ),
                 ],
@@ -791,7 +792,7 @@ class _ProcessingBanner extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   minimumSize: const Size(0, 28),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: Colors.indigo.shade100,
+                  backgroundColor: tintBg(context, Colors.indigo),
                   foregroundColor: Colors.indigo.shade900,
                 ),
                 child: Text(tr('보기', 'View'),
@@ -806,7 +807,7 @@ class _ProcessingBanner extends StatelessWidget {
                 minimumSize: const Size(0, 28),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: Colors.red.shade700,
-                side: BorderSide(color: Colors.red.shade300),
+                side: BorderSide(color: tintBorder(context, Colors.red)),
               ),
               child: Text(tr('중지', 'Stop'),
                   style: const TextStyle(fontSize: 12)),

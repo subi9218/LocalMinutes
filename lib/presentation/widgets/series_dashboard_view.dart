@@ -11,6 +11,7 @@ import '../../data/repositories/summary_repository_impl.dart';
 import '../../domain/entities/meeting.dart';
 import '../../domain/entities/meeting_group.dart';
 import '../providers/meeting_providers.dart';
+import 'theme_tint.dart';
 
 /// 정기 회의 시리즈 진행 대시보드 (P2 #9 Phase 2).
 ///
@@ -96,7 +97,7 @@ class SeriesDashboardView extends ConsumerWidget {
                   return Center(
                     child: Text(
                       tr('이 시리즈에 회의가 아직 없습니다.', 'No meetings in this series yet.'),
-                      style: TextStyle(color: Colors.grey.shade600),
+                      style: TextStyle(color: mutedText(context)),
                     ),
                   );
                 }
@@ -196,11 +197,11 @@ class _MetaChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: Colors.grey.shade700),
+          Icon(icon, size: 13, color: mutedText(context)),
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 11, color: mutedText(context)),
           ),
         ],
       ),
@@ -376,16 +377,16 @@ class _IssueRow extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: tintBg(context, Colors.orange),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: tintBorder(context, Colors.orange)),
                 ),
                 child: Text(
                   tr('${issue.count}회 등장', '${issue.count}x'),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: Colors.orange.shade800,
+                    color: tintFg(context, Colors.orange),
                   ),
                 ),
               ),
@@ -448,7 +449,7 @@ class _RecentDecisionsCard extends StatelessWidget {
                     Icon(
                       Icons.task_alt,
                       size: 14,
-                      color: Colors.green.shade700,
+                      color: tintFg(context, Colors.green),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -461,7 +462,7 @@ class _RecentDecisionsCard extends StatelessWidget {
                             '${d.meetingTitle} · ${_dateOnly(d.meetingDate)}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade600,
+                              color: mutedText(context),
                             ),
                           ),
                         ],
@@ -515,14 +516,14 @@ class _SectionShell extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: Colors.grey.shade700),
+              Icon(icon, size: 16, color: mutedText(context)),
               const SizedBox(width: 6),
               Text(
                 title,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade800,
+                  color: mutedText(context),
                 ),
               ),
               const SizedBox(width: 6),
@@ -628,7 +629,7 @@ class _TrackedActionRow extends StatelessWidget {
                           '${tracked.appearances.length}x'),
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade600,
+                        color: mutedText(context),
                       ),
                     ),
                     if (tracked.hasOwnerChange)
@@ -705,21 +706,21 @@ class _ChangeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: tintBg(context, Colors.orange),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.orange.shade200),
+        border: Border.all(color: tintBorder(context, Colors.orange)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: Colors.orange.shade800),
+          Icon(icon, size: 11, color: tintFg(context, Colors.orange)),
           const SizedBox(width: 3),
           Text(
             label,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: Colors.orange.shade800,
+              color: tintFg(context, Colors.orange),
             ),
           ),
         ],
@@ -983,7 +984,7 @@ class _CompareSheetState extends State<_CompareSheet> {
             const SizedBox(height: 8),
             Text(
               message,
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: mutedText(context)),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1014,7 +1015,7 @@ class _CompareDropdown extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+          style: TextStyle(fontSize: 11, color: mutedText(context)),
         ),
         const SizedBox(height: 4),
         DropdownButtonFormField<int>(
@@ -1084,7 +1085,7 @@ class _CompareSection extends StatelessWidget {
                 const Spacer(),
                 _CountChip(
                   label: '+${diff.added.length}',
-                  color: Colors.green.shade700,
+                  color: tintFg(context, Colors.green),
                 ),
                 const SizedBox(width: 4),
                 _CountChip(
@@ -1094,7 +1095,7 @@ class _CompareSection extends StatelessWidget {
                 const SizedBox(width: 4),
                 _CountChip(
                   label: '·${diff.shared.length}',
-                  color: Colors.grey.shade600,
+                  color: mutedText(context),
                 ),
               ],
             ),
@@ -1102,7 +1103,7 @@ class _CompareSection extends StatelessWidget {
             for (final s in diff.added)
               _DiffRow(
                 marker: '+',
-                color: Colors.green.shade700,
+                color: tintFg(context, Colors.green),
                 text: s,
                 meta: tr('새로 등장', 'Newly added'),
               ),
@@ -1157,7 +1158,7 @@ class _CompareActionsSection extends StatelessWidget {
                 const Spacer(),
                 _CountChip(
                   label: '+${diff.added.length}',
-                  color: Colors.green.shade700,
+                  color: tintFg(context, Colors.green),
                 ),
                 const SizedBox(width: 4),
                 _CountChip(
@@ -1167,7 +1168,7 @@ class _CompareActionsSection extends StatelessWidget {
                 const SizedBox(width: 4),
                 _CountChip(
                   label: '·${diff.shared.length}',
-                  color: Colors.grey.shade600,
+                  color: mutedText(context),
                 ),
               ],
             ),
@@ -1175,7 +1176,7 @@ class _CompareActionsSection extends StatelessWidget {
             for (final a in diff.added)
               _DiffRow(
                 marker: '+',
-                color: Colors.green.shade700,
+                color: tintFg(context, Colors.green),
                 text: a.task,
                 meta: a.owner.isEmpty
                     ? tr('새 액션', 'New action')
@@ -1273,7 +1274,7 @@ class _DiffRow extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
                     meta,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 11, color: mutedText(context)),
                   ),
                 ),
               ],

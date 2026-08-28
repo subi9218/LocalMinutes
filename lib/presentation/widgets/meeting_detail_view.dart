@@ -44,6 +44,7 @@ import '../../domain/entities/summary.dart';
 import '../../domain/entities/transcript.dart';
 import '../providers/meeting_providers.dart';
 import 'app_notice.dart';
+import 'theme_tint.dart';
 
 class MeetingDetailView extends ConsumerStatefulWidget {
   final int meetingId;
@@ -345,16 +346,16 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: tintBg(context, Colors.orange),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: tintBorder(context, Colors.orange)),
                 ),
                 child: Text(
                   tr('확인 필요', 'Needs review'),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.orange.shade800,
+                    color: tintFg(context, Colors.orange),
                   ),
                 ),
               ),
@@ -371,9 +372,9 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: tintBg(context, Colors.grey),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: tintBorder(context, Colors.grey)),
                 ),
                 child: Text(
                   query,
@@ -384,7 +385,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
               if (candidates.isEmpty)
                 Text(
                   tr('전사본에서 직접 연결할 만한 구간을 찾지 못했습니다.', 'No directly matching segment was found in the transcript.'),
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 13, color: mutedText(context)),
                 )
               else
                 Flexible(
@@ -601,7 +602,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                 title: Text(label, style: const TextStyle(fontSize: 13)),
                 subtitle: Text(
                   desc,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: mutedText(context)),
                 ),
               );
             }
@@ -674,7 +675,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
-                                            color: Colors.grey.shade700,
+                                            color: mutedText(context),
                                           ),
                                         ),
                                       ),
@@ -726,7 +727,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
-                                            color: Colors.grey.shade700,
+                                            color: mutedText(context),
                                           ),
                                         ),
                                         const SizedBox(width: 6),
@@ -778,7 +779,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                                         style.description,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey.shade700,
+                                          color: mutedText(context),
                                           height: 1.45,
                                         ),
                                       ),
@@ -885,7 +886,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                 children: [
                   Text(
                     tr('마우스를 올리면 모델 설명이 보입니다.', 'Hover to see model descriptions.'),
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 11, color: mutedText(context)),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -3611,7 +3612,7 @@ class _ExportMenuState extends State<_ExportMenu> {
       value: value,
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.grey.shade700),
+          Icon(icon, size: 18, color: mutedText(context)),
           const SizedBox(width: 10),
           Text(label, style: const TextStyle(fontSize: 13)),
         ],
@@ -3650,9 +3651,9 @@ class _BookmarksCard extends StatelessWidget {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: tintBg(context, Colors.amber),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.amber.shade300),
+                    border: Border.all(color: tintBorder(context, Colors.amber)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -3674,7 +3675,7 @@ class _BookmarksCard extends StatelessWidget {
                           b.label,
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade700,
+                            color: mutedText(context),
                           ),
                         ),
                       ],
@@ -3723,7 +3724,7 @@ class _AgendaCard extends StatelessWidget {
                       tr('한 줄에 하나씩 입력하세요. 다시 요약 시 항목별로 정리됩니다.', 'Enter one per line. They will be organized by item on the next summary.'),
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade600,
+                        color: mutedText(context),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -3947,7 +3948,7 @@ class _SpeakerStatsCard extends StatelessWidget {
         tr('${report.speakerCount}명 식별 · ${_formatDuration(report.labeledDuration)}', '${report.speakerCount} identified · ${_formatDuration(report.labeledDuration)}'),
         style: TextStyle(
           fontSize: 11,
-          color: Colors.grey.shade600,
+          color: mutedText(context),
           fontFeatures: const [FontFeature.tabularFigures()],
         ),
       ),
@@ -4007,7 +4008,7 @@ class _SpeakerStatsCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Colors.grey.shade800,
+                      color: mutedText(context),
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
@@ -4018,7 +4019,7 @@ class _SpeakerStatsCard extends StatelessWidget {
                       tr('${_formatDuration(report.speakers[i].duration)} · ${report.speakers[i].segmentCount}회', '${_formatDuration(report.speakers[i].duration)} · ${report.speakers[i].segmentCount}x'),
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade600,
+                        color: mutedText(context),
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                       textAlign: TextAlign.right,
@@ -4123,7 +4124,7 @@ class _QualityScoreCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.4,
-                          color: Colors.grey.shade700,
+                          color: mutedText(context),
                         ),
                       ),
                     ),
@@ -4162,7 +4163,7 @@ class _QualitySubScore extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: mutedText(context)),
               ),
               const Spacer(),
               Text(
@@ -4221,7 +4222,7 @@ class _ReportMetric extends StatelessWidget {
       width: 170,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: tintBorder(context, Colors.grey)),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -4235,7 +4236,7 @@ class _ReportMetric extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: mutedText(context)),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -4406,7 +4407,7 @@ class _AdvancedReportInfo extends StatelessWidget {
           tr('고급 정보', 'Advanced info'),
           style: TextStyle(
             fontSize: 11,
-            color: Colors.grey.shade600,
+            color: mutedText(context),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -4432,7 +4433,7 @@ class _AdvancedRow extends StatelessWidget {
             width: 130,
             child: Text(
               label,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 11, color: mutedText(context)),
             ),
           ),
           Expanded(
@@ -4743,7 +4744,7 @@ class _GroupSelector extends StatelessWidget {
             value: g.id,
             child: Row(
               children: [
-                Icon(Icons.folder, size: 16, color: Colors.amber.shade700),
+                Icon(Icons.folder, size: 16, color: tintFg(context, Colors.amber)),
                 const SizedBox(width: 8),
                 Text(
                   g.name,
@@ -4842,7 +4843,7 @@ class _MeetingTagsRowState extends ConsumerState<_MeetingTagsRow> {
                 const SizedBox(height: 12),
                 Text(
                   tr('기존 태그', 'Existing tags'),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 12, color: mutedText(context)),
                 ),
                 const SizedBox(height: 6),
                 Wrap(
@@ -5490,7 +5491,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
               const SizedBox(height: 6),
               Text(
                 tr('* 별칭은 다음 녹음/요약에서 자동으로 용어로 교정됩니다.', '* Aliases are auto-corrected to the term in future recordings/summaries.'),
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10, color: mutedText(context)),
               ),
             ],
           ),
@@ -5687,7 +5688,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                     tr('이름 (회의 내에서만 적용)', 'Name (applies within this meeting only)'),
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade700,
+                      color: mutedText(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -5716,7 +5717,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                     tr('다른 화자로 통합 (선택)', 'Merge into another speaker (optional)'),
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade700,
+                      color: mutedText(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -5728,7 +5729,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                     'Use when the system split one person into two speakers.'),
                     style: TextStyle(
                       fontSize: 10,
-                      color: Colors.grey.shade600,
+                      color: mutedText(context),
                       height: 1.4,
                     ),
                   ),
@@ -6174,7 +6175,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: tintBorder(context, Colors.grey)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -6185,7 +6186,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: tintBorder(context, Colors.grey)),
                 ),
               ),
               // onChanged 대신 addListener(_onSearchChanged) 사용 (한글 IME 대응)
@@ -6870,7 +6871,7 @@ class _TranscriptWithAudioState extends State<_TranscriptWithAudio> {
                                     child: Icon(
                                       Icons.bookmark_rounded,
                                       size: 11,
-                                      color: Colors.amber.shade700,
+                                      color: tintFg(context, Colors.amber),
                                     ),
                                   ),
                                 ],
@@ -7036,10 +7037,10 @@ class _SummaryHistoryDialog extends ConsumerWidget {
                                 width: 28,
                                 height: 28,
                                 decoration: BoxDecoration(
-                                  color: Colors.indigo.shade50,
+                                  color: tintBg(context, Colors.indigo),
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: Colors.indigo.shade200,
+                                    color: tintBorder(context, Colors.indigo),
                                   ),
                                 ),
                                 child: Center(
@@ -7048,7 +7049,7 @@ class _SummaryHistoryDialog extends ConsumerWidget {
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.indigo.shade700,
+                                      color: tintFg(context, Colors.indigo),
                                     ),
                                   ),
                                 ),
@@ -7121,7 +7122,7 @@ class _HistorySection extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
+              color: mutedText(context),
             ),
           ),
           const SizedBox(height: 2),
@@ -7251,7 +7252,7 @@ class _NotesEditorState extends State<_NotesEditor> {
                           child: Icon(
                             Icons.drag_handle,
                             size: 14,
-                            color: Colors.amber.shade800,
+                            color: tintFg(context, Colors.amber),
                           ),
                         ),
                       ),
@@ -7381,7 +7382,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
             Container(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
               decoration: BoxDecoration(
-                color: Colors.teal.shade50,
+                color: tintBg(context, Colors.teal),
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
@@ -7390,7 +7391,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                 children: [
                   Icon(
                     Icons.book_outlined,
-                    color: Colors.teal.shade700,
+                    color: tintFg(context, Colors.teal),
                     size: 18,
                   ),
                   const SizedBox(width: 10),
@@ -7403,7 +7404,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: Colors.teal.shade800,
+                            color: tintFg(context, Colors.teal),
                           ),
                         ),
                         Text(
@@ -7506,7 +7507,7 @@ class _TermExtractDialogState extends State<_TermExtractDialog> {
                 children: [
                   Text(
                     tr('$selectedCount개 선택됨', '$selectedCount selected'),
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 12, color: mutedText(context)),
                   ),
                   const Spacer(),
                   TextButton(
@@ -7777,16 +7778,16 @@ class _ActionItemQualityNotice extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: tintBg(context, Colors.amber),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: tintBorder(context, Colors.amber)),
       ),
       child: Row(
         children: [
           Icon(
             Icons.info_outline_rounded,
             size: 16,
-            color: Colors.amber.shade900,
+            color: tintFg(context, Colors.amber),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -7795,7 +7796,7 @@ class _ActionItemQualityNotice extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 height: 1.4,
-                color: Colors.amber.shade900,
+                color: tintFg(context, Colors.amber),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -7818,15 +7819,15 @@ class _ActionUnconfirmedChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.amber.shade50,
+          color: tintBg(context, Colors.amber),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.amber.shade200),
+          border: Border.all(color: tintBorder(context, Colors.amber)),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 10,
-            color: Colors.amber.shade900,
+            color: tintFg(context, Colors.amber),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -7902,7 +7903,7 @@ class _ActionItemRow extends StatelessWidget {
                         text: ' [${item.deadline}]',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.orange.shade700,
+                          color: tintFg(context, Colors.orange),
                         ),
                       ),
                   ],

@@ -29,6 +29,7 @@ import '../../data/datasources/microphone_service.dart';
 import '../../data/datasources/system_audio_service.dart';
 import '../providers/settings_providers.dart';
 import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 /// 설정 다이얼로그 열기 헬퍼
 void showSettingsDialog(BuildContext context, WidgetRef ref) {
@@ -1182,7 +1183,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 Icon(
                   Icons.lightbulb_outline,
                   size: 14,
-                  color: Colors.amber.shade700,
+                  color: tintFg(context, Colors.amber),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -1453,7 +1454,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               padding: const EdgeInsets.only(left: 16),
               child: Text(
                 _deleteResult!,
-                style: TextStyle(fontSize: 11, color: Colors.green.shade700),
+                style: TextStyle(fontSize: 11, color: tintFg(context, Colors.green)),
               ),
             ),
           ],

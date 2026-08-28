@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 
 import '../../core/services/app_settings.dart';
+import '../widgets/theme_tint.dart';
 
 PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
   pageBuilder: (_, _, _) => child,
@@ -200,7 +201,7 @@ class _LanguageOption extends StatelessWidget {
                     sublabel,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: mutedText(context),
                     ),
                   ),
                 ],

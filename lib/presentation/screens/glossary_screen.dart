@@ -4,6 +4,7 @@ import '../../core/services/isar_service.dart';
 import '../../data/repositories/glossary_repository_impl.dart';
 import '../../domain/entities/glossary_entry.dart';
 import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 /// 단어집 관리 다이얼로그 열기
 void showGlossaryDialog(BuildContext context) {
@@ -717,7 +718,7 @@ GLE :: 벤츠 중형 SUV''';
                 '한 줄에 한 용어씩 입력하세요. 형식: 용어 :: 설명 :: 별칭(콤마 구분)',
                 'One term per line. Format: term :: description :: aliases (comma-separated)',
               ),
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: mutedText(context)),
             ),
             const SizedBox(height: 4),
             Text(
