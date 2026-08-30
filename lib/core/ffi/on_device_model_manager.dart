@@ -172,7 +172,7 @@ class OnDeviceModelManager {
   /// STT 모델 로드 중이면 예외 → 먼저 unloadStt() 호출
   Future<void> loadLlm(String modelPath, {int nCtx = 4096, int nBatch = 512}) =>
       runExclusiveNativeTask(
-        tr('LLM 모델 로드', 'Loading summary model'),
+        tr('요약 모델 로드', 'Loading summary model'),
         () => _loadLlmUnlocked(modelPath, nCtx: nCtx, nBatch: nBatch),
       );
 
@@ -238,7 +238,7 @@ class OnDeviceModelManager {
 
   /// LLM 해제 (순서: context → model → backend)
   Future<void> unloadLlm() =>
-      runExclusiveNativeTask(tr('LLM 모델 해제', 'Unloading summary model'), _unloadLlmUnlocked);
+      runExclusiveNativeTask(tr('요약 모델 해제', 'Unloading summary model'), _unloadLlmUnlocked);
 
   Future<void> _unloadLlmUnlocked() async {
     if (!isLlmLoaded) return;

@@ -229,7 +229,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       ref.read(nativeRecordingActiveProvider.notifier).state = true;
       _phase = _RecordingPhase.recording;
       _segments.addAll(mic.segments);
-      _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
+      _statusMsg = tr('녹음 중 · 30초마다 실시간 전사', 'Recording · live transcript every 30s');
       _sttModelExists = true;
       _llmModelExists = true;
       // 세션 상태 복원 — 없으면 정상 녹음이 '0초 빈 녹음'으로 판정되어
@@ -1223,7 +1223,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         _phase = _RecordingPhase.recording;
         _statusMsg = _shouldRunFinalAccuratePass
             ? tr('녹음 중 (빠른 모델로 30초마다 초안 전사 · 요약 전 정확 전사)', 'Recording (draft every 30s with the fast model · accurate transcription before summary)')
-            : tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
+            : tr('녹음 중 · 30초마다 실시간 전사', 'Recording · live transcript every 30s');
       });
     } on MicrophonePermissionDeniedException catch (e) {
       // 로드가 비동기화되며 실패 시점에 뷰가 dispose됐을 수 있음 → mounted 가드
@@ -1398,7 +1398,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     setState(() {
       _phase = _RecordingPhase.recording;
-      _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
+      _statusMsg = tr('녹음 중 · 30초마다 실시간 전사', 'Recording · live transcript every 30s');
     });
   }
 
@@ -1735,6 +1735,35 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
+                                // 나머지 설정은 마지막 사용값이 그대로 유지되므로
+                                // 기본 접힘 — 매번 8개 컨트롤을 강요하지 않는다
+                                // (시작 마찰 최소화, 감사 지적 반영).
+                                Theme(
+                                  data: Theme.of(ctx).copyWith(
+                                    dividerColor: Colors.transparent,
+                                  ),
+                                  child: ExpansionTile(
+                                    tilePadding: EdgeInsets.zero,
+                                    childrenPadding: EdgeInsets.zero,
+                                    initiallyExpanded: false,
+                                    title: Text(
+                                      tr('상세 설정', 'Advanced options'),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      tr(
+                                        '$speakerCount명 · ${AppSettings.sttLanguageLabel(sttLanguage)} · ${recordingSource == 'both' ? '마이크+시스템' : recordingSource == 'system' ? '시스템 오디오' : '마이크'}',
+                                        '$speakerCount people · ${AppSettings.sttLanguageLabel(sttLanguage)} · ${recordingSource == 'both' ? 'Mic + System' : recordingSource == 'system' ? 'System audio' : 'Mic only'}',
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    children: [
                                 Row(
                                   children: [
                                     Expanded(
@@ -1993,6 +2022,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                    ],
                                   ),
                                 ),
                               ],

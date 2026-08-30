@@ -104,7 +104,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     if (!_isRerunningStt || _cancelRerunSttRequested) return;
     setState(() {
       _cancelRerunSttRequested = true;
-      _rerunSttStatus = tr('음성 인식 중지 요청 중... 현재 청크를 마무리하고 멈춥니다.', 'Requesting transcription stop... Finishing the current chunk before stopping.');
+      _rerunSttStatus = tr('음성 인식을 중지하는 중... 현재 구간을 마무리하고 멈춥니다.', 'Stopping transcription... Finishing the current section.');
     });
   }
 
@@ -1359,7 +1359,7 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Text(
-                                tr('기존 전사본을 삭제하고 오디오 파일에서 다시 받아쓰기를 실행합니다. 기존 요약은 유지되며, 필요하면 다시 요약할 수 있습니다.', 'Deletes the existing transcript and re-transcribes from the audio file. The existing summary is kept, and you can re-summarize if needed.'),
+                                tr('기존 전사본을 삭제하고 오디오 파일에서 다시 전사합니다. 기존 요약은 유지되며, 필요하면 다시 요약할 수 있습니다.', 'Deletes the existing transcript and re-transcribes from the audio file. The existing summary is kept, and you can re-summarize if needed.'),
                                 style: const TextStyle(fontSize: 13, height: 1.5),
                               ),
                               const SizedBox(height: 14),
@@ -1619,8 +1619,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
     setState(() {
       _isRerunningStt = true;
       _cancelRerunSttRequested = false;
-      _rerunSttStatus = tr('Whisper 모델 로드 중... 최초 실행은 가속 준비로 몇 분 걸릴 수 있어요.',
-          'Loading Whisper model... The first run may take a few minutes to warm up.');
+      _rerunSttStatus = tr('음성 인식 모델 준비 중... 최초 실행은 몇 분 걸릴 수 있습니다.',
+          'Preparing the speech recognition model... The first run may take a few minutes.');
       _rerunSttProgress = 0.0;
       _rerunSttProcessedMs = 0;
       _rerunSttTotalMs = 0;
@@ -1631,8 +1631,8 @@ class _MeetingDetailViewState extends ConsumerState<MeetingDetailView> {
       meetingId: widget.meetingId,
       kind: 'transcribe',
       meetingTitle: meeting.title,
-      label: tr('Whisper 모델 로드 중... 최초 실행은 가속 준비로 몇 분 걸릴 수 있어요.',
-          'Loading Whisper model... The first run may take a few minutes to warm up.'),
+      label: tr('음성 인식 모델 준비 중... 최초 실행은 몇 분 걸릴 수 있습니다.',
+          'Preparing the speech recognition model... The first run may take a few minutes.'),
       progress: 0,
     );
     // 화면을 떠나 cancel UI가 사라져도 배너에서 중지할 수 있도록 콜백 등록.

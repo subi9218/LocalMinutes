@@ -728,7 +728,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
           // 두 필수 항목 상태
           _RequiredRow(
-            label: tr('음성 인식 (받아쓰기)', 'Speech recognition'),
+            label: tr('음성 인식', 'Speech recognition'),
             ok: _anyStt,
             scheme: scheme,
           ),
