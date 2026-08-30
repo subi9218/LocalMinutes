@@ -12,6 +12,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
+import '../../core/services/backup_service.dart';
 import '../../core/services/calendar_service.dart';
 import '../../core/services/chunked_summarizer.dart';
 import '../../core/services/crash_log_service.dart';
@@ -43,6 +44,8 @@ import '../../domain/entities/transcript.dart';
 import '../../domain/entities/summary.dart';
 import '../providers/global_container.dart';
 import '../providers/meeting_providers.dart';
+import 'app_notice.dart';
+import 'theme_tint.dart';
 
 enum _RecordingPhase {
   idle,
@@ -189,16 +192,29 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     return suffix.isEmpty ? _datePrefix : '$_datePrefix $suffix';
   }
 
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
+  /// 기본 회의 제목용 날짜 접두어 — 표시 언어를 따른다.
+  /// (예전엔 영어 UI에서도 '26년 08월 23일…' 한국어 형식으로 생성돼
+  ///  모든 제목·내보내기 파일명에 한국어가 박혔다)
+  static String _makeDatePrefix(DateTime now) {
     final yy = now.year.toString().substring(2);
     final mm = now.month.toString().padLeft(2, '0');
     final dd = now.day.toString().padLeft(2, '0');
     final hh = now.hour.toString().padLeft(2, '0');
     final min = now.minute.toString().padLeft(2, '0');
-    _datePrefix = '$yy년 $mm월 $dd일 $hh:$min';
+    const monthsEn = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return tr(
+      '$yy년 $mm월 $dd일 $hh:$min',
+      '${monthsEn[now.month - 1]} ${now.day}, ${now.year} $hh:$min',
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _datePrefix = _makeDatePrefix(DateTime.now());
     _titleSuffixController = TextEditingController();
     _setupMicCallbacks();
     _loadInputDevices();
@@ -213,7 +229,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       ref.read(nativeRecordingActiveProvider.notifier).state = true;
       _phase = _RecordingPhase.recording;
       _segments.addAll(mic.segments);
-      _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
+      _statusMsg = tr('녹음 중 · 30초마다 실시간 전사', 'Recording · live transcript every 30s');
       _sttModelExists = true;
       _llmModelExists = true;
       // 세션 상태 복원 — 없으면 정상 녹음이 '0초 빈 녹음'으로 판정되어
@@ -642,12 +658,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           Icon(
                             Icons.delete_outline,
                             size: 16,
-                            color: Colors.red.shade700,
+                            color: tintFg(context, Colors.red),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             tr('삭제', 'Delete'),
-                            style: TextStyle(color: Colors.red.shade700),
+                            style: TextStyle(color: tintFg(context, Colors.red)),
                           ),
                         ],
                       ),
@@ -729,11 +745,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     } catch (e) {
       debugPrint('[EmptyRecording] discard failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('빈 녹음 삭제 실패: $e', 'Failed to delete empty recording: $e')),
-            backgroundColor: Colors.red.shade700,
-          ),
+        AppNotice.show(
+          tr('빈 녹음 삭제 실패: $e', 'Failed to delete empty recording: $e'),
+          kind: NoticeKind.error,
         );
       }
       return;
@@ -770,29 +784,15 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     final sec = _currentRecordingSec();
     setState(() => _bookmarks.add(Bookmark(sec: sec, label: label)));
 
-    // SnackBar 피드백
+    // 저장 피드백
     if (!showFeedback) return;
     final time = Bookmark(sec: sec).timeStr;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(milliseconds: 1500),
-        content: Row(
-          children: [
-            const Icon(
-              Icons.bookmark_added_rounded,
-              color: Colors.amber,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label.isEmpty
-                  ? tr('북마크 저장됨 — $time', 'Bookmark saved — $time')
-                  : tr('북마크 저장됨 — $time · $label', 'Bookmark saved — $time · $label'),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.indigo.shade700,
-      ),
+    AppNotice.show(
+      label.isEmpty
+          ? tr('북마크 저장됨 — $time', 'Bookmark saved — $time')
+          : tr('북마크 저장됨 — $time · $label', 'Bookmark saved — $time · $label'),
+      kind: NoticeKind.success,
+      duration: const Duration(milliseconds: 1500),
     );
   }
 
@@ -811,24 +811,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     final sec = _currentRecordingSec();
     final time = Bookmark(sec: sec).timeStr;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(milliseconds: 1600),
-        content: Row(
-          children: [
-            const Icon(
-              Icons.bookmark_added_rounded,
-              color: Colors.amber,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(count == 1
-                ? tr('트레이 북마크 저장됨 — $time', 'Tray bookmark saved — $time')
-                : tr('트레이 북마크 $count개 저장됨', '$count tray bookmarks saved')),
-          ],
-        ),
-        backgroundColor: Colors.indigo.shade700,
-      ),
+    AppNotice.show(
+      count == 1
+          ? tr('트레이 북마크 저장됨 — $time', 'Tray bookmark saved — $time')
+          : tr('트레이 북마크 $count개 저장됨', '$count tray bookmarks saved'),
+      kind: NoticeKind.success,
+      duration: const Duration(milliseconds: 1600),
     );
   }
 
@@ -936,8 +924,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   void _showNativeTaskBlocked(String actionLabel) {
     final reason = _nativeTaskBlockReason(actionLabel);
     if (reason == null || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(reason), backgroundColor: Colors.orange.shade700),
+    AppNotice.show(
+      reason,
+      kind: NoticeKind.warning,
     );
   }
 
@@ -987,6 +976,17 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     // 재진입 방지: 준비 다이얼로그가 열려 있는 동안 트레이 quick-start 등으로
     // 두 번째 _startRecording이 호출되면 중복 회의가 생성된다.
     if (_startInProgress) return;
+    // 백업/복원 중에는 녹음 시작 금지 (복원은 DB를 닫는다).
+    if (BackupService.isBusy) {
+      if (mounted) {
+        AppNotice.show(
+          tr('백업/복원이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
+                'A backup or restore is in progress. Please start recording after it finishes.'),
+          kind: NoticeKind.warning,
+        );
+      }
+      return;
+    }
     _startInProgress = true;
     try {
     final prep = await _showRecordingPrepDialog();
@@ -1047,13 +1047,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       _participants.clear();
       _participantInputCtrl.clear();
       // 날짜/시간 갱신 (재녹음 시 새 시각으로)
-      final now2 = DateTime.now();
-      final yy = now2.year.toString().substring(2);
-      final mm = now2.month.toString().padLeft(2, '0');
-      final dd = now2.day.toString().padLeft(2, '0');
-      final hh = now2.hour.toString().padLeft(2, '0');
-      final min = now2.minute.toString().padLeft(2, '0');
-      _datePrefix = '$yy년 $mm월 $dd일 $hh:$min';
+      _datePrefix = _makeDatePrefix(DateTime.now());
       _titleSuffixController.text = prep.titleSuffix.trim();
     });
     MicrophoneService.instance.reset();
@@ -1229,7 +1223,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         _phase = _RecordingPhase.recording;
         _statusMsg = _shouldRunFinalAccuratePass
             ? tr('녹음 중 (빠른 모델로 30초마다 초안 전사 · 요약 전 정확 전사)', 'Recording (draft every 30s with the fast model · accurate transcription before summary)')
-            : tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
+            : tr('녹음 중 · 30초마다 실시간 전사', 'Recording · live transcript every 30s');
       });
     } on MicrophonePermissionDeniedException catch (e) {
       // 로드가 비동기화되며 실패 시점에 뷰가 dispose됐을 수 있음 → mounted 가드
@@ -1404,7 +1398,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     }
     setState(() {
       _phase = _RecordingPhase.recording;
-      _statusMsg = tr('녹음 중 (30초마다 자동으로 텍스트 변환)', 'Recording (auto-transcribes every 30s)');
+      _statusMsg = tr('녹음 중 · 30초마다 실시간 전사', 'Recording · live transcript every 30s');
     });
   }
 
@@ -1516,16 +1510,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
   /// 시스템 오디오 시작 실패 안내 + '설정 열기' 액션.
   void _showSystemAudioFailSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        action: SnackBarAction(
-          label: tr('설정 열기', 'Open settings'),
-          onPressed: () => SystemAudioService.instance.openPrivacySettings(),
-        ),
-        duration: const Duration(seconds: 6),
-      ),
+    AppNotice.show(
+      message,
+      kind: NoticeKind.warning,
+      duration: const Duration(seconds: 6),
+      actionLabel: tr('설정 열기', 'Open settings'),
+      onAction: () => SystemAudioService.instance.openPrivacySettings(),
     );
   }
 
@@ -1745,6 +1735,35 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
+                                // 나머지 설정은 마지막 사용값이 그대로 유지되므로
+                                // 기본 접힘 — 매번 8개 컨트롤을 강요하지 않는다
+                                // (시작 마찰 최소화, 감사 지적 반영).
+                                Theme(
+                                  data: Theme.of(ctx).copyWith(
+                                    dividerColor: Colors.transparent,
+                                  ),
+                                  child: ExpansionTile(
+                                    tilePadding: EdgeInsets.zero,
+                                    childrenPadding: EdgeInsets.zero,
+                                    initiallyExpanded: false,
+                                    title: Text(
+                                      tr('상세 설정', 'Advanced options'),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      tr(
+                                        '$speakerCount명 · ${AppSettings.sttLanguageLabel(sttLanguage)} · ${recordingSource == 'both' ? '마이크+시스템' : recordingSource == 'system' ? '시스템 오디오' : '마이크'}',
+                                        '$speakerCount people · ${AppSettings.sttLanguageLabel(sttLanguage)} · ${recordingSource == 'both' ? 'Mic + System' : recordingSource == 'system' ? 'System audio' : 'Mic only'}',
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    children: [
                                 Row(
                                   children: [
                                     Expanded(
@@ -2005,6 +2024,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                                     color: scheme.onSurfaceVariant,
                                   ),
                                 ),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -2114,7 +2136,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                 children: [
                   Text(
                     tr('마우스를 올리면 모델 설명이 보입니다.', 'Hover to see the model description.'),
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 11, color: mutedText(context)),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -2579,11 +2601,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           _failedSummaryMeetingId = null;
           _cancelSummaryRequested = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('요약 완료 · 총 소요 $totalStr', 'Summary complete · total $totalStr')),
-            backgroundColor: Colors.green.shade700,
-          ),
+        AppNotice.show(
+          tr('요약 완료 · 총 소요 $totalStr', 'Summary complete · total $totalStr'),
+          kind: NoticeKind.success,
         );
 
         // MeetingDetailView로 이동 (화면에 있을 때만 의미 있는 동작)
@@ -2703,12 +2723,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         setState(() {
           _statusMsg = tr('정확 전사 실패 — 실시간 전사본으로 요약을 계속합니다.', 'Accurate transcription failed — continuing the summary with the live transcript.');
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(friendly.fullText),
-            backgroundColor: Colors.orange.shade700,
-            duration: const Duration(seconds: 6),
-          ),
+        AppNotice.show(
+          friendly.fullText,
+          kind: NoticeKind.warning,
+          duration: const Duration(seconds: 6),
         );
       }
     } finally {
@@ -2780,14 +2798,10 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
         setState(() {
           _statusMsg = tr('발화자 구분에 실패했습니다. 라벨 없이 요약을 계속합니다.', 'Speaker separation failed. Continuing the summary without labels.');
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              friendlyDiarizationFailureMessage(nextStep: tr('회의 요약은 계속 진행합니다.', 'The meeting summary will continue.')),
-            ),
-            backgroundColor: Colors.orange.shade700,
-            duration: const Duration(seconds: 6),
-          ),
+        AppNotice.show(
+          friendlyDiarizationFailureMessage(nextStep: tr('회의 요약은 계속 진행합니다.', 'The meeting summary will continue.')),
+          kind: NoticeKind.warning,
+          duration: const Duration(seconds: 6),
         );
       }
     }
@@ -2911,7 +2925,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     // ── macOS Calendar.app에 자동 이벤트 등록 (설정 ON일 때) ───────
     if (AppSettings.instance.autoAddToCalendar) {
-      // UI 블록 안 되도록 fire-and-forget. 결과는 SnackBar로 알림.
+      // UI 블록 안 되도록 fire-and-forget. 결과는 알림(HUD)으로 표시.
       unawaited(
         _addCurrentMeetingToCalendar(
           title: _fullTitle,
@@ -2948,20 +2962,16 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
     );
     if (!mounted) return;
     if (err == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 2),
-          content: Text(tr('macOS 캘린더에 회의가 등록되었습니다', 'The meeting was added to the macOS Calendar')),
-          backgroundColor: Colors.indigo.shade600,
-        ),
+      AppNotice.show(
+        tr('macOS 캘린더에 회의가 등록되었습니다', 'The meeting was added to the macOS Calendar'),
+        kind: NoticeKind.info,
+        duration: const Duration(seconds: 2),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 4),
-          content: Text(tr('캘린더 등록 실패 · $err', 'Calendar registration failed · $err')),
-          backgroundColor: Colors.orange.shade700,
-        ),
+      AppNotice.show(
+        tr('캘린더 등록 실패 · $err', 'Calendar registration failed · $err'),
+        kind: NoticeKind.warning,
+        duration: const Duration(seconds: 4),
       );
     }
   }
@@ -3042,11 +3052,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.pause, size: 18, color: Colors.orange.shade700),
+                    Icon(Icons.pause, size: 18, color: tintFg(context, Colors.orange)),
                     const SizedBox(width: 6),
                     Text(
                       tr('일시 정지  ${_elapsedStr()}', 'Pause  ${_elapsedStr()}'),
-                      style: TextStyle(color: Colors.orange.shade700),
+                      style: TextStyle(color: tintFg(context, Colors.orange)),
                     ),
                   ],
                 ),
@@ -3069,12 +3079,12 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                     Icon(
                       Icons.bookmark_add_rounded,
                       size: 18,
-                      color: Colors.amber.shade800,
+                      color: tintFg(context, Colors.amber),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       tr('북마크 ${_bookmarks.isEmpty ? "" : "${_bookmarks.length}"}', 'Bookmark ${_bookmarks.isEmpty ? "" : "${_bookmarks.length}"}'),
-                      style: TextStyle(color: Colors.amber.shade800),
+                      style: TextStyle(color: tintFg(context, Colors.amber)),
                     ),
                   ],
                 ),
@@ -3632,7 +3642,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       tr('입력됨', 'Filled'),
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.amber.shade900,
+                        color: tintFg(context, Colors.amber),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -3656,9 +3666,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
           // 전체를 하나의 테두리 컨테이너로 감싸기
           Container(
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: tintBg(context, Colors.amber),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade200),
+              border: Border.all(color: tintBorder(context, Colors.amber)),
             ),
             child: Column(
               children: [
@@ -3740,7 +3750,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                           child: Icon(
                             Icons.drag_handle,
                             size: 16,
-                            color: Colors.amber.shade900,
+                            color: tintFg(context, Colors.amber),
                           ),
                         ),
                       ),
@@ -3767,11 +3777,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       children: [
         Row(
           children: [
-            Icon(Icons.people_outline, size: 14, color: Colors.grey.shade600),
+            Icon(Icons.people_outline, size: 14, color: mutedText(context)),
             const SizedBox(width: 6),
             Text(
               tr('참석자 (선택)', 'Attendees (optional)'),
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: mutedText(context)),
             ),
             if (_participants.isNotEmpty) ...[
               const SizedBox(width: 6),
@@ -3859,11 +3869,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
 
     return Row(
       children: [
-        Icon(Icons.auto_awesome, size: 14, color: Colors.grey.shade600),
+        Icon(Icons.auto_awesome, size: 14, color: mutedText(context)),
         const SizedBox(width: 6),
         Text(
           tr('회의 유형', 'Meeting type'),
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 12, color: mutedText(context)),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -3872,7 +3882,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             isDense: true,
             isExpanded: true,
             underline: const SizedBox(),
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface),
             items: [
               DropdownMenuItem<String?>(
                 value: null,
@@ -3927,11 +3939,11 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
   Widget _buildDeviceSelector() {
     return Row(
       children: [
-        Icon(Icons.mic, size: 14, color: Colors.grey.shade600),
+        Icon(Icons.mic, size: 14, color: mutedText(context)),
         const SizedBox(width: 6),
         Text(
           tr('마이크', 'Microphone'),
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 12, color: mutedText(context)),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -3939,7 +3951,9 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
             child: DropdownButton<String>(
               value: _selectedDevice?.id,
               isDense: true,
-              style: const TextStyle(fontSize: 12, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface),
               items: _inputDevices.map((d) {
                 final isBluetooth =
                     d.label.contains('AirPods') ||
@@ -4211,25 +4225,19 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
       }
       if (_phase == _RecordingPhase.recording ||
           _phase == _RecordingPhase.paused) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('녹음을 중지한 뒤 요약을 실행할 수 있습니다.', 'Stop recording before running the summary.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('녹음을 중지한 뒤 요약을 실행할 수 있습니다.', 'Stop recording before running the summary.'),
+          kind: NoticeKind.warning,
         );
       } else if (_phase == _RecordingPhase.summarizing) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('이미 요약을 생성하고 있습니다.', 'A summary is already being generated.'),
+          kind: NoticeKind.warning,
         );
       } else if (_segments.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(tr('요약할 전사 내용이 없습니다. 먼저 녹음해 주세요.', 'No transcript to summarize. Please record first.')),
-            backgroundColor: Colors.orange.shade700,
-          ),
+        AppNotice.show(
+          tr('요약할 전사 내용이 없습니다. 먼저 녹음해 주세요.', 'No transcript to summarize. Please record first.'),
+          kind: NoticeKind.warning,
         );
       }
     });
@@ -4289,7 +4297,7 @@ class _RecordingViewState extends ConsumerState<RecordingView> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade700,
+                        color: mutedText(context),
                       ),
                     ),
                   ),
@@ -4733,7 +4741,7 @@ class _ModelFileRow extends StatelessWidget {
                 filename,
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.grey.shade600,
+                  color: mutedText(context),
                   fontFamily: 'monospace',
                 ),
               ),
@@ -4811,7 +4819,7 @@ class _LiveSummaryPreviewState extends State<_LiveSummaryPreview> {
         style: TextStyle(
           fontSize: 11,
           height: 1.45,
-          color: Colors.grey.shade800,
+          color: mutedText(context),
           fontFamily: 'monospace',
         ),
       ),
@@ -4896,14 +4904,14 @@ class _VoicePulseCardState extends State<_VoicePulseCard>
     if (l < 0.06) {
       return (
         label: tr('음성을 감지하지 못하고 있어요', 'Not detecting any voice'),
-        color: Colors.grey.shade600,
+        color: mutedText(context),
         icon: Icons.hearing_rounded,
       );
     }
     if (l < 0.15) {
       return (
         label: tr('말씀하시면 마이크가 따라갑니다', 'The mic follows when you speak'),
-        color: Colors.orange.shade700,
+        color: tintFg(context, Colors.orange),
         icon: Icons.mic_rounded,
       );
     }
@@ -5212,7 +5220,7 @@ class _CalendarSuggestionPanelState extends State<_CalendarSuggestionPanel> {
               const SizedBox(width: 6),
               Text(
                 tr('· 클릭하면 제목/어젠다 자동 채움', '· Click to auto-fill title/agenda'),
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10, color: mutedText(context)),
               ),
             ],
           ),
@@ -5256,7 +5264,7 @@ class _CalendarSuggestionPanelState extends State<_CalendarSuggestionPanel> {
                               '· ${_relativeStart(e.start)} · ${e.calendarName}',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: Colors.grey.shade600,
+                                color: mutedText(context),
                               ),
                             ),
                           ],
@@ -5439,7 +5447,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('확인 필요', 'Needs review'),
         hint: _error!,
-        color: Colors.red.shade700,
+        color: tintFg(context, Colors.red),
         icon: Icons.mic_off_rounded,
       );
     }
@@ -5447,7 +5455,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('테스트 준비 중', 'Preparing test'),
         hint: tr('선택한 마이크 입력을 확인하고 있습니다.', 'Checking the selected microphone input.'),
-        color: Colors.grey.shade600,
+        color: mutedText(context),
         icon: Icons.hourglass_empty_rounded,
       );
     }
@@ -5455,7 +5463,7 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('입력이 잘 들어오고 있어요', 'Input is coming in clearly'),
         hint: tr('이 상태로 녹음하면 음성 인식 품질이 좋아집니다.', 'Recording in this state gives good recognition quality.'),
-        color: Colors.green.shade700,
+        color: tintFg(context, Colors.green),
         icon: Icons.check_circle_outline_rounded,
       );
     }
@@ -5463,14 +5471,14 @@ class _MicTestPanelState extends State<_MicTestPanel> {
       return (
         label: tr('조금 작게 들립니다', 'Sounds a bit quiet'),
         hint: tr('마이크를 말하는 사람 가까이에 두면 더 좋습니다.', 'Placing the mic closer to the speaker helps.'),
-        color: Colors.orange.shade700,
+        color: tintFg(context, Colors.orange),
         icon: Icons.warning_amber_rounded,
       );
     }
     return (
       label: tr('너무 조용합니다', 'Too quiet'),
       hint: tr('3초 정도 말해보세요. 계속 낮으면 입력 장치나 권한을 확인해주세요.', 'Try speaking for ~3 seconds. If it stays low, check the input device or permissions.'),
-      color: Colors.red.shade700,
+      color: tintFg(context, Colors.red),
       icon: Icons.hearing_disabled_outlined,
     );
   }
@@ -5674,7 +5682,7 @@ class _PrepGuideRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 17, color: Colors.grey.shade700),
+          Icon(icon, size: 17, color: mutedText(context)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

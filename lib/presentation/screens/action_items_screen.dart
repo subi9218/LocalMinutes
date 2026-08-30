@@ -9,6 +9,7 @@ import '../../data/repositories/summary_repository_impl.dart';
 import '../../domain/entities/meeting.dart';
 import '../../domain/entities/summary.dart';
 import '../providers/meeting_providers.dart';
+import '../widgets/theme_tint.dart';
 
 enum _ActionStatusFilter { open, all, done }
 
@@ -120,14 +121,14 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
           icon: Icons.radio_button_unchecked,
           label: tr('미완료', 'Open'),
           value: '$openCount',
-          color: Colors.orange.shade700,
+          color: tintFg(context, Colors.orange),
         ),
         const SizedBox(width: 8),
         _StatPill(
           icon: Icons.check_circle_outline,
           label: tr('완료', 'Done'),
           value: '$doneCount',
-          color: Colors.green.shade700,
+          color: tintFg(context, Colors.green),
         ),
       ],
     );
@@ -252,7 +253,7 @@ class _ActionItemsDialogState extends ConsumerState<_ActionItemsDialog> {
                   _MetaChip(
                     icon: Icons.event_outlined,
                     label: item.deadline,
-                    color: Colors.orange.shade700,
+                    color: tintFg(context, Colors.orange),
                   ),
               ],
             ),

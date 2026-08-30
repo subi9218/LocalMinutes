@@ -3,6 +3,8 @@ import '../../core/l10n/app_tr.dart';
 import '../../core/services/isar_service.dart';
 import '../../data/repositories/glossary_repository_impl.dart';
 import '../../domain/entities/glossary_entry.dart';
+import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 /// 단어집 관리 다이얼로그 열기
 void showGlossaryDialog(BuildContext context) {
@@ -105,16 +107,13 @@ class _GlossaryDialogState extends State<_GlossaryDialog> {
     }
     await _loadEntries();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            tr(
+      AppNotice.show(
+        tr(
               '추가 $added개${skipped > 0 ? ' · 중복 스킵 $skipped개' : ''}',
               'Added $added${skipped > 0 ? ' · skipped $skipped duplicates' : ''}',
             ),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+        kind: NoticeKind.info,
+        duration: const Duration(seconds: 2),
       );
     }
   }
@@ -523,15 +522,12 @@ class _EntryEditDialogState extends State<_EntryEditDialog> {
             final term = _termCtrl.text.trim();
             final desc = _descCtrl.text.trim();
             if (term.isEmpty || desc.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    tr(
+              AppNotice.show(
+                tr(
                       '용어와 설명을 모두 입력해주세요.',
                       'Please enter both a term and a description.',
                     ),
-                  ),
-                ),
+                kind: NoticeKind.info,
               );
               return;
             }
@@ -722,7 +718,7 @@ GLE :: 벤츠 중형 SUV''';
                 '한 줄에 한 용어씩 입력하세요. 형식: 용어 :: 설명 :: 별칭(콤마 구분)',
                 'One term per line. Format: term :: description :: aliases (comma-separated)',
               ),
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: mutedText(context)),
             ),
             const SizedBox(height: 4),
             Text(

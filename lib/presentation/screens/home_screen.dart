@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
+import '../../core/services/backup_service.dart';
 import '../../core/services/processing_status_service.dart';
 import '../../core/services/recovery_service.dart';
 import '../../data/datasources/microphone_service.dart';
@@ -18,6 +19,8 @@ import '../widgets/meeting_detail_view.dart';
 import '../widgets/recording_view.dart';
 import '../widgets/series_dashboard_view.dart';
 import 'settings_screen.dart' show showSettingsDialog;
+import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -81,7 +84,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_recoverable.isEmpty) return;
     // 일단 즉시 일괄 복구 — 모달 다이얼로그 사용을 피해 click 차단 사고 방지.
     // 사용자가 더 세밀히 선택하고 싶으면 추후 별도 화면으로 이전 가능.
-    final messenger = ScaffoldMessenger.of(context);
     final list = List<Meeting>.from(_recoverable);
     int recovered = 0;
     Meeting? last;
@@ -100,21 +102,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(selectedMeetingIdProvider.notifier).state = last.id;
     }
     setState(() => _recoverable = const []);
-    messenger.showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 3),
-        content: Text(
-          recovered == list.length
-              ? '$recovered개 회의를 복구했습니다 — 일반 목록에서 요약 가능'
-              : '$recovered/${list.length}개 회의를 복구했습니다 (일부 실패)',
-        ),
-        backgroundColor: Colors.green.shade700,
-      ),
+    AppNotice.show(
+      recovered == list.length
+              ? tr('$recovered개 회의를 복구했습니다 — 일반 목록에서 요약 가능',
+                  'Recovered $recovered meeting(s) — you can summarize them from the list')
+              : tr('$recovered/${list.length}개 회의를 복구했습니다 (일부 실패)',
+                  'Recovered $recovered of ${list.length} meeting(s) (some failed)'),
+      kind: NoticeKind.success,
+      duration: const Duration(seconds: 3),
     );
   }
 
   /// 전사/요약 진행 중이면 녹음·업로드를 막을 사유 문구(없으면 null).
   String? _busyBlockReason() {
+    // 백업/복원 중 — DB가 닫히거나 스냅샷 중이므로 녹음 시작 금지.
+    if (BackupService.isBusy) {
+      return tr('백업/복원이 진행 중입니다. 완료 후 다시 시도해주세요.',
+          'A backup or restore is in progress. Please try again after it finishes.');
+    }
     // 녹음(마이크) 진행 중 — 툴바/단축키로 중복 시작 방지.
     final mic = MicrophoneService.instance;
     if (mic.isRecording || mic.isPaused) {
@@ -145,8 +150,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _startRecordingFromToolbar() {
     final reason = _busyBlockReason();
     if (reason != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(reason), backgroundColor: Colors.orange.shade700),
+      AppNotice.show(
+        reason,
+        kind: NoticeKind.warning,
       );
       return;
     }
@@ -178,13 +184,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _showShortcutSnack(String message, {bool isError = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.orange.shade700,
-        duration: const Duration(seconds: 3),
-      ),
+    AppNotice.show(
+      message,
+      kind: isError ? NoticeKind.error : NoticeKind.warning,
     );
   }
 
@@ -296,7 +298,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 titleWidth: 200,
                 title: const Text('Local Minutes'),
                 leading: MacosTooltip(
-                  message: _sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기',
+                  message: _sidebarCollapsed
+                      ? tr('사이드바 펼치기', 'Show Sidebar')
+                      : tr('사이드바 접기', 'Hide Sidebar'),
                   child: MacosIconButton(
                     icon: Icon(CupertinoIcons.sidebar_left, size: 19),
                     onPressed: () =>
@@ -323,7 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     icon: const MacosIcon(CupertinoIcons.gear),
                     onPressed: () => showSettingsDialog(context, ref),
                     showLabel: false,
-                    tooltipMessage: '설정 (⌘,)',
+                    tooltipMessage: tr('설정 (⌘,)', 'Settings (⌘,)'),
                   ),
                 ],
               ),
@@ -356,13 +360,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 },
                                 onCancel: () {
                                   ProcessingStatus.instance.requestCancel();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(tr(
+                                  AppNotice.show(
+                                    tr(
                                           '중지를 요청했습니다. 현재 단계를 마무리하고 멈춥니다.',
-                                          'Stop requested. Finishing the current step before stopping.')),
-                                      backgroundColor: Colors.orange.shade700,
-                                    ),
+                                          'Stop requested. Finishing the current step before stopping.'),
+                                    kind: NoticeKind.warning,
                                   );
                                 },
                               );
@@ -509,12 +511,10 @@ class _WelcomeView extends ConsumerWidget {
                     : tr('요약', 'summarization'))
                 : OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (busy != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('현재 $busy 작업이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
-              'A $busy task is running. Please start recording after it finishes.')),
-          backgroundColor: Colors.orange.shade700,
-        ),
+      AppNotice.show(
+        tr('현재 $busy 작업이 진행 중입니다. 완료 후 녹음을 시작해주세요.',
+              'A $busy task is running. Please start recording after it finishes.'),
+        kind: NoticeKind.warning,
       );
       return;
     }
@@ -529,6 +529,11 @@ class _WelcomeView extends ConsumerWidget {
     final color = Theme.of(context).colorScheme;
     final accent = macosTheme.primaryColor;
     final secondaryText = macosTheme.typography.subheadline.color;
+    // 회의가 이미 있으면 '빈 상태'가 아니라 '미선택 상태' — 문구를 분기한다.
+    // (예전엔 회의가 있어도 "회의록이 아직 없습니다"라고 표시해 사이드바와
+    //  모순되는 인상을 줬다)
+    final hasMeetings =
+        ref.watch(meetingsProvider).asData?.value.isNotEmpty ?? false;
 
     return SafeArea(
       top: false,
@@ -557,7 +562,9 @@ class _WelcomeView extends ConsumerWidget {
                     ),
                     const SizedBox(height: 22),
                     Text(
-                      tr('새 회의 녹음', 'New meeting recording'),
+                      hasMeetings
+                          ? tr('회의를 선택하세요', 'Select a meeting')
+                          : tr('새 회의 녹음', 'New meeting recording'),
                       textAlign: TextAlign.center,
                       style: macosTheme.typography.largeTitle.copyWith(
                         fontWeight: FontWeight.w700,
@@ -567,7 +574,10 @@ class _WelcomeView extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      tr('회의록이 아직 없습니다', 'No meetings yet'),
+                      hasMeetings
+                          ? tr('왼쪽 목록에서 회의를 선택하거나 새 녹음을 시작하세요',
+                              'Choose a meeting from the sidebar, or start a new recording')
+                          : tr('회의록이 아직 없습니다', 'No meetings yet'),
                       textAlign: TextAlign.center,
                       style: macosTheme.typography.subheadline.copyWith(
                         color: secondaryText,
@@ -636,27 +646,31 @@ class _RecoveryBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.amber.shade50,
+      color: tintBg(context, Colors.amber),
       child: Container(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.amber.shade300)),
+          border: Border(bottom: BorderSide(color: tintBorder(context, Colors.amber))),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
             Icon(
               Icons.history_toggle_off,
-              color: Colors.amber.shade800,
+              color: tintFg(context, Colors.amber),
               size: 18,
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '비정상 종료된 녹음 $count개가 있습니다. '
-                '복구하려면 오른쪽 버튼을 눌러주세요.',
+                tr(
+                  '비정상 종료된 녹음 $count개가 있습니다. '
+                      '복구하려면 오른쪽 버튼을 눌러주세요.',
+                  'Found $count recording(s) from an unexpected quit. '
+                      'Click the button on the right to recover them.',
+                ),
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.amber.shade900,
+                  color: tintFg(context, Colors.amber),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -669,19 +683,19 @@ class _RecoveryBanner extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 minimumSize: const Size(0, 28),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                backgroundColor: Colors.amber.shade100,
+                backgroundColor: tintBg(context, Colors.amber),
                 foregroundColor: Colors.amber.shade900,
               ),
-              child: const Text('복구하기', style: TextStyle(fontSize: 12)),
+              child: Text(tr('복구하기', 'Recover'), style: const TextStyle(fontSize: 12)),
             ),
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.close, size: 16),
-              tooltip: '닫기',
+              tooltip: tr('닫기', 'Dismiss'),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              color: Colors.amber.shade800,
+              color: tintFg(context, Colors.amber),
               onPressed: onDismiss,
             ),
           ],
@@ -719,10 +733,10 @@ class _ProcessingBanner extends StatelessWidget {
     final pctStr = hasPct ? ' ${(job.progress * 100).toStringAsFixed(0)}%' : '';
 
     return Material(
-      color: Colors.indigo.shade50,
+      color: tintBg(context, Colors.indigo),
       child: Container(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.indigo.shade200)),
+          border: Border(bottom: BorderSide(color: tintBorder(context, Colors.indigo))),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
@@ -752,7 +766,7 @@ class _ProcessingBanner extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.indigo.shade900,
+                      color: tintFg(context, Colors.indigo),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -763,7 +777,7 @@ class _ProcessingBanner extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.indigo.shade700,
+                        color: tintFg(context, Colors.indigo),
                       ),
                     ),
                 ],
@@ -778,7 +792,7 @@ class _ProcessingBanner extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   minimumSize: const Size(0, 28),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: Colors.indigo.shade100,
+                  backgroundColor: tintBg(context, Colors.indigo),
                   foregroundColor: Colors.indigo.shade900,
                 ),
                 child: Text(tr('보기', 'View'),
@@ -793,7 +807,7 @@ class _ProcessingBanner extends StatelessWidget {
                 minimumSize: const Size(0, 28),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: Colors.red.shade700,
-                side: BorderSide(color: Colors.red.shade300),
+                side: BorderSide(color: tintBorder(context, Colors.red)),
               ),
               child: Text(tr('중지', 'Stop'),
                   style: const TextStyle(fontSize: 12)),

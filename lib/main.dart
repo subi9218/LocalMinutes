@@ -8,13 +8,16 @@ import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:async';
 import 'core/constants/app_constants.dart';
+import 'core/l10n/app_tr.dart';
 import 'core/ffi/on_device_model_manager.dart';
 import 'core/services/app_settings.dart';
 import 'core/services/auto_delete_service.dart';
+import 'core/services/backup_service.dart';
 import 'core/services/crash_log_service.dart';
 import 'core/services/entitlement_service.dart';
 import 'core/services/isar_service.dart';
 import 'core/services/menu_bar_service.dart';
+import 'core/services/model_prewarm_service.dart';
 import 'core/services/native_appearance.dart';
 import 'core/services/processing_status_service.dart';
 import 'core/services/security_scoped_bookmark_service.dart';
@@ -28,6 +31,7 @@ import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/language_setup_screen.dart';
 import 'presentation/screens/setup_screen.dart';
 import 'presentation/screens/storage_setup_screen.dart';
+import 'presentation/widgets/app_notice.dart';
 
 void main() async {
   // 충돌·예외 캡처 핸들러 — 모든 init보다 먼저 설치
@@ -53,6 +57,10 @@ void main() async {
       // 저장 폴더 미준비로 간주해 저장 폴더 화면을 보여준다(창은 항상 렌더).
       if (storageReady) {
         try {
+          // 복원 도중 강제종료된 흔적이 있으면 원본 라이브러리를 먼저 되살린다.
+          await BackupService.recoverInterruptedRestoreIfNeeded(
+            AppSettings.instance.recordingsSavePath.trim(),
+          );
           await IsarService.instance.init();
         } catch (e, st) {
           CrashLogService.instance.recordCaught(e, st, context: 'isarInit');
@@ -155,6 +163,7 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
   @override
   void initState() {
     super.initState();
+    AppNotice.attach(_navigatorKey); // 전역 알림(HUD) 오버레이 연결
     _showHome = widget.modelsOk || AppSettings.instance.modelsSetupComplete;
     _storageReady = widget.storageReady;
     _languageChosen = AppSettings.instance.languageChosen;
@@ -197,6 +206,16 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
       ) {
         unawaited(_syncTrayStartState());
       });
+
+      // 모델 프리워밍 — macOS 업데이트 후 첫 녹음이 ANE 재컴파일로 몇 분씩
+      // 대기하지 않도록, 시작 15초 뒤 유휴 상태에서 미리 컴파일해 둔다.
+      // (온보딩 중이거나 모델 미설치면 서비스가 알아서 건너뛴다)
+      if (_showHome && _storageReady) {
+        unawaited(
+          Future<void>.delayed(const Duration(seconds: 15))
+              .then((_) => ModelPrewarmService.maybePrewarm()),
+        );
+      }
     });
   }
 
@@ -241,16 +260,24 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
 
   String? _activeWorkLabel() {
     final mic = MicrophoneService.instance;
-    if (mic.isRecording) return '녹음';
-    if (mic.isPaused) return '일시 정지된 녹음';
+    if (mic.isRecording) return tr('녹음', 'recording');
+    if (mic.isPaused) return tr('일시 정지된 녹음', 'paused recording');
     // 상세 화면의 다시 전사/재요약은 모델 로드·화자분리·DB 저장 구간에서
     // native task가 잠시 비활성일 수 있으므로 전역 처리상태를 우선 확인.
     final job = ProcessingStatus.instance.active.value;
-    if (job != null) return job.kind == 'transcribe' ? '전사' : '요약';
+    if (job != null) {
+      return job.kind == 'transcribe'
+          ? tr('전사', 'transcription')
+          : tr('요약', 'summarization');
+    }
     final native = OnDeviceModelManager.instance.nativeTaskSnapshot;
     if (native.activeLabel != null) return native.activeLabel;
-    if (LlmService.instance.isGenerationActive) return '요약 생성';
-    if (native.queuedLabel != null) return '대기 중인 ${native.queuedLabel}';
+    if (LlmService.instance.isGenerationActive) {
+      return tr('요약 생성', 'summary generation');
+    }
+    if (native.queuedLabel != null) {
+      return tr('대기 중인 ${native.queuedLabel}', 'queued ${native.queuedLabel}');
+    }
     return null;
   }
 
@@ -264,35 +291,38 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
 
     _exitPromptShowing = true;
     try {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showMacosAlertDialog<bool>(
         context: ctx,
         barrierDismissible: false,
-        builder: (dialogCtx) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-              const SizedBox(width: 8),
-              const Flexible(child: Text('작업이 진행 중입니다')),
-            ],
+        builder: (dialogCtx) => MacosAlertDialog(
+          appIcon: const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange,
+            size: 48,
           ),
-          content: Text(
-            '현재 $label 작업 중입니다.\n'
-            '종료하면 진행 중인 작업이 중단되거나 결과가 저장되지 않을 수 있습니다.\n\n'
-            '앱을 종료할까요?',
+          title: Text(tr('작업이 진행 중입니다', 'A task is in progress')),
+          message: Text(
+            tr(
+              '현재 $label 작업 중입니다.\n'
+                  '종료하면 진행 중인 작업이 중단되거나 결과가 저장되지 않을 수 있습니다.\n\n'
+                  '앱을 종료할까요?',
+              'A $label task is currently running.\n'
+                  'Quitting now may interrupt it or lose unsaved results.\n\n'
+                  'Quit the app?',
+            ),
+            textAlign: TextAlign.center,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade600,
-              ),
-              child: const Text('종료'),
-            ),
-          ],
+          primaryButton: PushButton(
+            controlSize: ControlSize.large,
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: Text(tr('종료', 'Quit')),
+          ),
+          secondaryButton: PushButton(
+            controlSize: ControlSize.large,
+            secondary: true,
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(tr('취소', 'Cancel')),
+          ),
         ),
       );
       return confirmed == true;
@@ -318,15 +348,25 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
     await _showAppWindow();
     if (!_storageReady) {
       await _showTrayStartBlockedDialog(
-        title: '저장 폴더 선택이 필요합니다',
-        message: '회의 녹음을 시작하려면 먼저 녹음 파일을 저장할 폴더를 선택해주세요.',
+        title: tr('저장 폴더 선택이 필요합니다', 'Choose a save folder first'),
+        message: tr('회의 녹음을 시작하려면 먼저 녹음 파일을 저장할 폴더를 선택해주세요.',
+            'To start recording, please choose a folder for your recordings first.'),
       );
       return;
     }
     if (!_showHome) {
       await _showTrayStartBlockedDialog(
-        title: 'AI 모델 준비가 필요합니다',
-        message: '트레이에서 바로 녹음하려면 먼저 음성 인식 모델과 요약 모델을 준비해주세요.',
+        title: tr('AI 모델 준비가 필요합니다', 'AI models need to be set up'),
+        message: tr('트레이에서 바로 녹음하려면 먼저 음성 인식 모델과 요약 모델을 준비해주세요.',
+            'To record from the menu bar, please set up the speech and summary models first.'),
+      );
+      return;
+    }
+    if (BackupService.isBusy) {
+      await _showTrayStartBlockedDialog(
+        title: tr('백업/복원이 진행 중입니다', 'A backup or restore is in progress'),
+        message: tr('백업/복원이 끝난 뒤 녹음을 시작해주세요.',
+            'Please start recording after the backup or restore finishes.'),
       );
       return;
     }
@@ -334,8 +374,9 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         OnDeviceModelManager.instance.nativeTaskSnapshot.activeLabel;
     if (activeTask != null) {
       await _showTrayStartBlockedDialog(
-        title: 'AI 작업이 진행 중입니다',
-        message: '현재 $activeTask 작업 중입니다. 작업이 끝난 뒤 빠른 녹음을 시작해주세요.',
+        title: tr('AI 작업이 진행 중입니다', 'An AI task is in progress'),
+        message: tr('현재 $activeTask 작업 중입니다. 작업이 끝난 뒤 빠른 녹음을 시작해주세요.',
+            '$activeTask is currently running. Please start quick recording after it finishes.'),
       );
       await _syncTrayStartState();
       return;
@@ -357,23 +398,21 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
   }) async {
     final ctx = _navigatorKey.currentContext;
     if (!mounted || ctx == null) return;
-    await showDialog<void>(
+    await showMacosAlertDialog<void>(
       context: ctx,
-      builder: (dialogCtx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.info_outline_rounded),
-            const SizedBox(width: 8),
-            Flexible(child: Text(title)),
-          ],
+      builder: (dialogCtx) => MacosAlertDialog(
+        appIcon: const Icon(
+          Icons.info_outline_rounded,
+          color: Colors.blueGrey,
+          size: 48,
         ),
-        content: Text(message),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('확인'),
-          ),
-        ],
+        title: Text(title),
+        message: Text(message, textAlign: TextAlign.center),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () => Navigator.of(dialogCtx).pop(),
+          child: Text(tr('확인', 'OK')),
+        ),
       ),
     );
   }
@@ -390,7 +429,9 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
         : TrayStartState.ready;
     return MenuBarService.instance.setStartState(
       state,
-      busyLabel: activeTask == null ? null : '$activeTask 중...',
+      busyLabel: activeTask == null
+          ? null
+          : tr('$activeTask 중...', '$activeTask...'),
     );
   }
 
@@ -562,13 +603,13 @@ class _MeetingAssistantAppState extends ConsumerState<MeetingAssistantApp>
                 ? const Color(0xFF1E1E1E)
                 : Colors.white,
           ),
-          // MacosApp 은 자동으로 ScaffoldMessenger 를 제공하지 않는다 (MaterialApp 과 차이).
-          // SnackBar 호출이 죽지 않도록 root 에 ScaffoldMessenger 를 명시 추가.
           // S1: _GlobalShortcuts 를 Navigator 위(builder)에 두어 모든 라우트
           // (pushReplacement 로 전환된 화면 포함)에서 전역 단축키가 살아 있도록 한다.
-          child: _GlobalShortcuts(
+          // (알림은 AppNotice(HUD)로 통일되어 루트 ScaffoldMessenger는 제거 — 2.3)
+          child: _AppMenuBar(
             ref: ref,
-            child: ScaffoldMessenger(
+            child: _GlobalShortcuts(
+              ref: ref,
               child: Material(
                 type: MaterialType.transparency,
                 child: child ?? const SizedBox.shrink(),
@@ -629,6 +670,137 @@ class _GlobalShortcuts extends StatelessWidget {
             _bump(shortcutOpenSettingsSignalProvider),
       },
       child: Focus(autofocus: true, child: child),
+    );
+  }
+}
+
+/// macOS 메뉴바(NSMenu)에 앱 명령을 등록한다.
+///
+/// 예전에는 명령이 CallbackShortcuts로만 존재해 메뉴바가 빈 템플릿
+/// 그대로였다 — 사용자가 메뉴에서 기능을 발견할 수 없고, 죽은
+/// 'Preferences…' 항목이 남는 등 Mac 앱의 기본 요건에 미달했다.
+class _AppMenuBar extends StatelessWidget {
+  final WidgetRef ref;
+  final Widget child;
+
+  const _AppMenuBar({required this.ref, required this.child});
+
+  void _bump(StateProvider<int> provider) {
+    ref.read(provider.notifier).update((s) => s + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PlatformMenuBar(
+      menus: [
+        PlatformMenu(
+          label: 'Local Minutes',
+          menus: [
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.about))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.about,
+                  ),
+              ],
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                PlatformMenuItem(
+                  label: tr('설정…', 'Settings…'),
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.comma,
+                    meta: true,
+                  ),
+                  onSelected: () =>
+                      _bump(shortcutOpenSettingsSignalProvider),
+                ),
+              ],
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.hide))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.hide,
+                  ),
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.hideOtherApplications))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.hideOtherApplications,
+                  ),
+              ],
+            ),
+            if (PlatformProvidedMenuItem.hasMenu(
+                PlatformProvidedMenuItemType.quit))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.quit,
+              ),
+          ],
+        ),
+        PlatformMenu(
+          label: tr('파일', 'File'),
+          menus: [
+            PlatformMenuItem(
+              label: tr('새 녹음', 'New Recording'),
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyR,
+                meta: true,
+                shift: true,
+              ),
+              onSelected: () => _bump(shortcutToggleRecordSignalProvider),
+            ),
+            PlatformMenuItem(
+              label: tr('요약 실행', 'Run Summary'),
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyS,
+                meta: true,
+                shift: true,
+              ),
+              onSelected: () => _bump(shortcutRunSummarySignalProvider),
+            ),
+          ],
+        ),
+        PlatformMenu(
+          label: tr('편집', 'Edit'),
+          menus: [
+            PlatformMenuItem(
+              label: tr('검색', 'Find'),
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyF,
+                meta: true,
+              ),
+              onSelected: () => _bump(shortcutFocusSearchSignalProvider),
+            ),
+          ],
+        ),
+        PlatformMenu(
+          label: tr('윈도우', 'Window'),
+          menus: [
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.minimizeWindow))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.minimizeWindow,
+                  ),
+                if (PlatformProvidedMenuItem.hasMenu(
+                    PlatformProvidedMenuItemType.zoomWindow))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.zoomWindow,
+                  ),
+              ],
+            ),
+            if (PlatformProvidedMenuItem.hasMenu(
+                PlatformProvidedMenuItemType.toggleFullScreen))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.toggleFullScreen,
+              ),
+          ],
+        ),
+      ],
+      child: child,
     );
   }
 }

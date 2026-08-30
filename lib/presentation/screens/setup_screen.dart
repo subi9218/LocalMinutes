@@ -15,6 +15,8 @@ import '../../core/services/crash_log_service.dart';
 import '../../core/services/model_download_service.dart';
 import '../../core/services/user_error_message.dart';
 import 'home_screen.dart';
+import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 PageRouteBuilder<void> _instantRoute(Widget child) => PageRouteBuilder<void>(
   pageBuilder: (_, _, _) => child,
@@ -585,13 +587,10 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? Colors.red.shade700 : null,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-      ),
+    AppNotice.show(
+      msg,
+      kind: isError ? NoticeKind.error : NoticeKind.info,
+      duration: const Duration(seconds: 5),
     );
   }
 
@@ -670,7 +669,7 @@ class _SetupScreenState extends State<SetupScreen> {
               const SizedBox(height: 2),
               Text(
                 tr('회의록을 위한 AI 모델 준비', 'Set up the on-device AI models'),
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 13, color: mutedText(context)),
               ),
             ],
           ),
@@ -722,14 +721,14 @@ class _SetupScreenState extends State<SetupScreen> {
             style: TextStyle(
               fontSize: 12.5,
               height: 1.4,
-              color: Colors.grey.shade600,
+              color: mutedText(context),
             ),
           ),
           const SizedBox(height: 14),
 
           // 두 필수 항목 상태
           _RequiredRow(
-            label: tr('음성 인식 (받아쓰기)', 'Speech recognition'),
+            label: tr('음성 인식', 'Speech recognition'),
             ok: _anyStt,
             scheme: scheme,
           ),
@@ -781,7 +780,7 @@ class _SetupScreenState extends State<SetupScreen> {
               children: [
                 Text(
                   '${bulkDl.receivedStr} / ${bulkDl.totalStr}',
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11.5, color: mutedText(context)),
                 ),
                 const Spacer(),
                 TextButton(
@@ -840,7 +839,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 style: TextStyle(
                   fontSize: 11.5,
                   height: 1.4,
-                  color: Colors.grey.shade600,
+                  color: mutedText(context),
                 ),
               ),
             ],
@@ -887,7 +886,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       ? Icons.expand_less_rounded
                       : Icons.expand_more_rounded,
                   size: 18,
-                  color: Colors.grey.shade600,
+                  color: mutedText(context),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -895,7 +894,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
+                    color: mutedText(context),
                   ),
                 ),
               ],
@@ -986,7 +985,7 @@ class _SetupScreenState extends State<SetupScreen> {
             '정확도, 속도, 발화자 라벨이 필요할 때 추가합니다.',
             'Add these for higher accuracy, speed, or speaker labels.',
           ),
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 12, color: mutedText(context)),
         ),
         const SizedBox(height: 10),
         _ModelDownloadCard(
@@ -1148,22 +1147,22 @@ class _SetupScreenState extends State<SetupScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: tintBg(context, Colors.amber),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: tintBorder(context, Colors.amber)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.key, size: 16, color: Colors.amber.shade800),
+              Icon(Icons.key, size: 16, color: tintFg(context, Colors.amber)),
               const SizedBox(width: 6),
               Text(
                 tr('HuggingFace 토큰', 'HuggingFace token'),
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: Colors.amber.shade900,
+                  color: tintFg(context, Colors.amber),
                 ),
               ),
               const Spacer(),
@@ -1184,7 +1183,7 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
             style: TextStyle(
               fontSize: 11,
-              color: Colors.amber.shade900,
+              color: tintFg(context, Colors.amber),
               height: 1.5,
             ),
           ),
@@ -1420,7 +1419,7 @@ class _ModelDownloadCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontFamily: 'monospace',
-                        color: Colors.grey.shade600,
+                        color: mutedText(context),
                       ),
                     ),
                   ],
@@ -1442,7 +1441,7 @@ class _ModelDownloadCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.green.shade700,
+                      color: tintFg(context, Colors.green),
                     ),
                   ),
                 )
@@ -1453,7 +1452,7 @@ class _ModelDownloadCard extends StatelessWidget {
                   label: Text(tr('취소', 'Cancel')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red.shade600,
-                    side: BorderSide(color: Colors.red.shade300),
+                    side: BorderSide(color: tintBorder(context, Colors.red)),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 6,
@@ -1492,7 +1491,7 @@ class _ModelDownloadCard extends StatelessWidget {
               children: [
                 Text(
                   '${dlState.receivedStr} / ${dlState.totalStr}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: mutedText(context)),
                 ),
                 const Spacer(),
                 if (dlState.speedStr.isNotEmpty)
@@ -1513,7 +1512,7 @@ class _ModelDownloadCard extends StatelessWidget {
               dlState.errorMsg,
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.red.shade700,
+                color: tintFg(context, Colors.red),
                 height: 1.4,
               ),
             ),

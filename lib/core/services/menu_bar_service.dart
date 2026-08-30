@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:tray_manager/tray_manager.dart';
+import '../l10n/app_tr.dart';
 
 enum TrayStartState { ready, storageRequired, modelsRequired, busy }
 
@@ -126,47 +127,49 @@ class MenuBarService with TrayListener {
         if (_recording) ...[
           MenuItem(
             key: 'recording_status',
-            label: '녹음 중 · $elapsedStr',
+            label: tr('녹음 중 · $elapsedStr', 'Recording · $elapsedStr'),
             disabled: true,
           ),
           MenuItem.separator(),
-          MenuItem(key: 'bookmark', label: '북마크 추가  (⌘B)'),
-          MenuItem(key: 'stop', label: '■ 녹음 정지  (⌘⇧R)'),
+          MenuItem(key: 'bookmark', label: tr('북마크 추가  (⌘B)', 'Add Bookmark  (⌘B)')),
+          MenuItem(key: 'stop', label: tr('■ 녹음 정지  (⌘⇧R)', '■ Stop Recording  (⌘⇧R)')),
         ] else ...[
           _startMenuItem(),
         ],
         MenuItem.separator(),
-        MenuItem(key: 'show', label: '앱 창 열기'),
+        MenuItem(key: 'show', label: tr('앱 창 열기', 'Open Local Minutes')),
         MenuItem.separator(),
-        MenuItem(key: 'quit', label: '종료'),
+        MenuItem(key: 'quit', label: tr('종료', 'Quit')),
       ],
     );
     await trayManager.setContextMenu(menu);
     await trayManager.setToolTip(
-      _recording ? 'Local Minutes — 녹음 중 ($elapsedStr)' : _idleToolTip(),
+      _recording
+          ? tr('Local Minutes — 녹음 중 ($elapsedStr)', 'Local Minutes — Recording ($elapsedStr)')
+          : _idleToolTip(),
     );
   }
 
   MenuItem _startMenuItem() {
     switch (_startState) {
       case TrayStartState.ready:
-        return MenuItem(key: 'start', label: '빠른 녹음 시작  (⌘⇧R)');
+        return MenuItem(key: 'start', label: tr('빠른 녹음 시작  (⌘⇧R)', 'Quick Record  (⌘⇧R)'));
       case TrayStartState.storageRequired:
         return MenuItem(
           key: 'storage_required',
-          label: '저장 폴더 설정 필요',
+          label: tr('저장 폴더 설정 필요', 'Save folder setup required'),
           disabled: true,
         );
       case TrayStartState.modelsRequired:
         return MenuItem(
           key: 'models_required',
-          label: 'AI 모델 준비 필요',
+          label: tr('AI 모델 준비 필요', 'AI model setup required'),
           disabled: true,
         );
       case TrayStartState.busy:
         return MenuItem(
           key: 'busy',
-          label: _busyLabel ?? '처리 중',
+          label: _busyLabel ?? tr('처리 중', 'Processing'),
           disabled: true,
         );
     }
@@ -177,11 +180,11 @@ class MenuBarService with TrayListener {
       case TrayStartState.ready:
         return 'Local Minutes';
       case TrayStartState.storageRequired:
-        return 'Local Minutes — 저장 폴더 설정 필요';
+        return tr('Local Minutes — 저장 폴더 설정 필요', 'Local Minutes — Save folder setup required');
       case TrayStartState.modelsRequired:
-        return 'Local Minutes — AI 모델 준비 필요';
+        return tr('Local Minutes — AI 모델 준비 필요', 'Local Minutes — AI model setup required');
       case TrayStartState.busy:
-        return 'Local Minutes — ${_busyLabel ?? '처리 중'}';
+        return 'Local Minutes — ${_busyLabel ?? tr('처리 중', 'Processing')}';
     }
   }
 

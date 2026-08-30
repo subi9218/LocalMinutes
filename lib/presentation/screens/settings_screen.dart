@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import '../../core/constants/legal_notices.dart';
 import '../../core/l10n/app_tr.dart';
 import '../../core/services/app_settings.dart';
 import '../../core/services/auto_delete_service.dart';
+import '../../core/services/backup_service.dart';
 import '../../core/services/crash_log_service.dart';
 import '../../core/services/diagnostic_export_service.dart';
 import '../../core/services/isar_service.dart';
@@ -22,9 +24,12 @@ import '../../core/services/summary_templates.dart';
 import '../../core/services/user_error_message.dart';
 import '../../core/ffi/on_device_model_manager.dart';
 import '../../data/datasources/llm_service.dart';
+import '../providers/meeting_providers.dart';
 import '../../data/datasources/microphone_service.dart';
 import '../../data/datasources/system_audio_service.dart';
 import '../providers/settings_providers.dart';
+import '../widgets/app_notice.dart';
+import '../widgets/theme_tint.dart';
 
 /// 설정 다이얼로그 열기 헬퍼
 void showSettingsDialog(BuildContext context, WidgetRef ref) {
@@ -207,13 +212,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       _diarEmbDl.status == _DlStatus.downloading;
 
   void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : null,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-      ),
+    AppNotice.show(
+      message,
+      kind: isError ? NoticeKind.error : NoticeKind.info,
+      duration: const Duration(seconds: 4),
     );
   }
 
@@ -371,6 +373,320 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       return tr('요약 생성', 'summary generation');
     }
     return null;
+  }
+
+  // ── 전체 백업 / 복원 ───────────────────────────────────────────────
+  bool _backupBusy = false;
+
+  /// 진행 다이얼로그 — phase 문구가 갱신되는 모달.
+  /// 다이얼로그의 컨텍스트를 보관해, 위에 다른 라우트(설정 재진입·녹음 준비
+  /// 다이얼로그 등)가 떠 있어도 '이 다이얼로그만' 정확히 닫는다.
+  BuildContext? _backupProgressCtx;
+
+  void _showBackupProgress(ValueNotifier<String> phase, String title) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        _backupProgressCtx = dialogCtx;
+        return AlertDialog(
+          title: Text(title),
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: ValueListenableBuilder<String>(
+                  valueListenable: phase,
+                  builder: (context, v, child) =>
+                      Text(v, style: const TextStyle(fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _popBackupProgress() {
+    final ctx = _backupProgressCtx;
+    _backupProgressCtx = null;
+    if (ctx != null && ctx.mounted) {
+      Navigator.of(ctx).pop();
+    }
+  }
+
+  Future<void> _exportFullBackup() async {
+    if (_backupBusy) return;
+    final busy = _activeWorkLabel();
+    if (busy != null) {
+      _showSnack(
+        tr('$busy 작업 중에는 백업할 수 없습니다. 작업이 끝난 뒤 다시 시도하세요.',
+            'Cannot back up while $busy is in progress. Try again after it finishes.'),
+        isError: true,
+      );
+      return;
+    }
+    if (!IsarService.instance.isOpen) {
+      _showSnack(tr('저장 폴더가 설정된 뒤에 백업할 수 있습니다.',
+          'Backup is available after a save folder is set up.'), isError: true);
+      return;
+    }
+
+    // 미리보기 + 오디오 포함 선택
+    final est = await BackupService.estimate();
+    if (!mounted) return;
+    var includeAudio = true;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(tr('전체 백업 내보내기', 'Export full backup')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr('회의록 ${est.meetings}개의 데이터·설정을 하나의 ZIP 파일로 저장합니다.',
+                    'Saves ${est.meetings} meeting(s), their data, and settings into a single ZIP file.'),
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                value: includeAudio,
+                onChanged: (v) => setLocal(() => includeAudio = v ?? true),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(
+                  tr('녹음 오디오 포함 (${est.audioFiles}개 · ${est.audioMb >= 1024 ? '${(est.audioMb / 1024).toStringAsFixed(1)} GB' : '${est.audioMb.toStringAsFixed(0)} MB'})',
+                      'Include audio (${est.audioFiles} files · ${est.audioMb >= 1024 ? '${(est.audioMb / 1024).toStringAsFixed(1)} GB' : '${est.audioMb.toStringAsFixed(0)} MB'})'),
+                  style: const TextStyle(fontSize: 13),
+                ),
+                subtitle: Text(
+                  tr('끄면 전사·요약만 백업되어 파일이 작아집니다.',
+                      'Turn off to back up transcripts and summaries only (smaller file).'),
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(tr('취소', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(tr('내보내기…', 'Export…')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (proceed != true || !mounted) return;
+
+    final now = DateTime.now();
+    final stamp =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final location = await getSaveLocation(
+      suggestedName: 'LocalMinutes-backup-$stamp.zip',
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'ZIP', extensions: ['zip']),
+      ],
+    );
+    if (location == null || !mounted) return;
+
+    // 파일 선택기 대기 중 녹음/작업이 시작됐을 수 있다 — 재검사(TOCTOU).
+    final busyNow = _activeWorkLabel();
+    if (busyNow != null) {
+      _showSnack(
+        tr('$busyNow 작업이 시작되어 백업을 중단했습니다. 완료 후 다시 시도하세요.',
+            'A $busyNow task started — backup cancelled. Try again after it finishes.'),
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _backupBusy = true);
+    final phase = ValueNotifier<String>(tr('준비 중...', 'Preparing...'));
+    _showBackupProgress(phase, tr('백업 내보내는 중', 'Exporting backup'));
+    try {
+      await BackupService.exportBackup(
+        zipPath: location.path,
+        includeAudio: includeAudio,
+        onProgress: (p) => phase.value = p,
+      );
+      _popBackupProgress();
+      _showSnack(tr('백업 완료 — ${location.path.split('/').last}',
+          'Backup complete — ${location.path.split('/').last}'));
+    } catch (e) {
+      _popBackupProgress();
+      final friendly = friendlyErrorMessage(
+        e,
+        fallbackTitle: tr('백업을 만들지 못했습니다', 'Could not create the backup'),
+        fallbackMessage:
+            tr('백업 파일 생성 중 문제가 발생했습니다.', 'A problem occurred while creating the backup.'),
+        nextStep: tr('디스크 여유 공간을 확인한 뒤 다시 시도해주세요.',
+            'Check free disk space and try again.'),
+      );
+      _showSnack(friendly.fullText, isError: true);
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _importFullBackup() async {
+    if (_backupBusy) return;
+    final busy = _activeWorkLabel();
+    if (busy != null) {
+      _showSnack(
+        tr('$busy 작업 중에는 복원할 수 없습니다. 작업이 끝난 뒤 다시 시도하세요.',
+            'Cannot restore while $busy is in progress. Try again after it finishes.'),
+        isError: true,
+      );
+      return;
+    }
+    if (!IsarService.instance.isOpen) {
+      _showSnack(tr('저장 폴더가 설정된 뒤에 복원할 수 있습니다.',
+          'Restore is available after a save folder is set up.'), isError: true);
+      return;
+    }
+
+    final picked = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'ZIP', extensions: ['zip']),
+      ],
+      confirmButtonText: tr('열기', 'Open'),
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _backupBusy = true);
+    final phase = ValueNotifier<String>(tr('백업 파일 확인 중...', 'Checking the backup file...'));
+    _showBackupProgress(phase, tr('백업 가져오는 중', 'Importing backup'));
+
+    Directory? staging;
+    try {
+      final info = await BackupService.inspectBackup(picked.path);
+      staging = info.stagingDir;
+      _popBackupProgress();
+      if (!mounted) {
+        await BackupService.discardStaging(staging);
+        return;
+      }
+
+      final createdAt = DateTime.tryParse(info.createdAt);
+      final createdStr = createdAt == null
+          ? info.createdAt
+          : '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')} ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(tr('백업에서 복원', 'Restore from backup')),
+          content: Text(
+            tr(
+              '백업 생성일: $createdStr\n오디오 파일: ${info.audioCount}개\n\n'
+                  '복원하면 현재 회의록 전체가 이 백업 시점의 내용으로 대체됩니다.\n'
+                  '지금 있는 데이터는 저장 폴더 안에 "Local Minutes Data.before-restore-…" 이름으로 보존되므로 나중에 되돌릴 수 있습니다.\n\n'
+                  '계속할까요?',
+              'Backup created: $createdStr\nAudio files: ${info.audioCount}\n\n'
+                  'Restoring will replace all current meetings with the contents of this backup.\n'
+                  'Your current data is preserved in the save folder as "Local Minutes Data.before-restore-…" so you can go back later.\n\n'
+                  'Continue?',
+            ),
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(tr('취소', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(tr('복원', 'Restore')),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true || !mounted) {
+        await BackupService.discardStaging(staging);
+        return;
+      }
+
+      // 확인 다이얼로그 대기 중 녹음/작업이 시작됐을 수 있다 — 재검사(TOCTOU).
+      // (복원은 DB를 닫으므로 라이브 작업과 절대 겹치면 안 된다)
+      final busyNow = _activeWorkLabel();
+      if (busyNow != null) {
+        await BackupService.discardStaging(staging);
+        _showSnack(
+          tr('$busyNow 작업이 시작되어 복원을 중단했습니다. 완료 후 다시 시도하세요.',
+              'A $busyNow task started — restore cancelled. Try again after it finishes.'),
+          isError: true,
+        );
+        return;
+      }
+
+      phase.value = tr('복원 중...', 'Restoring...');
+      _showBackupProgress(phase, tr('백업 가져오는 중', 'Importing backup'));
+      final toRestore = staging;
+      staging = null; // 이 시점부터 정리는 restoreBackup 소유 (이중 삭제 방지)
+      await BackupService.restoreBackup(
+        stagingDir: toRestore,
+        onProgress: (p) => phase.value = p,
+      );
+      _popBackupProgress();
+
+      // 목록·상세 캐시 전부 새로고침 (id 재사용으로 낡은 전사/요약이
+      // 보이지 않도록 family provider까지 무효화)
+      widget.ref.invalidate(meetingsProvider);
+      widget.ref.invalidate(groupsProvider);
+      widget.ref.invalidate(allSummariesProvider);
+      widget.ref.invalidate(meetingTranscriptProvider);
+      widget.ref.invalidate(meetingSummaryProvider);
+      widget.ref.invalidate(summaryVersionsProvider);
+      widget.ref.read(selectedMeetingIdProvider.notifier).state = null;
+      widget.ref.read(selectedGroupIdProvider.notifier).state = null;
+
+      // 가져온 테마·언어를 즉시 반영 (재시작 불필요)
+      widget.ref.read(themeModeProvider.notifier).state =
+          switch (AppSettings.instance.themeMode) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+      widget.ref.read(languageProvider.notifier).state =
+          AppSettings.instance.effectiveLanguageCode;
+      if (mounted) setState(() {}); // 설정 화면 자체도 가져온 값으로 다시 그림
+
+      unawaited(_loadStorageInfo());
+      _showSnack(tr('복원 완료 — 회의록이 백업 시점으로 돌아왔습니다.',
+          'Restore complete — your meetings are back to the backup state.'));
+    } catch (e) {
+      _popBackupProgress();
+      if (staging != null) {
+        await BackupService.discardStaging(staging);
+      }
+      if (e is BackupRollbackException) {
+        // 롤백까지 실패 — '데이터 무변경' 문구는 사실이 아니므로 정확히 안내
+        _showSnack(e.message, isError: true);
+      } else {
+        final friendly = friendlyErrorMessage(
+          e,
+          fallbackTitle: tr('복원하지 못했습니다', 'Could not restore'),
+          fallbackMessage: tr('백업 파일을 읽거나 적용하는 중 문제가 발생했습니다.',
+              'A problem occurred while reading or applying the backup.'),
+          nextStep: tr('올바른 Local Minutes 백업(.zip)인지 확인해주세요. 기존 데이터는 되돌려졌습니다.',
+              'Make sure the file is a valid Local Minutes backup (.zip). Your existing data was rolled back.'),
+        );
+        _showSnack(friendly.fullText, isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
   }
 
   // ── 폴더 선택 ─────────────────────────────────────────────────────
@@ -614,14 +930,11 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 await _checkModels();
                 if (!mounted) return;
                 setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      tr('${AppSettings.sttProcessingModeLabel(next)} 방식으로 전환했습니다.',
+                AppNotice.show(
+                  tr('${AppSettings.sttProcessingModeLabel(next)} 방식으로 전환했습니다.',
                           'Switched to ${AppSettings.sttProcessingModeLabel(next)} mode.'),
-                    ),
-                    duration: const Duration(seconds: 3),
-                  ),
+                  kind: NoticeKind.info,
+                  duration: const Duration(seconds: 3),
                 );
               }
             },
@@ -716,11 +1029,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     await settings.setMicGuideShown(false);
                     setState(() {});
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(tr('가이드가 초기화되었습니다. 다음 녹음 시작 시 다시 표시됩니다.',
-                              'The guide has been reset. It will appear again the next time you start recording.')),
-                        ),
+                      AppNotice.show(
+                        tr('가이드가 초기화되었습니다. 다음 녹음 시작 시 다시 표시됩니다.',
+                              'The guide has been reset. It will appear again the next time you start recording.'),
+                        kind: NoticeKind.info,
                       );
                     }
                   }
@@ -871,7 +1183,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 Icon(
                   Icons.lightbulb_outline,
                   size: 14,
-                  color: Colors.amber.shade700,
+                  color: tintFg(context, Colors.amber),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -1054,6 +1366,35 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
         const Divider(height: 20),
 
+        // 전체 백업 / 복원
+        _SettingRow(
+          title: tr('전체 백업', 'Full backup'),
+          subtitle: tr(
+              '회의록·오디오·설정을 하나의 ZIP으로 저장하거나, 백업에서 복원합니다. 새 Mac으로 옮길 때도 사용하세요.',
+              'Save all meetings, audio, and settings to a single ZIP — or restore from one. Also useful when moving to a new Mac.'),
+          trailing: const SizedBox.shrink(),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _backupBusy ? null : _exportFullBackup,
+                  icon: const Icon(Icons.archive_outlined, size: 16),
+                  label: Text(tr('백업 내보내기…', 'Export Backup…')),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _backupBusy ? null : _importFullBackup,
+                  icon: const Icon(Icons.unarchive_outlined, size: 16),
+                  label: Text(tr('백업 가져오기…', 'Import Backup…')),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const Divider(height: 20),
+
         // 자동 삭제
         _SettingRow(
           title: tr('오래된 녹음 파일 자동 삭제', 'Auto-delete old recordings'),
@@ -1113,7 +1454,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               padding: const EdgeInsets.only(left: 16),
               child: Text(
                 _deleteResult!,
-                style: TextStyle(fontSize: 11, color: Colors.green.shade700),
+                style: TextStyle(fontSize: 11, color: tintFg(context, Colors.green)),
               ),
             ),
           ],
@@ -1781,8 +2122,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       await CrashLogService.instance.clearLog();
                       await _loadCrashLogInfo();
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(tr('로그가 비워졌습니다.', 'Logs cleared.'))),
+                      AppNotice.show(
+                        tr('로그가 비워졌습니다.', 'Logs cleared.'),
+                        kind: NoticeKind.info,
                       );
                     }
                   },
@@ -1808,25 +2150,22 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       final path = await DiagnosticExportService.exportWithSavePanel();
       if (!mounted) return;
       if (path == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-            content: Text(tr('진단 자료 내보내기를 취소했습니다.',
-                'Diagnostic export was cancelled.'))));
+        AppNotice.show(
+          tr('진단 자료 내보내기를 취소했습니다.',
+                'Diagnostic export was cancelled.'),
+          kind: NoticeKind.info,
+        );
       } else {
         await _loadCrashLogInfo();
         await Clipboard.setData(ClipboardData(text: path));
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 8),
-            content: Text(tr('진단 자료를 저장했습니다. 파일 경로도 복사했습니다.',
-                'Diagnostic data saved. The file path was also copied.')),
-            action: SnackBarAction(
-              label: tr('Finder 열기', 'Open in Finder'),
-              onPressed: () => _openPathInFinder(path),
-            ),
-          ),
+        AppNotice.show(
+          tr('진단 자료를 저장했습니다. 파일 경로도 복사했습니다.',
+              'Diagnostic data saved. The file path was also copied.'),
+          kind: NoticeKind.success,
+          duration: const Duration(seconds: 8),
+          actionLabel: tr('Finder 열기', 'Open in Finder'),
+          onAction: () => _openPathInFinder(path),
         );
       }
     } catch (e, st) {
@@ -1844,12 +2183,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         nextStep: tr('저장 위치 권한과 디스크 여유 공간을 확인한 뒤 다시 시도해주세요.',
             'Check the save location permissions and free disk space, then try again.'),
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(friendly),
-          backgroundColor: Colors.red.shade700,
-          duration: const Duration(seconds: 7),
-        ),
+      AppNotice.show(
+        friendly,
+        kind: NoticeKind.error,
+        duration: const Duration(seconds: 7),
       );
     } finally {
       if (mounted) setState(() => _exportingDiagnostics = false);
@@ -1926,20 +2263,16 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       if (!mounted) return;
       await Clipboard.setData(ClipboardData(text: path));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyErrorText(
+      AppNotice.show(
+        friendlyErrorText(
               e,
               fallbackTitle: tr('파일 위치를 열지 못했습니다', 'Could not open the file location'),
               fallbackMessage: tr('Finder에서 폴더를 열 수 없습니다. 대신 경로를 복사했습니다.',
                   'Could not open the folder in Finder. The path was copied instead.'),
               nextStep: path,
             ),
-          ),
-          backgroundColor: Colors.orange.shade700,
-          duration: const Duration(seconds: 7),
-        ),
+        kind: NoticeKind.warning,
+        duration: const Duration(seconds: 7),
       );
     }
   }
@@ -2021,10 +2354,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: content));
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(tr('로그를 클립보드에 복사했습니다.',
-                          'Logs copied to clipboard.'))),
+                AppNotice.show(
+                  tr('로그를 클립보드에 복사했습니다.',
+                          'Logs copied to clipboard.'),
+                  kind: NoticeKind.info,
                 );
               },
             ),
